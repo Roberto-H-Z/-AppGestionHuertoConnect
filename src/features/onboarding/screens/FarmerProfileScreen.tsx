@@ -55,8 +55,7 @@ export const FarmerProfileScreen: React.FC<{ navigation?: any }> = ({ navigation
     );
 
     const handleNext = () => {
-        console.log('Selected profile:', selectedProfile);
-        // TODO: Navigate to next screen or save profile
+        navigation?.navigate('GardenArea');
     };
 
     return (
