@@ -1,5 +1,5 @@
 export { HomeScreen } from './HomeScreen';
 export { MonitoringScreen } from './MonitoringScreen';
-export { AnalysisScreen } from './AnalysisScreen';
+export { AIChatScreen } from './AIChatScreen';
 export { CommunityScreen } from './CommunityScreen';
-export { SettingsScreen } from './SettingsScreen';
+export { ProfileScreen } from './ProfileScreen';

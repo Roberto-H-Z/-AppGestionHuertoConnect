@@ -2,13 +2,13 @@ import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
-export const AnalysisScreen: React.FC = () => {
+export const AIChatScreen: React.FC = () => {
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
             <View style={styles.content}>
-                <Text style={styles.title}>Análisis</Text>
-                <Text style={styles.subtitle}>Analiza tu cultivo</Text>
+                <Text style={styles.title}>Asistente IA</Text>
+                <Text style={styles.subtitle}>Tu asistente inteligente para el huerto</Text>
             </View>
         </SafeAreaView>
     );
@@ -36,4 +36,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default AnalysisScreen;
+export default AIChatScreen;

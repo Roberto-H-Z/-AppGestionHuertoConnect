@@ -2,13 +2,13 @@ import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
-export const SettingsScreen: React.FC = () => {
+export const ProfileScreen: React.FC = () => {
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
             <View style={styles.content}>
-                <Text style={styles.title}>Ajustes</Text>
-                <Text style={styles.subtitle}>Configuración de la aplicación</Text>
+                <Text style={styles.title}>Perfil</Text>
+                <Text style={styles.subtitle}>Tu perfil de agricultor</Text>
             </View>
         </SafeAreaView>
     );
@@ -36,4 +36,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default SettingsScreen;
+export default ProfileScreen;
