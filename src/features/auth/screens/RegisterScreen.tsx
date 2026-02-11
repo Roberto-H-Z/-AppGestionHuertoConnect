@@ -24,9 +24,7 @@ const BackgroundImage = require('../../../../assets/Fondo login.png');
 
 const { width, height } = Dimensions.get('window');
 
-
-
-export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
+export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
     // Animaciones
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
@@ -77,8 +75,6 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
         >
             <StatusBar style="light" />
 
-
-
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardView}
@@ -113,8 +109,8 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                         </View>
 
                         {/* Título */}
-                        <Text style={styles.title}>HuertoConnect</Text>
-                        <Text style={styles.subtitle}>Cultiva el futuro con tecnología</Text>
+                        <Text style={styles.title}>Únete a HuertoConnect</Text>
+                        <Text style={styles.subtitle}>Forma parte de nuestra comunidad </Text>
                     </Animated.View>
 
                     {/* Formulario con glassmorphism */}
@@ -129,6 +125,33 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                     >
                         <View style={styles.formGlass}>
                             <Input
+                                label="Usuario"
+                                placeholder="Nombre de usuario"
+                                autoCapitalize="none"
+                            />
+
+                            <Input
+                                label="Nombre"
+                                placeholder="Tu nombre"
+                            />
+
+                            <Input
+                                label="Apellido paterno"
+                                placeholder="Apellido paterno"
+                            />
+
+                            <Input
+                                label="Apellido materno"
+                                placeholder="Apellido materno"
+                            />
+
+                            <Input
+                                label="Teléfono"
+                                placeholder="10 dígitos"
+                                keyboardType="phone-pad"
+                            />
+
+                            <Input
                                 label="Correo electrónico"
                                 placeholder="ejemplo@correo.com"
                                 keyboardType="email-address"
@@ -141,19 +164,24 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                                 isPassword
                             />
 
-                            {/* Link olvidé contraseña */}
-                            <TouchableOpacity style={styles.forgotPassword}>
-                                <Text style={styles.forgotPasswordText}>
-                                    ¿Olvidaste tu contraseña?
-                                </Text>
-                            </TouchableOpacity>
-
-                            {/* Botón iniciar sesión */}
-                            <Button
-                                title="Iniciar Sesión"
-                                onPress={() => console.log('Login pressed')}
-                                style={styles.loginButton}
+                            <Input
+                                label="Confirmar contraseña"
+                                placeholder="••••••••"
+                                isPassword
                             />
+
+                            {/* Botón crear cuenta */}
+                            <Button
+                                title="Crear Cuenta"
+                                onPress={() => console.log('Register pressed')}
+                                style={styles.registerButton}
+                            />
+
+                            {/* Términos y privacidad */}
+                            <Text style={styles.termsText}>
+                                Al registrarte, aceptas nuestros{' '}
+                                <Text style={styles.termsLink}>Términos y Privacidad</Text>
+                            </Text>
 
                             {/* Separador */}
                             <View style={styles.separator}>
@@ -162,14 +190,14 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                                 <View style={styles.separatorLine} />
                             </View>
 
-                            {/* Link registro */}
+                            {/* Link login */}
                             <TouchableOpacity
-                                style={styles.registerLink}
-                                onPress={() => navigation?.navigate('Register')}
+                                style={styles.loginLink}
+                                onPress={() => navigation?.goBack()}
                             >
-                                <Text style={styles.registerText}>
-                                    ¿No tienes cuenta?{' '}
-                                    <Text style={styles.registerTextBold}>Regístrate aquí</Text>
+                                <Text style={styles.loginLinkText}>
+                                    ¿Ya tienes cuenta?{' '}
+                                    <Text style={styles.loginLinkBold}>Inicia sesión</Text>
                                 </Text>
                             </TouchableOpacity>
                         </View>
@@ -204,22 +232,22 @@ const styles = StyleSheet.create({
     scrollContent: {
         flexGrow: 1,
         paddingHorizontal: 24,
-        paddingTop: height * 0.08,
+        paddingTop: height * 0.05,
         paddingBottom: 30,
     },
 
     // Header
     headerContainer: {
         alignItems: 'center',
-        marginBottom: 30,
-    },
-    logoContainer: {
         marginBottom: 20,
     },
+    logoContainer: {
+        marginBottom: 12,
+    },
     logoCircle: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
+        width: 80,
+        height: 80,
+        borderRadius: 40,
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
         alignItems: 'center',
         justifyContent: 'center',
@@ -236,27 +264,28 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     logoImage: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
+        width: 80,
+        height: 80,
+        borderRadius: 40,
     },
     title: {
-        fontSize: 28,
+        fontSize: 24,
         fontWeight: '700',
         color: '#fff',
-        marginBottom: 8,
+        marginBottom: 6,
         textShadowColor: 'rgba(0, 0, 0, 0.3)',
         textShadowOffset: { width: 0, height: 2 },
         textShadowRadius: 4,
     },
     subtitle: {
-        fontSize: 16,
+        fontSize: 14,
         color: 'rgba(255, 255, 255, 0.7)',
         fontWeight: '400',
     },
+
     // Formulario
     formContainer: {
-        marginTop: 10,
+        marginTop: 5,
     },
     formGlass: {
         backgroundColor: 'rgba(255, 255, 255, 0.08)',
@@ -273,23 +302,25 @@ const styles = StyleSheet.create({
         shadowRadius: 16,
         elevation: 10,
     },
-    forgotPassword: {
-        alignSelf: 'flex-end',
-        marginBottom: 20,
-        marginTop: -8,
-    },
-    forgotPasswordText: {
-        color: 'rgba(255, 255, 255, 0.7)',
-        fontSize: 14,
-    },
-    loginButton: {
+    registerButton: {
         width: '100%',
-        marginBottom: 20,
+        marginBottom: 16,
+        marginTop: 8,
+    },
+    termsText: {
+        color: 'rgba(255, 255, 255, 0.5)',
+        fontSize: 12,
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    termsLink: {
+        color: '#6ee7b7',
+        fontWeight: '600',
     },
     separator: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginVertical: 16,
+        marginVertical: 12,
     },
     separatorLine: {
         flex: 1,
@@ -301,22 +332,23 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         fontSize: 14,
     },
-    registerLink: {
+    loginLink: {
         alignItems: 'center',
         paddingVertical: 8,
     },
-    registerText: {
+    loginLinkText: {
         color: 'rgba(255, 255, 255, 0.7)',
         fontSize: 14,
     },
-    registerTextBold: {
+    loginLinkBold: {
         color: '#6ee7b7',
         fontWeight: '600',
     },
+
     // Footer
     footer: {
         alignItems: 'center',
-        marginTop: 30,
+        marginTop: 20,
         paddingBottom: 20,
     },
     footerText: {
@@ -325,4 +357,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default LoginScreen;
+export default RegisterScreen;
