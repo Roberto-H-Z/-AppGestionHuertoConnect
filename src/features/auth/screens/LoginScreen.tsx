@@ -151,7 +151,7 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                             {/* Botón iniciar sesión */}
                             <Button
                                 title="Iniciar Sesión"
-                                onPress={() => console.log('Login pressed')}
+                                onPress={() => navigation?.navigate('FarmerProfile')}
                                 style={styles.loginButton}
                             />
 
