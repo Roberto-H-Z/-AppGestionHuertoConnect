@@ -104,8 +104,7 @@ export const GardenAreaScreen: React.FC<{ navigation?: any }> = ({ navigation })
     ).current;
 
     const handleNext = () => {
-        console.log('Garden area:', { length, width: widthNum, area });
-        // TODO: Navigate to next screen
+        navigation?.navigate('LocationWater');
     };
 
     const handleDimensionChange = (
