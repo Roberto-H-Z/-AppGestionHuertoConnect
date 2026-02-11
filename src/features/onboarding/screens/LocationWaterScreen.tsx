@@ -122,11 +122,8 @@ export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation
     };
 
     const handleFinish = () => {
-        console.log('Setup complete:', {
-            location: locationText,
-            waterAccess: selectedWater,
-        });
-        // TODO: Navigate to main app / dashboard
+        navigation?.navigate('Main');
+
     };
 
     const waterOptions: { type: WaterAccessType; icon: string; label: string; description: string }[] = [
