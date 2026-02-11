@@ -9,9 +9,11 @@ import {
     Animated,
     SafeAreaView,
     PanResponder,
+    TouchableOpacity,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from '@react-navigation/native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button } from '../../../shared/components/ui';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -127,6 +129,28 @@ export const GardenAreaScreen: React.FC<{ navigation?: any }> = ({ navigation })
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
             >
+                {/* Botón de retroceso */}
+                <Animated.View
+                    style={[
+                        styles.backButtonContainer,
+                        {
+                            opacity: fadeAnim,
+                        },
+                    ]}
+                >
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={() => navigation?.goBack()}
+                        activeOpacity={0.7}
+                    >
+                        <MaterialCommunityIcons
+                            name="arrow-left"
+                            size={24}
+                            color="#1B5E20"
+                        />
+                    </TouchableOpacity>
+                </Animated.View>
+
                 {/* Título */}
                 <Animated.View
                     style={[
@@ -249,6 +273,22 @@ const styles = StyleSheet.create({
         paddingHorizontal: 24,
         paddingTop: screenHeight * 0.06,
         paddingBottom: 40,
+    },
+    backButtonContainer: {
+        marginBottom: 16,
+    },
+    backButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
     },
     headerContainer: {
         marginBottom: 24,
