@@ -54,7 +54,7 @@ export const Input: React.FC<InputProps> = ({
                 toValue: 1.02,
                 friction: 8,
                 tension: 100,
-                useNativeDriver: true,
+                useNativeDriver: false,
             }),
             Animated.timing(borderColorAnim, {
                 toValue: 1,
@@ -72,8 +72,7 @@ export const Input: React.FC<InputProps> = ({
                 toValue: 1,
                 friction: 8,
                 tension: 100,
-
-                useNativeDriver: true,
+                useNativeDriver: false,
             }),
             Animated.timing(borderColorAnim, {
                 toValue: 0,

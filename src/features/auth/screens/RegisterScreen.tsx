@@ -26,7 +26,6 @@ const { width, height } = Dimensions.get('window');
 
 export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
     // Animaciones
-    const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
     const logoScale = useRef(new Animated.Value(0.8)).current;
     const formSlide = useRef(new Animated.Value(50)).current;
@@ -34,21 +33,15 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
     useFocusEffect(
         useCallback(() => {
             // Resetear animaciones
-            fadeAnim.setValue(0);
             slideAnim.setValue(30);
             logoScale.setValue(0.8);
             formSlide.setValue(50);
 
-            // Animación de entrada
+            // Animación de entrada (sin fade para evitar flash)
             Animated.parallel([
-                Animated.timing(fadeAnim, {
-                    toValue: 1,
-                    duration: 800,
-                    useNativeDriver: true,
-                }),
                 Animated.timing(slideAnim, {
                     toValue: 0,
-                    duration: 800,
+                    duration: 600,
                     useNativeDriver: true,
                 }),
                 Animated.spring(logoScale, {
@@ -59,12 +52,12 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                 }),
                 Animated.timing(formSlide, {
                     toValue: 0,
-                    duration: 1000,
-                    delay: 300,
+                    duration: 800,
+                    delay: 200,
                     useNativeDriver: true,
                 }),
             ]).start();
-        }, [fadeAnim, slideAnim, logoScale, formSlide])
+        }, [slideAnim, logoScale, formSlide])
     );
 
     return (
@@ -89,7 +82,6 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                         style={[
                             styles.headerContainer,
                             {
-                                opacity: fadeAnim,
                                 transform: [
                                     { translateY: slideAnim },
                                     { scale: logoScale },
@@ -118,7 +110,6 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                         style={[
                             styles.formContainer,
                             {
-                                opacity: fadeAnim,
                                 transform: [{ translateY: formSlide }],
                             },
                         ]}
@@ -207,7 +198,6 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                     <Animated.View
                         style={[
                             styles.footer,
-                            { opacity: fadeAnim },
                         ]}
                     >
                         <Text style={styles.footerText}>
@@ -225,6 +215,7 @@ const styles = StyleSheet.create({
         flex: 1,
         width: width,
         height: height,
+        backgroundColor: '#1a3a2a',
     },
     keyboardView: {
         flex: 1,

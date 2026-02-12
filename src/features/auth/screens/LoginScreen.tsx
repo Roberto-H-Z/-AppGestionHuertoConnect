@@ -45,7 +45,7 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
             Animated.parallel([
                 Animated.timing(fadeAnim, {
                     toValue: 1,
-                    duration: 800,
+                    duration: 400,
                     useNativeDriver: true,
                 }),
                 Animated.timing(slideAnim, {
@@ -129,7 +129,7 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                     >
                         <View style={styles.formGlass}>
                             <Input
-                                label="Correo electrónico"
+                                label="Usuario o correo electrónico"
                                 placeholder="ejemplo@correo.com"
                                 keyboardType="email-address"
                                 autoCapitalize="none"
@@ -197,6 +197,7 @@ const styles = StyleSheet.create({
         flex: 1,
         width: width,
         height: height,
+        backgroundColor: '#1a3a2a',
     },
     keyboardView: {
         flex: 1,
