@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {
@@ -7,6 +7,8 @@ import {
     StyleSheet,
     TouchableOpacity,
     Platform,
+    Animated,
+    Easing,
 } from 'react-native';
 import {
     HomeScreen,
@@ -20,6 +22,259 @@ const TAB_BAR_HEIGHT = 60;
 const CENTER_BUTTON_SIZE = 56;
 
 const Tab = createBottomTabNavigator();
+
+// ── Animated indicator line under the active tab ──
+
+const TabIndicator: React.FC<{ isFocused: boolean }> = ({ isFocused }) => {
+    const widthAnim = useRef(new Animated.Value(isFocused ? 1 : 0)).current;
+
+    useEffect(() => {
+        Animated.spring(widthAnim, {
+            toValue: isFocused ? 1 : 0,
+            friction: 7,
+            tension: 60,
+            useNativeDriver: false,
+        }).start();
+    }, [isFocused]);
+
+    const indicatorWidth = widthAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 20],
+    });
+
+    const indicatorOpacity = widthAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 1],
+    });
+
+    return (
+        <Animated.View
+            style={[
+                styles.indicator,
+                {
+                    width: indicatorWidth,
+                    opacity: indicatorOpacity,
+                },
+            ]}
+        />
+    );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// ██  PREMIUM CENTER BUTTON — Hero animation for Análisis  ██
+// ═══════════════════════════════════════════════════════════════
+
+
+
+// Pulse ring component — expands outward and fades
+const PulseRing: React.FC<{ delay: number; active: boolean }> = ({ delay, active }) => {
+    const anim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        if (active) {
+            const pulse = Animated.loop(
+                Animated.sequence([
+                    Animated.delay(delay),
+                    Animated.timing(anim, {
+                        toValue: 1,
+                        duration: 2000,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(anim, {
+                        toValue: 0,
+                        duration: 0,
+                        useNativeDriver: false,
+                    }),
+                ])
+            );
+            pulse.start();
+            return () => pulse.stop();
+        } else {
+            anim.setValue(0);
+        }
+    }, [active]);
+
+    const scale = anim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [1, 1.6],
+    });
+    const opacity = anim.interpolate({
+        inputRange: [0, 0.3, 1],
+        outputRange: [0.5, 0.25, 0],
+    });
+
+    return (
+        <Animated.View
+            style={{
+                position: 'absolute',
+                width: CENTER_BUTTON_SIZE,
+                height: CENTER_BUTTON_SIZE,
+                borderRadius: CENTER_BUTTON_SIZE / 2,
+                borderWidth: 2,
+                borderColor: '#66BB6A',
+                opacity,
+                transform: [{ scale }],
+            }}
+        />
+    );
+};
+
+const CenterButtonAnimated: React.FC<{ active: boolean }> = ({ active }) => {
+    // ── Animation values ──
+    const scaleAnim = useRef(new Animated.Value(1)).current;
+    const glowAnim = useRef(new Animated.Value(0)).current;
+    const colorAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        if (active) {
+            // ── BREATHING SCALE ──
+            const breathe = Animated.loop(
+                Animated.sequence([
+                    Animated.timing(scaleAnim, {
+                        toValue: 1.07,
+                        duration: 1600,
+                        easing: Easing.inOut(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(scaleAnim, {
+                        toValue: 1,
+                        duration: 1600,
+                        easing: Easing.inOut(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                ])
+            );
+            breathe.start();
+
+            // ── MULTI-LAYER GLOW PULSE ──
+            const glow = Animated.loop(
+                Animated.sequence([
+                    Animated.timing(glowAnim, {
+                        toValue: 1,
+                        duration: 1400,
+                        easing: Easing.inOut(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(glowAnim, {
+                        toValue: 0,
+                        duration: 1400,
+                        easing: Easing.inOut(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                ])
+            );
+            glow.start();
+
+            // ── COLOR SHIFT on the button bg ──
+            const colorShift = Animated.loop(
+                Animated.timing(colorAnim, {
+                    toValue: 3,
+                    duration: 6000,
+                    easing: Easing.linear,
+                    useNativeDriver: false,
+                })
+            );
+            colorShift.start();
+
+            return () => {
+                breathe.stop();
+                glow.stop();
+                colorShift.stop();
+            };
+        } else {
+            scaleAnim.setValue(1);
+            glowAnim.setValue(0);
+            colorAnim.setValue(0);
+        }
+    }, [active]);
+
+    // ── Interpolations ──
+    const shadowOp = glowAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.25, 0.75],
+    });
+    const shadowR = glowAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [6, 22],
+    });
+    const btnBg = colorAnim.interpolate({
+        inputRange: [0, 1, 2, 3],
+        outputRange: ['#4CAF50', '#43A047', '#2E7D32', '#4CAF50'],
+    });
+
+    return (
+        <View style={styles.centerButtonOuter}>
+            {/* ── Layer 1: Pulse ripple rings ── */}
+            {active && (
+                <>
+                    <PulseRing delay={0} active={active} />
+                    <PulseRing delay={800} active={active} />
+                </>
+            )}
+
+            {/* ── The green button itself ── */}
+            <Animated.View
+                style={[
+                    styles.centerButton,
+                    active && {
+                        backgroundColor: btnBg,
+                        transform: [{ scale: scaleAnim }],
+                        shadowColor: '#4CAF50',
+                        shadowOffset: { width: 0, height: 0 },
+                        shadowOpacity: shadowOp,
+                        shadowRadius: shadowR,
+                    },
+                ]}
+            >
+                <MaterialCommunityIcons
+                    name="robot-outline"
+                    size={26}
+                    color="#fff"
+                />
+            </Animated.View>
+        </View>
+    );
+};
+
+// ── Tab Icon with bounce ──
+
+const TabIcon: React.FC<{
+    iconName: string;
+    isFocused: boolean;
+}> = ({ iconName, isFocused }) => {
+    const scaleAnim = useRef(new Animated.Value(1)).current;
+
+    useEffect(() => {
+        if (isFocused) {
+            Animated.sequence([
+                Animated.timing(scaleAnim, {
+                    toValue: 1.25,
+                    duration: 150,
+                    useNativeDriver: false,
+                }),
+                Animated.spring(scaleAnim, {
+                    toValue: 1,
+                    friction: 4,
+                    tension: 100,
+                    useNativeDriver: false,
+                }),
+            ]).start();
+        }
+    }, [isFocused]);
+
+    return (
+        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+            <MaterialCommunityIcons
+                name={iconName as any}
+                size={24}
+                color={isFocused ? '#4CAF50' : '#9E9E9E'}
+            />
+        </Animated.View>
+    );
+};
+
+// ── Custom Tab Bar ──
 
 const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
     return (
@@ -46,7 +301,7 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
                         }
                     };
 
-                    // Center button (AI)
+                    // Center button (AI/Análisis)
                     if (isCenter) {
                         return (
                             <TouchableOpacity
@@ -55,18 +310,13 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
                                 activeOpacity={0.8}
                                 style={styles.centerTabItem}
                             >
-                                <View style={styles.centerButtonOuter}>
-                                    <View style={styles.centerButton}>
-                                        <MaterialCommunityIcons
-                                            name="robot-outline"
-                                            size={26}
-                                            color="#fff"
-                                        />
-                                    </View>
-                                </View>
+                                <CenterButtonAnimated active={isFocused} />
                                 <Text style={[
                                     styles.tabLabel,
-                                    { color: isFocused ? '#4CAF50' : '#9E9E9E' },
+                                    {
+                                        color: isFocused ? '#4CAF50' : '#9E9E9E',
+                                        fontWeight: isFocused ? '700' : '600',
+                                    },
                                 ]}>
                                     {label}
                                 </Text>
@@ -88,17 +338,17 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
                             activeOpacity={0.7}
                             style={styles.tabItem}
                         >
-                            <MaterialCommunityIcons
-                                name={iconName as any}
-                                size={24}
-                                color={isFocused ? '#4CAF50' : '#9E9E9E'}
-                            />
+                            <TabIcon iconName={iconName} isFocused={isFocused} />
                             <Text style={[
                                 styles.tabLabel,
-                                { color: isFocused ? '#4CAF50' : '#9E9E9E' },
+                                {
+                                    color: isFocused ? '#4CAF50' : '#9E9E9E',
+                                    fontWeight: isFocused ? '700' : '600',
+                                },
                             ]}>
                                 {label}
                             </Text>
+                            <TabIndicator isFocused={isFocused} />
                         </TouchableOpacity>
                     );
                 })}
@@ -230,6 +480,16 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         marginTop: 3,
     },
+
+    // Indicator line
+    indicator: {
+        height: 3,
+        backgroundColor: '#4CAF50',
+        borderRadius: 1.5,
+        marginTop: 4,
+    },
+
+
 });
 
 export default MainTabNavigator;
