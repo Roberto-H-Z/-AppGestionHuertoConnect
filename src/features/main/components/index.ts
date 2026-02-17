@@ -4,3 +4,4 @@ export { AddCropModal } from './AddCropModal';
 export { WateringModal } from './WateringModal';
 export { WeatherModal } from './WeatherModal';
 export { TasksModal } from './TasksModal';
+export { NotificationsModal } from './NotificationsModal';

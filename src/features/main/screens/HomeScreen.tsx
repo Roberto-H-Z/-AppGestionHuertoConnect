@@ -20,7 +20,7 @@ import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Crop, GardenArea, WateringSchedule, CropTask } from '../types/cropTypes';
 import { defaultGardenAreas, wateringFrequencyOptions } from '../data/cropData';
-import { EmptyState, CropCard, AddCropModal, WateringModal, WeatherModal, TasksModal } from '../components';
+import { EmptyState, CropCard, AddCropModal, WateringModal, WeatherModal, TasksModal, NotificationsModal } from '../components';
 import { WeatherData, fetchWeatherByLocation } from '../services/weatherService';
 
 export const HomeScreen: React.FC = () => {
@@ -38,9 +38,11 @@ export const HomeScreen: React.FC = () => {
     const [weatherLoading, setWeatherLoading] = useState(false);
     const [weatherModalVisible, setWeatherModalVisible] = useState(false);
 
-    // Tasks modal state
     const [tasksModalVisible, setTasksModalVisible] = useState(false);
     const [selectedCropForTasks, setSelectedCropForTasks] = useState<Crop | null>(null);
+
+    // Notifications modal state
+    const [notificationsVisible, setNotificationsVisible] = useState(false);
 
     // Fetch weather on mount
     useEffect(() => {
@@ -134,7 +136,11 @@ export const HomeScreen: React.FC = () => {
                     <Text style={styles.greeting}>Hola,</Text>
                     <Text style={styles.userName}>Agricultor</Text>
                 </View>
-                <TouchableOpacity style={styles.notificationButton} activeOpacity={0.7}>
+                <TouchableOpacity
+                    style={styles.notificationButton}
+                    activeOpacity={0.7}
+                    onPress={() => setNotificationsVisible(true)}
+                >
                     <MaterialCommunityIcons name="bell-outline" size={24} color="#1B5E20" />
                     <View style={styles.notificationDot} />
                 </TouchableOpacity>
@@ -224,6 +230,12 @@ export const HomeScreen: React.FC = () => {
                 crop={selectedCropForTasks}
                 onClose={() => setTasksModalVisible(false)}
                 onSave={handleTasksSave}
+            />
+
+            {/* Notifications Modal */}
+            <NotificationsModal
+                visible={notificationsVisible}
+                onClose={() => setNotificationsVisible(false)}
             />
         </SafeAreaView>
     );
