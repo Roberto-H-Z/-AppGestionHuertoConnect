@@ -32,6 +32,7 @@ interface CropCardProps {
     onWateringPress?: (crop: Crop) => void;
     onWeatherPress?: () => void;
     onTasksPress?: (crop: Crop) => void;
+    onSpecsPress?: (crop: Crop) => void;
     weatherText?: string;
 }
 
@@ -71,6 +72,7 @@ export const CropCard: React.FC<CropCardProps> = ({
     onWateringPress,
     onWeatherPress,
     onTasksPress,
+    onSpecsPress,
     weatherText = '-- °C',
 }) => {
     const [expanded, setExpanded] = useState(defaultExpanded);
@@ -170,6 +172,7 @@ export const CropCard: React.FC<CropCardProps> = ({
                             icon="information-outline"
                             label="Info. de Planta"
                             value="Ver especificaciones"
+                            onPress={onSpecsPress ? () => onSpecsPress(crop) : undefined}
                         />
                     </View>
 

@@ -18,12 +18,14 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { Crop, GardenArea, WateringSchedule, CropTask } from '../types/cropTypes';
 import { defaultGardenAreas, wateringFrequencyOptions } from '../data/cropData';
 import { EmptyState, CropCard, AddCropModal, WateringModal, WeatherModal, TasksModal, NotificationsModal } from '../components';
 import { WeatherData, fetchWeatherByLocation } from '../services/weatherService';
 
 export const HomeScreen: React.FC = () => {
+    const navigation = useNavigation<any>();
     // Crop & area state (local, no API)
     const [crops, setCrops] = useState<Crop[]>([]);
     const [gardenAreas, setGardenAreas] = useState<GardenArea[]>(defaultGardenAreas);
@@ -113,6 +115,14 @@ export const HomeScreen: React.FC = () => {
         setTasksModalVisible(true);
     }, []);
 
+    const handleSpecsPress = useCallback((crop: Crop) => {
+        navigation.navigate('PlantSpecs', {
+            cropName: crop.name,
+            scientificName: crop.description || 'Solanum lycopersicum',
+            cropIcon: 'sprout',
+        });
+    }, [navigation]);
+
     const handleTasksSave = useCallback((cropId: string, tasks: CropTask[]) => {
         setCrops((prev) =>
             prev.map((c) => (c.id === cropId ? { ...c, tasks } : c))
@@ -177,6 +187,7 @@ export const HomeScreen: React.FC = () => {
                                 onWateringPress={handleWateringPress}
                                 onWeatherPress={handleWeatherPress}
                                 onTasksPress={handleTasksPress}
+                                onSpecsPress={handleSpecsPress}
                                 weatherText={weatherText}
                             />
                         ))}

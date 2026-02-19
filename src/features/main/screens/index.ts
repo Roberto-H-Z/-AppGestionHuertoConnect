@@ -3,3 +3,8 @@ export { MonitoringScreen } from './MonitoringScreen';
 export { AIChatScreen } from './AIChatScreen';
 export { CommunityScreen } from './CommunityScreen';
 export { ProfileScreen } from './ProfileScreen';
+export { EditProfileScreen } from './EditProfileScreen';
+export { MyLandScreen } from './MyLandScreen';
+export { HarvestHistoryScreen } from './HarvestHistoryScreen';
+export { NotificationSettingsScreen } from './NotificationSettingsScreen';
+export { PlantSpecsScreen } from './PlantSpecsScreen';

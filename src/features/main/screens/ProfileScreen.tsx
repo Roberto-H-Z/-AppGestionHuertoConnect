@@ -56,20 +56,24 @@ const MENU_ITEMS = [
     {
         icon: 'account-edit-outline',
         label: 'Editar Perfil',
+        route: 'EditProfile',
     },
     {
         icon: 'map-marker-radius-outline',
         label: 'Mi Terreno y Riego',
         subtitle: 'Ver configuración inicial',
+        route: 'MyLand',
     },
     {
         icon: 'history',
         label: 'Historial de Cosechas',
         subtitle: '3 cosechas completadas',
+        route: 'HarvestHistory',
     },
     {
         icon: 'bell-outline',
         label: 'Configuración de Notificaciones',
+        route: 'NotificationSettings',
     },
 ];
 
@@ -338,6 +342,7 @@ export const ProfileScreen: React.FC = () => {
                                 icon={item.icon}
                                 label={item.label}
                                 subtitle={item.subtitle}
+                                onPress={() => navigation.navigate(item.route)}
                                 delay={450 + index * 80}
                                 focusKey={focusKey}
                             />
