@@ -9,6 +9,7 @@ import {
     View,
     Text,
     StyleSheet,
+    SafeAreaView,
     ScrollView,
     TouchableOpacity,
     Image,
@@ -494,7 +495,7 @@ export const CommunityScreen: React.FC = () => {
         : posts.filter(post => post.cropType === selectedFilter);
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
 
             {/* Header */}
@@ -560,7 +561,7 @@ export const CommunityScreen: React.FC = () => {
                 onClose={() => setModalVisible(false)}
                 onSubmit={handleCreatePost}
             />
-        </View>
+        </SafeAreaView>
     );
 };
 
