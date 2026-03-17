@@ -13,10 +13,12 @@ import {
     TouchableOpacity,
     Platform,
     Animated,
+    Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useAuth } from '../../../config/providers/AuthProvider';
 
 // ═══════════════════════════════════════════
 // ██  TYPES
@@ -192,7 +194,13 @@ const MenuItem: React.FC<MenuItemProps> = ({ icon, label, subtitle, onPress, del
 
 export const ProfileScreen: React.FC = () => {
     const navigation = useNavigation<any>();
+    const { user, signOut } = useAuth();
     const [focusKey, setFocusKey] = useState(0);
+
+    // Get user display name from Supabase metadata
+    const userName = user?.user_metadata?.nombre
+        ? `${user.user_metadata.nombre} ${user.user_metadata.apellido_paterno || ''}`.trim()
+        : user?.email || 'Usuario';
 
     // ── Animations ──
     const headerFade = useRef(new Animated.Value(0)).current;
@@ -257,10 +265,24 @@ export const ProfileScreen: React.FC = () => {
     );
 
     const handleLogout = () => {
-        navigation.reset({
-            index: 0,
-            routes: [{ name: 'Login' }],
-        });
+        Alert.alert(
+            'Cerrar Sesión',
+            '¿Estás seguro que deseas cerrar sesión?',
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Cerrar Sesión',
+                    style: 'destructive',
+                    onPress: async () => {
+                        await signOut();
+                        navigation.reset({
+                            index: 0,
+                            routes: [{ name: 'Login' }],
+                        });
+                    },
+                },
+            ]
+        );
     };
 
     return (
@@ -304,7 +326,7 @@ export const ProfileScreen: React.FC = () => {
                     </Animated.View>
 
                     {/* Name & Badge */}
-                    <Text style={styles.userName}>{USER_DATA.name}</Text>
+                    <Text style={styles.userName}>{userName}</Text>
                     <View style={styles.badgeContainer}>
                         <Text style={styles.badgeText}>{USER_DATA.badge}</Text>
                     </View>

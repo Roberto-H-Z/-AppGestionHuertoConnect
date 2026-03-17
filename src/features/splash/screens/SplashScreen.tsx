@@ -1,8 +1,7 @@
 /**
  * SplashScreen — Animated welcome screen shown on app launch.
- * Features staggered fade-in / scale-in animations for logo text,
- * divider, plant icon, and the "Comenzar" CTA button.
- * Navigates to Login on button press.
+ * Now checks for an existing Supabase session and optionally runs
+ * biometric authentication before navigating the user.
  */
 
 import React, { useRef, useEffect } from 'react';
@@ -18,11 +17,15 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../../../config/providers/AuthProvider';
+import * as biometricService from '../../auth/services/biometricService';
+import * as authServiceModule from '../../auth/services/authService';
 
 const { width } = Dimensions.get('window');
 
 export const SplashScreen: React.FC = () => {
     const navigation = useNavigation<any>();
+    const { loading: authLoading } = useAuth();
 
     // ── Animation values ──
     const bgFade = useRef(new Animated.Value(0)).current;
@@ -191,8 +194,48 @@ export const SplashScreen: React.FC = () => {
         ).start();
     }, []);
 
-    const handleStart = () => {
-        navigation.replace('Login');
+    const handleStart = async () => {
+        // Wait for auth to finish loading
+        if (authLoading) {
+            navigation.replace('Login');
+            return;
+        }
+
+        try {
+            // Check for existing session
+            const { session } = await authServiceModule.getSession();
+
+            if (session && session.user) {
+                // Session exists — check if biometric is enabled for this user
+                const biometricEnabled = await biometricService.isBiometricEnabled(
+                    session.user.id
+                );
+                const biometricAvailable = await biometricService.isBiometricAvailable();
+
+                if (biometricEnabled && biometricAvailable) {
+                    // Request biometric authentication
+                    const { success } = await biometricService.authenticate(
+                        'Verifica tu identidad para continuar'
+                    );
+
+                    if (success) {
+                        navigation.replace('Main');
+                    } else {
+                        // Biometric failed/cancelled — go to login
+                        navigation.replace('Login');
+                    }
+                } else {
+                    // Session exists but no biometric — go straight to Main
+                    navigation.replace('Main');
+                }
+            } else {
+                // No session — go to Login
+                navigation.replace('Login');
+            }
+        } catch {
+            // Any error — fallback to Login
+            navigation.replace('Login');
+        }
     };
 
     return (

@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -11,10 +11,17 @@ import {
     Platform,
     Image,
     ImageBackground,
+    Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from '@react-navigation/native';
-import { Input, Button } from '../../../shared/components/ui';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Input } from '../../../shared/components/ui';
+import { Button } from '../../../shared/components/ui';
+import { useAuth } from '../../../config/providers/AuthProvider';
+import * as biometricService from '../services/biometricService';
+import { useFormValidation } from '../hooks/useFormValidation';
 
 // Logo de HuertoConnect
 const Logo = require('../../../../assets/hurtooo.png');
@@ -27,21 +34,45 @@ const { width, height } = Dimensions.get('window');
 
 
 export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
-    // Animaciones
+    const { signIn } = useAuth();
+    const { handleValidateField, getFieldStatus, isTouched, validateAllFields, markTouched, resetValidation } = useFormValidation();
+
+    // ── Form state ──
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // ── Biometric state ──
+    const [biometricAvailable, setBiometricAvailable] = useState(false);
+    const [biometricLoading, setBiometricLoading] = useState(false);
+
+    // ── Animations ──
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
     const logoScale = useRef(new Animated.Value(0.8)).current;
     const formSlide = useRef(new Animated.Value(50)).current;
 
+    // Check biometric availability on mount
+    useEffect(() => {
+        const checkBiometric = async () => {
+            const available = await biometricService.isBiometricAvailable();
+            setBiometricAvailable(available);
+        };
+        checkBiometric();
+    }, []);
+
     useFocusEffect(
         useCallback(() => {
-            // Resetear animaciones
+            // Reset animations
             fadeAnim.setValue(0);
             slideAnim.setValue(30);
             logoScale.setValue(0.8);
             formSlide.setValue(50);
 
-            // Animación de entrada
+            // Reset validation state
+            resetValidation();
+
             Animated.parallel([
                 Animated.timing(fadeAnim, {
                     toValue: 1,
@@ -66,8 +97,136 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                     useNativeDriver: true,
                 }),
             ]).start();
-        }, [fadeAnim, slideAnim, logoScale, formSlide])
+        }, [fadeAnim, slideAnim, logoScale, formSlide, resetValidation])
     );
+
+    // ── Validation helpers ──
+    const emailStatus = getFieldStatus('email');
+    const passwordStatus = getFieldStatus('loginPassword');
+
+    const handleEmailChange = (text: string) => {
+        setEmail(text);
+        setError(null);
+        if (isTouched('email') && text.trim()) {
+            handleValidateField('email', text);
+        }
+    };
+
+    const handleEmailBlur = () => {
+        markTouched('email');
+        if (email.trim()) {
+            handleValidateField('email', email);
+        }
+    };
+
+    const handlePasswordChange = (text: string) => {
+        setPassword(text);
+        setError(null);
+        if (isTouched('loginPassword') && text.trim()) {
+            handleValidateField('loginPassword', text);
+        }
+    };
+
+    const handlePasswordBlur = () => {
+        markTouched('loginPassword');
+        if (password.trim()) {
+            handleValidateField('loginPassword', password);
+        }
+    };
+
+    // ── Handlers ──
+
+    const handleLogin = async () => {
+        const isValid = validateAllFields([
+            { name: 'email', value: email },
+            { name: 'loginPassword', value: password },
+        ]);
+
+        if (!isValid) {
+            setError('Corrige los campos señalados antes de continuar');
+            return;
+        }
+
+        setError(null);
+        setLoading(true);
+        try {
+            const { error: authError } = await signIn(email.trim(), password);
+            if (authError) {
+                // Translate common Supabase error messages
+                if (authError.message?.includes('Invalid login credentials')) {
+                    setError('Correo o contraseña incorrectos');
+                } else if (authError.message?.includes('Email not confirmed')) {
+                    setError('Debes confirmar tu correo electrónico antes de iniciar sesión');
+                } else {
+                    setError(authError.message || 'Error al iniciar sesión');
+                }
+            } else {
+                // Successful login — ask to enable biometrics if available
+                if (biometricAvailable) {
+                    Alert.alert(
+                        'Activar Face ID',
+                        '¿Deseas usar Face ID para iniciar sesión la próxima vez?',
+                        [
+                            {
+                                text: 'No, gracias',
+                                style: 'cancel',
+                                onPress: () => navigation?.navigate('FarmerProfile'),
+                            },
+                            {
+                                text: 'Sí, activar',
+                                onPress: async () => {
+                                    // We need the user id — get it from the session
+                                    const { getSession } = require('../services/authService');
+                                    const { session } = await getSession();
+                                    if (session?.user?.id) {
+                                        await biometricService.setBiometricEnabled(
+                                            session.user.id,
+                                            true
+                                        );
+                                    }
+                                    navigation?.navigate('FarmerProfile');
+                                },
+                            },
+                        ]
+                    );
+                } else {
+                    navigation?.navigate('FarmerProfile');
+                }
+            }
+        } catch (e: any) {
+            setError('Error de conexión. Verifica tu internet.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleBiometricLogin = async () => {
+        setBiometricLoading(true);
+        setError(null);
+        try {
+            const { success, error: bioError } = await biometricService.authenticate(
+                'Inicia sesión con Face ID'
+            );
+            if (success) {
+                // Biometric passed — check if there's an existing session
+                const { getSession } = require('../services/authService');
+                const { session } = await getSession();
+                if (session) {
+                    navigation?.navigate('Main');
+                } else {
+                    setError('No hay sesión guardada. Inicia sesión con tu correo y contraseña primero.');
+                }
+            } else {
+                if (bioError && !bioError.includes('cancelada')) {
+                    setError(bioError);
+                }
+            }
+        } catch {
+            setError('Error al acceder a la biometría');
+        } finally {
+            setBiometricLoading(false);
+        }
+    };
 
     return (
         <ImageBackground
@@ -76,8 +235,6 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
             resizeMode="cover"
         >
             <StatusBar style="light" />
-
-
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -101,7 +258,6 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                             },
                         ]}
                     >
-                        {/* Logo circular */}
                         <View style={styles.logoContainer}>
                             <View style={styles.logoCircle}>
                                 <Image
@@ -112,7 +268,6 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                             </View>
                         </View>
 
-                        {/* Título */}
                         <Text style={styles.title}>HuertoConnect</Text>
                         <Text style={styles.subtitle}>Cultiva el futuro con tecnología</Text>
                     </Animated.View>
@@ -128,17 +283,39 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                         ]}
                     >
                         <View style={styles.formGlass}>
+                            {/* Error message */}
+                            {error && (
+                                <View style={styles.errorContainer}>
+                                    <MaterialCommunityIcons
+                                        name="alert-circle-outline"
+                                        size={16}
+                                        color="#ff6b6b"
+                                    />
+                                    <Text style={styles.errorText}>{error}</Text>
+                                </View>
+                            )}
+
                             <Input
-                                label="Usuario o correo electrónico"
+                                label="Correo electrónico"
                                 placeholder="ejemplo@correo.com"
                                 keyboardType="email-address"
                                 autoCapitalize="none"
+                                value={email}
+                                onChangeText={handleEmailChange}
+                                onBlur={handleEmailBlur}
+                                validationStatus={isTouched('email') ? emailStatus.status : 'idle'}
+                                validationMessage={isTouched('email') ? emailStatus.message : undefined}
                             />
 
                             <Input
                                 label="Contraseña"
                                 placeholder="••••••••"
                                 isPassword
+                                value={password}
+                                onChangeText={handlePasswordChange}
+                                onBlur={handlePasswordBlur}
+                                validationStatus={isTouched('loginPassword') ? passwordStatus.status : 'idle'}
+                                validationMessage={isTouched('loginPassword') ? passwordStatus.message : undefined}
                             />
 
                             {/* Link olvidé contraseña */}
@@ -150,17 +327,61 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
 
                             {/* Botón iniciar sesión */}
                             <Button
-                                title="Iniciar Sesión"
-                                onPress={() => navigation?.navigate('FarmerProfile')}
+                                title={loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+                                onPress={handleLogin}
                                 style={styles.loginButton}
+                                disabled={loading}
                             />
 
-                            {/* Separador */}
-                            <View style={styles.separator}>
-                                <View style={styles.separatorLine} />
-                                <Text style={styles.separatorText}>o</Text>
-                                <View style={styles.separatorLine} />
-                            </View>
+                            {loading && (
+                                <ActivityIndicator
+                                    color="#6ee7b7"
+                                    style={{ marginBottom: 12 }}
+                                />
+                            )}
+
+                            {/* Biometric button — only if device supports it */}
+                            {biometricAvailable && (
+                                <>
+                                    {/* Separador */}
+                                    <View style={styles.separator}>
+                                        <View style={styles.separatorLine} />
+                                        <Text style={styles.separatorText}>o</Text>
+                                        <View style={styles.separatorLine} />
+                                    </View>
+
+                                    <TouchableOpacity
+                                        style={styles.biometricButton}
+                                        onPress={handleBiometricLogin}
+                                        disabled={biometricLoading}
+                                        activeOpacity={0.7}
+                                    >
+                                        {biometricLoading ? (
+                                            <ActivityIndicator color="#6ee7b7" />
+                                        ) : (
+                                            <>
+                                                <MaterialCommunityIcons
+                                                    name="face-recognition"
+                                                    size={28}
+                                                    color="#6ee7b7"
+                                                />
+                                                <Text style={styles.biometricButtonText}>
+                                                    Iniciar con Face ID
+                                                </Text>
+                                            </>
+                                        )}
+                                    </TouchableOpacity>
+                                </>
+                            )}
+
+                            {/* Separador para registro */}
+                            {!biometricAvailable && (
+                                <View style={styles.separator}>
+                                    <View style={styles.separatorLine} />
+                                    <Text style={styles.separatorText}>o</Text>
+                                    <View style={styles.separatorLine} />
+                                </View>
+                            )}
 
                             {/* Link registro */}
                             <TouchableOpacity
@@ -274,6 +495,24 @@ const styles = StyleSheet.create({
         shadowRadius: 16,
         elevation: 10,
     },
+    // Error
+    errorContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 107, 107, 0.15)',
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 107, 107, 0.3)',
+    },
+    errorText: {
+        color: '#ff6b6b',
+        fontSize: 13,
+        marginLeft: 8,
+        flex: 1,
+    },
     forgotPassword: {
         alignSelf: 'flex-end',
         marginBottom: 20,
@@ -286,6 +525,25 @@ const styles = StyleSheet.create({
     loginButton: {
         width: '100%',
         marginBottom: 20,
+    },
+    // Biometric
+    biometricButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(110, 231, 183, 0.1)',
+        borderRadius: 16,
+        paddingVertical: 14,
+        paddingHorizontal: 24,
+        borderWidth: 1,
+        borderColor: 'rgba(110, 231, 183, 0.3)',
+        marginBottom: 16,
+    },
+    biometricButtonText: {
+        color: '#6ee7b7',
+        fontSize: 16,
+        fontWeight: '600',
+        marginLeft: 10,
     },
     separator: {
         flexDirection: 'row',
