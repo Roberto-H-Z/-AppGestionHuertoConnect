@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useState } from 'react';
 import {
     View,
     Text,
@@ -14,7 +14,14 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from '@react-navigation/native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Input, Button } from '../../../shared/components/ui';
+import {
+    useFormValidation,
+    getPasswordStrength,
+    getStrengthLabel,
+    getStrengthColor,
+} from '../hooks/useFormValidation';
 
 // Logo de HuertoConnect
 const Logo = require('../../../../assets/hurtooo.png');
@@ -24,8 +31,157 @@ const BackgroundImage = require('../../../../assets/Fondo login.png');
 
 const { width, height } = Dimensions.get('window');
 
+// ── Password Strength Bar Component ──
+const PasswordStrengthBar: React.FC<{ password: string }> = ({ password }) => {
+    const strength = getPasswordStrength(password);
+    const label = getStrengthLabel(strength);
+    const color = getStrengthColor(strength);
+    const barWidthAnim = useRef(new Animated.Value(0)).current;
+
+    React.useEffect(() => {
+        Animated.timing(barWidthAnim, {
+            toValue: ((strength + 1) / 5) * 100,
+            duration: 400,
+            useNativeDriver: false,
+        }).start();
+    }, [strength, barWidthAnim]);
+
+    if (!password) return null;
+
+    return (
+        <View style={strengthStyles.container}>
+            <View style={strengthStyles.barBackground}>
+                <Animated.View
+                    style={[
+                        strengthStyles.barFill,
+                        {
+                            backgroundColor: color,
+                            width: barWidthAnim.interpolate({
+                                inputRange: [0, 100],
+                                outputRange: ['0%', '100%'],
+                            }),
+                        },
+                    ]}
+                />
+            </View>
+            <View style={strengthStyles.labelRow}>
+                <View style={strengthStyles.dotsRow}>
+                    {[0, 1, 2, 3, 4].map((i) => (
+                        <View
+                            key={i}
+                            style={[
+                                strengthStyles.dot,
+                                {
+                                    backgroundColor: i <= strength ? color : 'rgba(255,255,255,0.15)',
+                                },
+                            ]}
+                        />
+                    ))}
+                </View>
+                <Text style={[strengthStyles.label, { color }]}>{label}</Text>
+            </View>
+        </View>
+    );
+};
+
+const strengthStyles = StyleSheet.create({
+    container: {
+        marginTop: -8,
+        marginBottom: 8,
+        paddingHorizontal: 2,
+    },
+    barBackground: {
+        height: 4,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 2,
+        overflow: 'hidden',
+        marginBottom: 6,
+    },
+    barFill: {
+        height: '100%',
+        borderRadius: 2,
+    },
+    labelRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    dotsRow: {
+        flexDirection: 'row',
+        gap: 4,
+    },
+    dot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+    },
+    label: {
+        fontSize: 11,
+        fontWeight: '600',
+    },
+});
+
+// ── Password Match Indicator ──
+const PasswordMatchIndicator: React.FC<{ password: string; confirmPassword: string }> = ({
+    password,
+    confirmPassword,
+}) => {
+    if (!confirmPassword) return null;
+
+    const match = password === confirmPassword;
+
+    return (
+        <View style={matchStyles.container}>
+            <MaterialCommunityIcons
+                name={match ? 'check-circle' : 'close-circle'}
+                size={14}
+                color={match ? '#6ee7b7' : '#ff6b6b'}
+            />
+            <Text style={[matchStyles.text, { color: match ? '#6ee7b7' : '#ff6b6b' }]}>
+                {match ? 'Las contraseñas coinciden ✓' : 'Las contraseñas no coinciden'}
+            </Text>
+        </View>
+    );
+};
+
+const matchStyles = StyleSheet.create({
+    container: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: -8,
+        marginBottom: 10,
+        paddingHorizontal: 2,
+    },
+    text: {
+        fontSize: 12,
+        fontWeight: '500',
+        marginLeft: 6,
+    },
+});
+
+// ── Main Component ──
 export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
-    // Animaciones
+    const {
+        handleValidateField,
+        getFieldStatus,
+        isTouched,
+        validateAllFields,
+        markTouched,
+        resetValidation,
+    } = useFormValidation();
+
+    // ── Form state ──
+    const [username, setUsername] = useState('');
+    const [nombre, setNombre] = useState('');
+    const [apellidoPaterno, setApellidoPaterno] = useState('');
+    const [apellidoMaterno, setApellidoMaterno] = useState('');
+    const [telefono, setTelefono] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [error, setError] = useState<string | null>(null);
+
+    // ── Animations ──
     const slideAnim = useRef(new Animated.Value(30)).current;
     const logoScale = useRef(new Animated.Value(0.8)).current;
     const formSlide = useRef(new Animated.Value(50)).current;
@@ -36,6 +192,7 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
             slideAnim.setValue(30);
             logoScale.setValue(0.8);
             formSlide.setValue(50);
+            resetValidation();
 
             // Animación de entrada (sin fade para evitar flash)
             Animated.parallel([
@@ -57,8 +214,73 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                     useNativeDriver: true,
                 }),
             ]).start();
-        }, [slideAnim, logoScale, formSlide])
+        }, [slideAnim, logoScale, formSlide, resetValidation])
     );
+
+    // ── Field validation helpers ──
+    const createFieldHandlers = (
+        fieldName: string,
+        setter: (v: string) => void,
+        extra?: () => { password?: string }
+    ) => ({
+        onChangeText: (text: string) => {
+            setter(text);
+            setError(null);
+            if (isTouched(fieldName) && text.trim()) {
+                handleValidateField(fieldName, text, extra?.());
+            }
+            // Re-validate confirmPassword when password changes
+            if (fieldName === 'password' && isTouched('confirmPassword') && confirmPassword) {
+                handleValidateField('confirmPassword', confirmPassword, { password: text });
+            }
+        },
+        onBlur: () => {
+            markTouched(fieldName);
+            handleValidateField(
+                fieldName,
+                fieldName === 'username' ? username :
+                fieldName === 'nombre' ? nombre :
+                fieldName === 'apellidoPaterno' ? apellidoPaterno :
+                fieldName === 'apellidoMaterno' ? apellidoMaterno :
+                fieldName === 'telefono' ? telefono :
+                fieldName === 'email' ? email :
+                fieldName === 'password' ? password :
+                fieldName === 'confirmPassword' ? confirmPassword : '',
+                extra?.()
+            );
+        },
+    });
+
+    // ── Validation & Submit ──
+    const handleRegister = () => {
+        const isValid = validateAllFields([
+            { name: 'username', value: username },
+            { name: 'nombre', value: nombre },
+            { name: 'apellidoPaterno', value: apellidoPaterno },
+            { name: 'apellidoMaterno', value: apellidoMaterno },
+            { name: 'telefono', value: telefono },
+            { name: 'email', value: email },
+            { name: 'password', value: password },
+            { name: 'confirmPassword', value: confirmPassword, extra: { password } },
+        ]);
+
+        if (!isValid) {
+            setError('Corrige los campos señalados antes de continuar');
+            return;
+        }
+
+        setError(null);
+        console.log('Register pressed — all validations passed');
+    };
+
+    // ── Get statuses ──
+    const getStatus = (name: string) => {
+        const s = getFieldStatus(name);
+        return {
+            validationStatus: isTouched(name) ? s.status : ('idle' as const),
+            validationMessage: isTouched(name) ? s.message : undefined,
+        };
+    };
 
     return (
         <ImageBackground
@@ -115,56 +337,112 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                         ]}
                     >
                         <View style={styles.formGlass}>
+                            {/* Error message */}
+                            {error && (
+                                <View style={styles.errorContainer}>
+                                    <MaterialCommunityIcons
+                                        name="alert-circle-outline"
+                                        size={16}
+                                        color="#ff6b6b"
+                                    />
+                                    <Text style={styles.errorText}>{error}</Text>
+                                </View>
+                            )}
+
                             <Input
-                                label="Usuario"
+                                label="Usuario *"
                                 placeholder="Nombre de usuario"
                                 autoCapitalize="none"
+                                value={username}
+                                maxLength={20}
+                                {...createFieldHandlers('username', setUsername)}
+                                {...getStatus('username')}
                             />
 
                             <Input
-                                label="Nombre"
+                                label="Nombre *"
                                 placeholder="Tu nombre"
+                                value={nombre}
+                                maxLength={50}
+                                {...createFieldHandlers('nombre', setNombre)}
+                                {...getStatus('nombre')}
                             />
 
                             <Input
-                                label="Apellido paterno"
+                                label="Apellido paterno *"
                                 placeholder="Apellido paterno"
+                                value={apellidoPaterno}
+                                maxLength={50}
+                                {...createFieldHandlers('apellidoPaterno', setApellidoPaterno)}
+                                {...getStatus('apellidoPaterno')}
                             />
 
                             <Input
                                 label="Apellido materno"
-                                placeholder="Apellido materno"
+                                placeholder="Apellido materno (opcional)"
+                                value={apellidoMaterno}
+                                maxLength={50}
+                                {...createFieldHandlers('apellidoMaterno', setApellidoMaterno)}
+                                {...getStatus('apellidoMaterno')}
                             />
 
                             <Input
                                 label="Teléfono"
-                                placeholder="10 dígitos"
+                                placeholder="10 dígitos (opcional)"
                                 keyboardType="phone-pad"
+                                value={telefono}
+                                maxLength={10}
+                                {...createFieldHandlers('telefono', setTelefono)}
+                                onChangeText={(text) => {
+                                    const cleaned = text.replace(/[^0-9]/g, '');
+                                    createFieldHandlers('telefono', setTelefono).onChangeText(cleaned);
+                                }}
+                                {...getStatus('telefono')}
                             />
 
                             <Input
-                                label="Correo electrónico"
+                                label="Correo electrónico *"
                                 placeholder="ejemplo@correo.com"
                                 keyboardType="email-address"
                                 autoCapitalize="none"
+                                value={email}
+                                {...createFieldHandlers('email', setEmail)}
+                                {...getStatus('email')}
                             />
 
                             <Input
-                                label="Contraseña"
+                                label="Contraseña *"
                                 placeholder="••••••••"
                                 isPassword
+                                value={password}
+                                {...createFieldHandlers('password', setPassword)}
+                                {...getStatus('password')}
                             />
 
+                            {/* Password strength bar */}
+                            <PasswordStrengthBar password={password} />
+
                             <Input
-                                label="Confirmar contraseña"
+                                label="Confirmar contraseña *"
                                 placeholder="••••••••"
                                 isPassword
+                                value={confirmPassword}
+                                {...createFieldHandlers('confirmPassword', setConfirmPassword, () => ({
+                                    password,
+                                }))}
+                                {...getStatus('confirmPassword')}
+                            />
+
+                            {/* Password match indicator */}
+                            <PasswordMatchIndicator
+                                password={password}
+                                confirmPassword={confirmPassword}
                             />
 
                             {/* Botón crear cuenta */}
                             <Button
                                 title="Crear Cuenta"
-                                onPress={() => console.log('Register pressed')}
+                                onPress={handleRegister}
                                 style={styles.registerButton}
                             />
 
@@ -292,6 +570,24 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 16,
         elevation: 10,
+    },
+    // Error
+    errorContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 107, 107, 0.15)',
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 107, 107, 0.3)',
+    },
+    errorText: {
+        color: '#ff6b6b',
+        fontSize: 13,
+        marginLeft: 8,
+        flex: 1,
     },
     registerButton: {
         width: '100%',

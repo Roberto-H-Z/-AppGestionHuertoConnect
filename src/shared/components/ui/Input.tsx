@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     TextInput,
     View,
@@ -10,9 +10,13 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
+export type ValidationStatus = 'idle' | 'valid' | 'error';
+
 interface InputProps extends TextInputProps {
     label?: string;
     isPassword?: boolean;
+    validationStatus?: ValidationStatus;
+    validationMessage?: string;
 }
 
 // Icono de ojo abierto
@@ -35,19 +39,94 @@ const EyeOffIcon = () => (
     </Svg>
 );
 
+// Icono check animado
+const CheckIcon = () => (
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+        <Path
+            d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"
+            fill="#6ee7b7"
+        />
+    </Svg>
+);
+
+// Icono error animado
+const CrossIcon = () => (
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+        <Path
+            d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"
+            fill="#ff6b6b"
+        />
+    </Svg>
+);
+
 
 export const Input: React.FC<InputProps> = ({
     label,
     isPassword = false,
+    validationStatus = 'idle',
+    validationMessage,
     style,
+    onFocus,
+    onBlur,
     ...props
 }) => {
     const [showPassword, setShowPassword] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
     const scaleAnim = useRef(new Animated.Value(1)).current;
     const borderColorAnim = useRef(new Animated.Value(0)).current;
+    const shakeAnim = useRef(new Animated.Value(0)).current;
+    const messageOpacity = useRef(new Animated.Value(0)).current;
+    const messageSlide = useRef(new Animated.Value(-6)).current;
+    const iconScale = useRef(new Animated.Value(0)).current;
+    const prevStatus = useRef<ValidationStatus>('idle');
 
-    const handleFocus = () => {
+    // Animate validation message & icon appearance
+    useEffect(() => {
+        const hasMessage = validationStatus !== 'idle' && !!validationMessage;
+        Animated.parallel([
+            Animated.timing(messageOpacity, {
+                toValue: hasMessage ? 1 : 0,
+                duration: 250,
+                useNativeDriver: true,
+            }),
+            Animated.timing(messageSlide, {
+                toValue: hasMessage ? 0 : -6,
+                duration: 250,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, [validationStatus, validationMessage, messageOpacity, messageSlide]);
+
+    // Animate status icon pop-in
+    useEffect(() => {
+        if (validationStatus !== 'idle') {
+            Animated.spring(iconScale, {
+                toValue: 1,
+                friction: 4,
+                tension: 120,
+                useNativeDriver: true,
+            }).start();
+        } else {
+            iconScale.setValue(0);
+        }
+    }, [validationStatus, iconScale]);
+
+    // Shake animation when switching to error
+    useEffect(() => {
+        if (validationStatus === 'error' && prevStatus.current !== 'error') {
+            Animated.sequence([
+                Animated.timing(shakeAnim, { toValue: 8, duration: 50, useNativeDriver: true }),
+                Animated.timing(shakeAnim, { toValue: -8, duration: 50, useNativeDriver: true }),
+                Animated.timing(shakeAnim, { toValue: 6, duration: 50, useNativeDriver: true }),
+                Animated.timing(shakeAnim, { toValue: -6, duration: 50, useNativeDriver: true }),
+                Animated.timing(shakeAnim, { toValue: 3, duration: 40, useNativeDriver: true }),
+                Animated.timing(shakeAnim, { toValue: 0, duration: 40, useNativeDriver: true }),
+            ]).start();
+        }
+        prevStatus.current = validationStatus;
+    }, [validationStatus, shakeAnim]);
+
+    const handleFocus = (e: any) => {
         setIsFocused(true);
         Animated.parallel([
             Animated.spring(scaleAnim, {
@@ -60,12 +139,12 @@ export const Input: React.FC<InputProps> = ({
                 toValue: 1,
                 duration: 200,
                 useNativeDriver: false,
-
             }),
         ]).start();
+        onFocus?.(e);
     };
 
-    const handleBlur = () => {
+    const handleBlur = (e: any) => {
         setIsFocused(false);
         Animated.parallel([
             Animated.spring(scaleAnim, {
@@ -80,12 +159,25 @@ export const Input: React.FC<InputProps> = ({
                 useNativeDriver: false,
             }),
         ]).start();
+        onBlur?.(e);
     };
 
-    const borderColor = borderColorAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['rgba(255,255,255,0.15)', 'rgba(110, 231, 183, 0.6)'],
-    });
+    // Determine border color based on validation / focus
+    const getBorderColor = () => {
+        if (validationStatus === 'error') return '#ff6b6b';
+        if (validationStatus === 'valid') return '#6ee7b7';
+        if (isFocused) return 'rgba(110, 231, 183, 0.6)';
+        return 'rgba(255,255,255,0.15)';
+    };
+
+    const borderColor = validationStatus !== 'idle'
+        ? getBorderColor()
+        : borderColorAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: ['rgba(255,255,255,0.15)', 'rgba(110, 231, 183, 0.6)'],
+        });
+
+    const messageColor = validationStatus === 'error' ? '#ff6b6b' : '#6ee7b7';
 
     return (
         <View style={styles.container}>
@@ -94,31 +186,74 @@ export const Input: React.FC<InputProps> = ({
                 style={[
                     styles.inputContainer,
                     {
-                        transform: [{ scale: scaleAnim }],
+                        transform: [
+                            { scale: scaleAnim },
+                            { translateX: shakeAnim },
+                        ],
                         borderColor: borderColor,
                     },
                 ]}
             >
                 {/* @ts-ignore - outlineStyle en styles.input */}
+                {/* @ts-ignore */}
                 <TextInput
-                    style={[styles.input, style]}
+                    style={[styles.input, style] as any}
                     placeholderTextColor="rgba(255,255,255,0.5)"
                     secureTextEntry={isPassword && !showPassword}
                     onFocus={handleFocus}
-
                     onBlur={handleBlur}
                     {...props}
                 />
-                {isPassword && (
-                    <TouchableOpacity
-                        style={styles.eyeButton}
-                        onPress={() => setShowPassword(!showPassword)}
-                        activeOpacity={0.7}
+                {/* Validation status icon */}
+                {validationStatus !== 'idle' && !isPassword && (
+                    <Animated.View
+                        style={[
+                            styles.statusIcon,
+                            { transform: [{ scale: iconScale }] },
+                        ]}
                     >
-                        {showPassword ? <EyeIcon /> : <EyeOffIcon />}
-                    </TouchableOpacity>
+                        {validationStatus === 'valid' ? <CheckIcon /> : <CrossIcon />}
+                    </Animated.View>
+                )}
+                {isPassword && (
+                    <View style={styles.passwordIcons}>
+                        {validationStatus !== 'idle' && (
+                            <Animated.View
+                                style={[
+                                    styles.statusIconInline,
+                                    { transform: [{ scale: iconScale }] },
+                                ]}
+                            >
+                                {validationStatus === 'valid' ? <CheckIcon /> : <CrossIcon />}
+                            </Animated.View>
+                        )}
+                        <TouchableOpacity
+                            style={styles.eyeButton}
+                            onPress={() => setShowPassword(!showPassword)}
+                            activeOpacity={0.7}
+                        >
+                            {showPassword ? <EyeIcon /> : <EyeOffIcon />}
+                        </TouchableOpacity>
+                    </View>
                 )}
             </Animated.View>
+
+            {/* Validation message */}
+            {validationMessage && validationStatus !== 'idle' && (
+                <Animated.View
+                    style={[
+                        styles.messageContainer,
+                        {
+                            opacity: messageOpacity,
+                            transform: [{ translateY: messageSlide }],
+                        },
+                    ]}
+                >
+                    <Text style={[styles.messageText, { color: messageColor }]}>
+                        {validationMessage}
+                    </Text>
+                </Animated.View>
+            )}
         </View>
     );
 };
@@ -140,7 +275,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: 'rgba(255,255,255,0.1)',
         borderRadius: 12,
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: 'rgba(255,255,255,0.15)',
     },
     input: {
@@ -151,9 +286,27 @@ const styles = StyleSheet.create({
         fontSize: 16,
         outlineStyle: 'none',
     },
+    statusIcon: {
+        paddingRight: 14,
+    },
+    passwordIcons: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    statusIconInline: {
+        marginRight: 2,
+    },
     eyeButton: {
-        paddingHorizontal: 16,
+        paddingHorizontal: 14,
         paddingVertical: 14,
+    },
+    messageContainer: {
+        marginTop: 6,
+        paddingHorizontal: 4,
+    },
+    messageText: {
+        fontSize: 12,
+        fontWeight: '500',
     },
 });
 

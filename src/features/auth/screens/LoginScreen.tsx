@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useState } from 'react';
 import {
     View,
     Text,
@@ -14,7 +14,9 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from '@react-navigation/native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Input, Button } from '../../../shared/components/ui';
+import { useFormValidation } from '../hooks/useFormValidation';
 
 // Logo de HuertoConnect
 const Logo = require('../../../../assets/hurtooo.png');
@@ -27,7 +29,14 @@ const { width, height } = Dimensions.get('window');
 
 
 export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
-    // Animaciones
+    const { handleValidateField, getFieldStatus, isTouched, validateAllFields, markTouched, resetValidation } = useFormValidation();
+
+    // ── Form state ──
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState<string | null>(null);
+
+    // ── Animations ──
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
     const logoScale = useRef(new Animated.Value(0.8)).current;
@@ -40,6 +49,12 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
             slideAnim.setValue(30);
             logoScale.setValue(0.8);
             formSlide.setValue(50);
+
+            // Reset validation state
+            resetValidation();
+            setEmail('');
+            setPassword('');
+            setError(null);
 
             // Animación de entrada
             Animated.parallel([
@@ -66,8 +81,55 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                     useNativeDriver: true,
                 }),
             ]).start();
-        }, [fadeAnim, slideAnim, logoScale, formSlide])
+        }, [fadeAnim, slideAnim, logoScale, formSlide, resetValidation])
     );
+
+    // ── Validation helpers ──
+    const emailStatus = getFieldStatus('email');
+    const passwordStatus = getFieldStatus('loginPassword');
+
+    const handleEmailChange = (text: string) => {
+        setEmail(text);
+        setError(null);
+        if (isTouched('email') && text.trim()) {
+            handleValidateField('email', text);
+        }
+    };
+
+    const handleEmailBlur = () => {
+        markTouched('email');
+        handleValidateField('email', email);
+    };
+
+    const handlePasswordChange = (text: string) => {
+        setPassword(text);
+        setError(null);
+        if (isTouched('loginPassword') && text.trim()) {
+            handleValidateField('loginPassword', text);
+        }
+    };
+
+    const handlePasswordBlur = () => {
+        markTouched('loginPassword');
+        handleValidateField('loginPassword', password);
+    };
+
+    // ── Handler ──
+    const handleLogin = () => {
+        const isValid = validateAllFields([
+            { name: 'email', value: email },
+            { name: 'loginPassword', value: password },
+        ]);
+
+        if (!isValid) {
+            setError('Corrige los campos señalados antes de continuar');
+            return;
+        }
+
+        setError(null);
+        // Navigate on successful validation
+        navigation?.navigate('FarmerProfile');
+    };
 
     return (
         <ImageBackground
@@ -76,8 +138,6 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
             resizeMode="cover"
         >
             <StatusBar style="light" />
-
-
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -128,17 +188,39 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                         ]}
                     >
                         <View style={styles.formGlass}>
+                            {/* Error message */}
+                            {error && (
+                                <View style={styles.errorContainer}>
+                                    <MaterialCommunityIcons
+                                        name="alert-circle-outline"
+                                        size={16}
+                                        color="#ff6b6b"
+                                    />
+                                    <Text style={styles.errorText}>{error}</Text>
+                                </View>
+                            )}
+
                             <Input
-                                label="Usuario o correo electrónico"
+                                label="Correo electrónico"
                                 placeholder="ejemplo@correo.com"
                                 keyboardType="email-address"
                                 autoCapitalize="none"
+                                value={email}
+                                onChangeText={handleEmailChange}
+                                onBlur={handleEmailBlur}
+                                validationStatus={isTouched('email') ? emailStatus.status : 'idle'}
+                                validationMessage={isTouched('email') ? emailStatus.message : undefined}
                             />
 
                             <Input
                                 label="Contraseña"
                                 placeholder="••••••••"
                                 isPassword
+                                value={password}
+                                onChangeText={handlePasswordChange}
+                                onBlur={handlePasswordBlur}
+                                validationStatus={isTouched('loginPassword') ? passwordStatus.status : 'idle'}
+                                validationMessage={isTouched('loginPassword') ? passwordStatus.message : undefined}
                             />
 
                             {/* Link olvidé contraseña */}
@@ -151,7 +233,7 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                             {/* Botón iniciar sesión */}
                             <Button
                                 title="Iniciar Sesión"
-                                onPress={() => navigation?.navigate('FarmerProfile')}
+                                onPress={handleLogin}
                                 style={styles.loginButton}
                             />
 
@@ -273,6 +355,24 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 16,
         elevation: 10,
+    },
+    // Error
+    errorContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 107, 107, 0.15)',
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 107, 107, 0.3)',
+    },
+    errorText: {
+        color: '#ff6b6b',
+        fontSize: 13,
+        marginLeft: 8,
+        flex: 1,
     },
     forgotPassword: {
         alignSelf: 'flex-end',
