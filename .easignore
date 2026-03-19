@@ -5,6 +5,7 @@ node_modules/
 
 # Expo
 .expo/
+.expo-export-validation/
 dist/
 web-build/
 expo-env.d.ts
@@ -40,3 +41,6 @@ credentials.json
 # generated native folders
 /ios
 /android
+
+!credentials.json
+!android-upload-keystore.jks

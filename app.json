@@ -2,6 +2,7 @@
   "expo": {
     "name": "HuertoConnect",
     "slug": "HuertoConnect",
+    "owner": "betooo501",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,6 +17,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.betooo501.huertoconnect",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -25,6 +27,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "a60182b0-794e-4a70-af02-83840cd8b5f2"
+      }
     }
   }
 }
