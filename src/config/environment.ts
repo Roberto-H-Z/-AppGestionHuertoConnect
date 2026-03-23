@@ -6,18 +6,20 @@ import { Platform } from 'react-native';
  * Similar a environment.ts de Angular.
  */
 
-// Dependiendo de si ejecutamos en un emulador o navegador (web), el localhost cambia.
-const LOCAL_IP = Platform.OS === 'web' ? 'localhost' : '10.0.2.2';
+// Web keeps localhost. Physical devices must use the PC LAN IP.
+const WEB_HOST = 'localhost';
+const DEVICE_HOST = '192.168.1.68';
+const API_HOST = Platform.OS === 'web' ? WEB_HOST : DEVICE_HOST;
 
 export const environment = {
     production: false,
-    apiUrl: `http://${LOCAL_IP}:8000/api`, // API Gateway
+    apiUrl: `http://${API_HOST}:8000/api`, // API Gateway
     services: {
-        auth: `http://${LOCAL_IP}:8000/api/auth`,
-        huertos: `http://${LOCAL_IP}:8000/api/huertos`,
-        plagas: `http://${LOCAL_IP}:8000/api/plagas`,
-        chat: `http://${LOCAL_IP}:8000/api/chat`,
-        reportes: `http://${LOCAL_IP}:8000/api/reportes`,
+        auth: `http://${API_HOST}:8000/api/auth`,
+        huertos: `http://${API_HOST}:8000/api/huertos`,
+        plagas: `http://${API_HOST}:8000/api/plagas`,
+        chat: `http://${API_HOST}:8000/api/chat`,
+        reportes: `http://${API_HOST}:8000/api/reportes`,
     }
 };
 
