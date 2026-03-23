@@ -51,12 +51,48 @@ export const HomeScreen: React.FC = () => {
     // User profile state
     const [userName, setUserName] = useState('Agricultor');
 
-    // Fetch weather on mount
+    // Fetch on mount
     useEffect(() => {
         loadWeather();
         loadProfile();
         loadRegiones();
+        loadCrops();
     }, []);
+
+    const loadCrops = async () => {
+        try {
+            console.log('[HomeScreen] Fetching /huertos-realizados...');
+            const res = await apiClient.get('/huertos-realizados');
+            console.log('[HomeScreen] Crops fetched:', res.data?.length || 0, 'items');
+            
+            // Transform API data to frontend Crop format
+            const apiCrops = (res.data || []).map((h: any) => ({
+                id: h.id,
+                gardenAreaId: h.region_id,
+                name: h.cultivo_nombre || 'Cultivo', // Backend should ideally provide name or we map it
+                imageUri: null, 
+                currentDay: h.dia_actual,
+                totalDays: h.total_dias,
+                harvestStatus: h.estado_cosecha,
+                nextWatering: h.proximo_riego || 'Sin programar',
+                watering: {
+                    nextDate: h.proximo_riego || '', // Now using ISO string from DB
+                    frequency: 2, // Default or could be stored in DB too
+                    quantity: 2,
+                    lastWatering: 'Sin registro'
+                },
+                tasks: (h.tareas || []).map((t: string, idx: number) => ({
+                    id: String(idx),
+                    title: t,
+                    completed: false
+                })),
+                description: h.description || ''
+            }));
+            setCrops(apiCrops);
+        } catch (error) {
+            console.warn('Crops fetch failed:', error);
+        }
+    };
 
     const loadRegiones = async () => {
         try {
@@ -94,13 +130,40 @@ export const HomeScreen: React.FC = () => {
         ? `${weatherData.current.temperature}°C - ${weatherData.current.condition}`
         : '-- °C';
 
-    const handleSaveCrop = useCallback((crop: Crop, newArea?: GardenArea) => {
-        if (newArea) {
-            setGardenAreas((prev) => [...prev, newArea]);
+    const handleSaveCrop = useCallback(async (cropData: any, newArea?: GardenArea) => {
+        try {
+            // Re-map to match Backend HuertoRealizadoCreate
+            const payload = {
+                region_id: cropData.regionId,
+                cultivo_id: cropData.cultivoId,
+                estado_cosecha: cropData.harvestStatus,
+                dia_actual: cropData.currentDay,
+                total_dias: cropData.totalDays,
+                proximo_riego: cropData.nextWateringISO, // Send ISO date
+                tareas: cropData.tasks.map((t: any) => t.title),
+                descripcion: cropData.description
+            };
+
+            console.log('[HomeScreen] Saving crop payload:', JSON.stringify(payload, null, 2));
+
+            const res = await apiClient.post('/huertos-realizados', payload);
+            
+            console.log('[HomeScreen] Save response:', res.status, res.data);
+            
+            if (res.data) {
+                // Refresh list
+                loadCrops();
+            }
+
+            if (newArea) {
+                setGardenAreas((prev) => [...prev, newArea]);
+            }
+            setModalVisible(false);
+        } catch (error) {
+            console.error('Error saving crop:', error);
+            alert('Error al guardar el cultivo');
         }
-        setCrops((prev) => [...prev, crop]);
-        setModalVisible(false);
-    }, []);
+    }, [gardenAreas]);
 
     const handleWateringPress = useCallback((crop: Crop) => {
         setSelectedCropForWatering(crop);

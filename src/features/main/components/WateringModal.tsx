@@ -29,7 +29,9 @@ interface WateringModalProps {
 // ---- Helpers ----
 
 const formatDateDisplay = (isoDate: string): string => {
+    if (!isoDate) return 'Sin fecha';
     const date = new Date(isoDate + 'T12:00:00');
+    if (isNaN(date.getTime())) return 'Fecha inválida';
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);

@@ -39,7 +39,7 @@ import {
 interface AddCropModalProps {
     visible: boolean;
     onClose: () => void;
-    onSave: (crop: Crop, gardenArea?: GardenArea) => void;
+    onSave: (cropData: any, gardenArea?: GardenArea) => void;
     gardenAreas: GardenArea[];
 }
 
@@ -293,26 +293,21 @@ export const AddCropModal: React.FC<AddCropModalProps> = ({
             return `${y}-${m}-${day}`;
         };
 
-        const crop: Crop = {
-            id: generateId(),
-            gardenAreaId: areaId,
+        const cropData = {
+            regionId: selectedRegion?.id,
+            cultivoId: selectedCultivo?.id,
             name: selectedCultivo?.nombre || 'Cultivo Nuevo',
-            imageUri,
             currentDay: parseInt(currentDay) || 1,
             totalDays: parseInt(totalDays) || 90,
             harvestStatus,
             nextWatering: `${formatDate(wateringDate)} (${getFrequencyLabel()})`,
-            watering: {
-                nextDate: isoDate(wateringDate),
-                frequency: wateringFrequency,
-                quantity: 2,
-                lastWatering: 'Sin registro',
-            },
+            nextWateringISO: isoDate(wateringDate),
+            wateringFrequency,
             tasks: allTasks,
             description: description.trim(),
         };
 
-        onSave(crop, newArea);
+        onSave(cropData, newArea);
         resetForm();
     };
 
