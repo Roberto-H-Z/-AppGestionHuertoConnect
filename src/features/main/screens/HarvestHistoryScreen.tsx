@@ -43,41 +43,13 @@ interface HarvestItem {
 // ═══════════════════════════════════════════
 
 const STATS: StatCard[] = [
-    { icon: 'calendar-outline', value: '3', label: 'Cosechas Totales' },
-    { icon: 'basket-outline', value: '44', label: 'Kg Recolectados' },
-    { icon: 'trending-up', value: '67', label: 'Días Promedio' },
-    { icon: 'trophy-outline', value: '100', label: 'Tasa de Éxito %' },
+    { icon: 'calendar-outline', value: '0', label: 'Cosechas Totales' },
+    { icon: 'basket-outline', value: '0', label: 'Kg Recolectados' },
+    { icon: 'trending-up', value: '0', label: 'Días Promedio' },
+    { icon: 'trophy-outline', value: '0', label: 'Tasa de Éxito %' },
 ];
 
-const HARVESTS: HarvestItem[] = [
-    {
-        name: 'Tomates Cherry',
-        date: '15 Sep 2024',
-        quality: 'Excelente',
-        qualityColor: '#4CAF50',
-        quantity: '12 kg',
-        duration: '85 días',
-        note: 'Cosecha abundante. Excelente sabor y color.',
-    },
-    {
-        name: 'Lechugas',
-        date: '28 Ago 2024',
-        quality: 'Muy Buena',
-        qualityColor: '#66BB6A',
-        quantity: '24 unidades',
-        duration: '45 días',
-        note: 'Crecimiento rápido. Algunas hojas afectadas por el calor.',
-    },
-    {
-        name: 'Zanahorias',
-        date: '10 Ago 2024',
-        quality: 'Buena',
-        qualityColor: '#81C784',
-        quantity: '8 kg',
-        duration: '70 días',
-        note: 'Tamaño irregular debido al suelo arcilloso.',
-    },
-];
+const HARVESTS: HarvestItem[] = [];
 
 // ═══════════════════════════════════════════
 // ██  STAT CARD COMPONENT
@@ -266,13 +238,21 @@ export const HarvestHistoryScreen: React.FC = () => {
                 </View>
 
                 {/* ── Harvest List ── */}
-                {HARVESTS.map((harvest, i) => (
-                    <HarvestCard
-                        key={harvest.name}
-                        {...harvest}
-                        delay={400 + i * 120}
-                    />
-                ))}
+                {HARVESTS.length > 0 ? (
+                    HARVESTS.map((harvest, i) => (
+                        <HarvestCard
+                            key={harvest.name}
+                            {...harvest}
+                            delay={400 + i * 120}
+                        />
+                    ))
+                ) : (
+                    <View style={styles.emptyContainer}>
+                        <MaterialCommunityIcons name="leaf-off" size={48} color="#C8E6C9" />
+                        <Text style={styles.emptyTitle}>Aún no hay cosechas</Text>
+                        <Text style={styles.emptySubtitle}>Cuando finalices tu primer cultivo, aquí aparecerá su registro histórico.</Text>
+                    </View>
+                )}
 
                 <View style={{ height: 40 }} />
             </ScrollView>
@@ -440,6 +420,26 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#757575',
         lineHeight: 18,
+    },
+    
+    // ── Empty State ──
+    emptyContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 40,
+    },
+    emptyTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#81C784',
+        marginTop: 12,
+    },
+    emptySubtitle: {
+        fontSize: 14,
+        color: '#A5D6A7',
+        textAlign: 'center',
+        paddingHorizontal: 30,
+        marginTop: 8,
     },
 });
 

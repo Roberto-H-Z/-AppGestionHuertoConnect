@@ -16,19 +16,11 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { perfilAgricultorService } from '../../onboarding/services/perfilAgricultorService';
+import { useState, useCallback } from 'react';
 
-// ═══════════════════════════════════════════
-// ██  MOCK DATA
-// ═══════════════════════════════════════════
 
-const LAND_DATA = {
-    location: 'current',
-    width: 10,
-    length: 10,
-    totalArea: 100,
-    irrigationSystem: 'constant',
-};
 
 // ═══════════════════════════════════════════
 // ██  MAIN SCREEN
@@ -46,8 +38,15 @@ export const MyLandScreen: React.FC = () => {
     const card3Fade = useRef(new Animated.Value(0)).current;
     const card3Slide = useRef(new Animated.Value(30)).current;
     const buttonFade = useRef(new Animated.Value(0)).current;
+    
+    const [userData, setUserData] = useState<any>(null);
 
-    useEffect(() => {
+    useFocusEffect(
+        useCallback(() => {
+            perfilAgricultorService.getMyProfile()
+                .then(setUserData)
+                .catch(e => console.log('Error fetching user data:', e));
+
         Animated.timing(headerFade, {
             toValue: 1,
             duration: 400,
@@ -109,7 +108,8 @@ export const MyLandScreen: React.FC = () => {
             delay: 600,
             useNativeDriver: true,
         }).start();
-    }, []);
+        }, [])
+    );
 
     return (
         <SafeAreaView style={styles.container}>
@@ -157,64 +157,13 @@ export const MyLandScreen: React.FC = () => {
                         <View>
                             <Text style={styles.cardTitle}>Ubicación</Text>
                             <Text style={styles.cardSubtitle}>
-                                {LAND_DATA.location}
+                                {userData?.ubicacion || 'Desconocida'}
                             </Text>
                         </View>
                     </View>
                 </Animated.View>
 
-                {/* ── Dimensiones Card ── */}
-                <Animated.View
-                    style={[
-                        styles.card,
-                        {
-                            opacity: card2Fade,
-                            transform: [{ translateY: card2Slide }],
-                        },
-                    ]}
-                >
-                    <View style={styles.cardRow}>
-                        <View style={styles.iconCircle}>
-                            <MaterialCommunityIcons
-                                name="square-outline"
-                                size={22}
-                                color="#4CAF50"
-                            />
-                        </View>
-                        <View>
-                            <Text style={styles.cardTitle}>
-                                Dimensiones del Terreno
-                            </Text>
-                            <Text style={styles.cardSubtitle}>
-                                Configuración actual
-                            </Text>
-                        </View>
-                    </View>
 
-                    {/* Dimension boxes */}
-                    <View style={styles.dimensionRow}>
-                        <View style={styles.dimensionBox}>
-                            <Text style={styles.dimensionLabel}>Ancho</Text>
-                            <Text style={styles.dimensionValue}>
-                                {LAND_DATA.width}m
-                            </Text>
-                        </View>
-                        <View style={styles.dimensionBox}>
-                            <Text style={styles.dimensionLabel}>Largo</Text>
-                            <Text style={styles.dimensionValue}>
-                                {LAND_DATA.length}m
-                            </Text>
-                        </View>
-                    </View>
-
-                    {/* Total area banner */}
-                    <View style={styles.areaBanner}>
-                        <Text style={styles.areaBannerLabel}>Área Total</Text>
-                        <Text style={styles.areaBannerValue}>
-                            {LAND_DATA.totalArea}m²
-                        </Text>
-                    </View>
-                </Animated.View>
 
                 {/* ── Sistema de Riego Card ── */}
                 <Animated.View
@@ -239,7 +188,7 @@ export const MyLandScreen: React.FC = () => {
                                 Sistema de Riego
                             </Text>
                             <Text style={styles.cardSubtitle}>
-                                {LAND_DATA.irrigationSystem}
+                                {userData?.acceso_agua || 'Desconocido'}
                             </Text>
                         </View>
                     </View>

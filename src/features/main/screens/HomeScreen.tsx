@@ -20,15 +20,17 @@ import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { Crop, GardenArea, WateringSchedule, CropTask } from '../types/cropTypes';
-import { defaultGardenAreas, wateringFrequencyOptions } from '../data/cropData';
+import { wateringFrequencyOptions } from '../data/cropData';
+import { apiClient } from '../../../infrastructure/api/apiClient';
 import { EmptyState, CropCard, AddCropModal, WateringModal, WeatherModal, TasksModal, NotificationsModal } from '../components';
 import { WeatherData, fetchWeatherByLocation } from '../services/weatherService';
+import { perfilAgricultorService } from '../../onboarding/services/perfilAgricultorService';
 
 export const HomeScreen: React.FC = () => {
     const navigation = useNavigation<any>();
     // Crop & area state (local, no API)
     const [crops, setCrops] = useState<Crop[]>([]);
-    const [gardenAreas, setGardenAreas] = useState<GardenArea[]>(defaultGardenAreas);
+    const [gardenAreas, setGardenAreas] = useState<GardenArea[]>([]);
     const [modalVisible, setModalVisible] = useState(false);
 
     // Watering modal state
@@ -46,10 +48,35 @@ export const HomeScreen: React.FC = () => {
     // Notifications modal state
     const [notificationsVisible, setNotificationsVisible] = useState(false);
 
+    // User profile state
+    const [userName, setUserName] = useState('Agricultor');
+
     // Fetch weather on mount
     useEffect(() => {
         loadWeather();
+        loadProfile();
+        loadRegiones();
     }, []);
+
+    const loadRegiones = async () => {
+        try {
+            const res = await apiClient.get('/regiones');
+            setGardenAreas(res.data || []);
+        } catch (error) {
+            console.warn('Regions fetch failed:', error);
+        }
+    };
+
+    const loadProfile = async () => {
+        try {
+            const data = await perfilAgricultorService.getMyProfile();
+            if (data?.nombre) {
+                setUserName(data.nombre);
+            }
+        } catch (error) {
+            console.warn('Profile fetch failed:', error);
+        }
+    };
 
     const loadWeather = async () => {
         try {
@@ -144,7 +171,7 @@ export const HomeScreen: React.FC = () => {
             <View style={styles.header}>
                 <View>
                     <Text style={styles.greeting}>Hola,</Text>
-                    <Text style={styles.userName}>Agricultor</Text>
+                    <Text style={styles.userName}>{userName}</Text>
                 </View>
                 <TouchableOpacity
                     style={styles.notificationButton}

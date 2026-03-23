@@ -109,46 +109,7 @@ const getStageStatus = (
 };
 
 const buildMockTimelines = (): CropTimeline[] => {
-    const today = new Date();
-
-    return [
-        {
-            cropId: 'mock-tomate',
-            cropName: 'Tomate',
-            cropIcon: 'food-apple',
-            stages: stageDefinitions.map((sd) => ({
-                id: `tomate-${sd.name}`,
-                name: sd.name === 'Crecimiento' ? 'Crecimiento Vegetativo' : (sd.name === 'Germinación' ? 'Siembra' : sd.name),
-                dayLabel: `Día ${sd.dayStart}`,
-                status: getStageStatus(sd.name, 'Floración', 45, sd.dayStart),
-                description:
-                    getStageStatus(sd.name, 'Floración', 45, sd.dayStart) === 'completed'
-                        ? 'Completado exitosamente'
-                        : getStageStatus(sd.name, 'Floración', 45, sd.dayStart) === 'in-progress'
-                            ? `En progreso - ${sd.description}`
-                            : 'Próxima etapa del cultivo',
-                activities: buildMockActivities(sd.name, new Date(today.getTime() - sd.dayStart * 86400000)),
-            })),
-        },
-        {
-            cropId: 'mock-chile',
-            cropName: 'Chile Habanero',
-            cropIcon: 'chili-mild',
-            stages: stageDefinitions.map((sd) => ({
-                id: `chile-${sd.name}`,
-                name: sd.name === 'Crecimiento' ? 'Crecimiento Vegetativo' : (sd.name === 'Germinación' ? 'Siembra' : sd.name),
-                dayLabel: `Día ${sd.dayStart}`,
-                status: getStageStatus(sd.name, 'Crecimiento', 20, sd.dayStart),
-                description:
-                    getStageStatus(sd.name, 'Crecimiento', 20, sd.dayStart) === 'completed'
-                        ? 'Completado exitosamente'
-                        : getStageStatus(sd.name, 'Crecimiento', 20, sd.dayStart) === 'in-progress'
-                            ? `En progreso - ${sd.description}`
-                            : 'Próxima etapa del cultivo',
-                activities: buildMockActivities(sd.name, new Date(today.getTime() - sd.dayStart * 86400000)),
-            })),
-        },
-    ];
+    return [];
 };
 
 // ---- Status visual helpers ----
@@ -337,30 +298,38 @@ export const MonitoringScreen: React.FC = () => {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {displayedTimelines.map((tl) => (
-                    <View key={tl.cropId} style={styles.timelineSection}>
-                        {/* Crop section header (only when showing all) */}
-                        {!selectedCropId && (
-                            <View style={styles.cropSectionHeader}>
-                                <MaterialCommunityIcons
-                                    name={tl.cropIcon as any}
-                                    size={18}
-                                    color="#4CAF50"
-                                />
-                                <Text style={styles.cropSectionTitle}>{tl.cropName}</Text>
-                            </View>
-                        )}
+                {displayedTimelines.length > 0 ? (
+                    displayedTimelines.map((tl) => (
+                        <View key={tl.cropId} style={styles.timelineSection}>
+                            {/* Crop section header (only when showing all) */}
+                            {!selectedCropId && (
+                                <View style={styles.cropSectionHeader}>
+                                    <MaterialCommunityIcons
+                                        name={tl.cropIcon as any}
+                                        size={18}
+                                        color="#4CAF50"
+                                    />
+                                    <Text style={styles.cropSectionTitle}>{tl.cropName}</Text>
+                                </View>
+                            )}
 
-                        {/* Stages */}
-                        {tl.stages.map((stage, idx) => (
-                            <StageCard
-                                key={stage.id}
-                                stage={stage}
-                                isLast={idx === tl.stages.length - 1}
-                            />
-                        ))}
+                            {/* Stages */}
+                            {tl.stages.map((stage, idx) => (
+                                <StageCard
+                                    key={stage.id}
+                                    stage={stage}
+                                    isLast={idx === tl.stages.length - 1}
+                                />
+                            ))}
+                        </View>
+                    ))
+                ) : (
+                    <View style={styles.emptyContainer}>
+                        <MaterialCommunityIcons name="sprout-outline" size={48} color="#C8E6C9" />
+                        <Text style={styles.emptyTitle}>Línea de tiempo vacía</Text>
+                        <Text style={styles.emptySubtitle}>Aquí verás el progreso de tus cultivos etapa por etapa, una vez que agregues uno.</Text>
                     </View>
-                ))}
+                )}
 
                 {/* Bottom spacer */}
                 <View style={{ height: 100 }} />
@@ -573,6 +542,26 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: '#BDBDBD',
         fontWeight: '500',
+    },
+    
+    // Empty state
+    emptyContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 60,
+    },
+    emptyTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#81C784',
+        marginTop: 12,
+    },
+    emptySubtitle: {
+        fontSize: 14,
+        color: '#A5D6A7',
+        textAlign: 'center',
+        paddingHorizontal: 30,
+        marginTop: 8,
     },
 });
 

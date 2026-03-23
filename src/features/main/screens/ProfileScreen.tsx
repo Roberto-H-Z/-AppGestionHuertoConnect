@@ -18,6 +18,7 @@ import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../auth/services/AuthContext';
+import { perfilAgricultorService } from '../../onboarding/services/perfilAgricultorService';
 
 // ═══════════════════════════════════════════
 // ██  TYPES
@@ -43,16 +44,6 @@ interface MenuItemProps {
 // ██  MOCK DATA
 // ═══════════════════════════════════════════
 
-const USER_DATA = {
-    name: 'Roberto Herrera',
-    badge: 'Cultivador a Gran Escala',
-    stats: {
-        harvests: 3,
-        activeDays: 45,
-        sharedTips: 12,
-    },
-};
-
 const MENU_ITEMS = [
     {
         icon: 'account-edit-outline',
@@ -68,7 +59,6 @@ const MENU_ITEMS = [
     {
         icon: 'history',
         label: 'Historial de Cosechas',
-        subtitle: '3 cosechas completadas',
         route: 'HarvestHistory',
     },
     {
@@ -195,6 +185,7 @@ export const ProfileScreen: React.FC = () => {
     const navigation = useNavigation<any>();
     const { signOut } = useAuth();
     const [focusKey, setFocusKey] = useState(0);
+    const [userData, setUserData] = useState<any>(null);
 
     // ── Animations ──
     const headerFade = useRef(new Animated.Value(0)).current;
@@ -212,6 +203,11 @@ export const ProfileScreen: React.FC = () => {
             cardFade.setValue(0);
             cardSlide.setValue(40);
             logoutFade.setValue(0);
+
+            // Fetch data
+            perfilAgricultorService.getMyProfile()
+                .then(setUserData)
+                .catch(e => console.log('Error fetching profile:', e));
 
             // Increment key so children (StatItem, MenuItem) also replay
             setFocusKey((k) => k + 1);
@@ -307,29 +303,31 @@ export const ProfileScreen: React.FC = () => {
                     </Animated.View>
 
                     {/* Name & Badge */}
-                    <Text style={styles.userName}>{USER_DATA.name}</Text>
+                    <Text style={styles.userName}>
+                        {userData ? `${userData.nombre} ${userData.apellidos}` : 'Cargando...'}
+                    </Text>
                     <View style={styles.badgeContainer}>
-                        <Text style={styles.badgeText}>{USER_DATA.badge}</Text>
+                        <Text style={styles.badgeText}>{userData?.perfil || 'Cultivador'}</Text>
                     </View>
 
                     {/* Stats Row */}
                     <View style={styles.statsRow}>
                         <StatItem
-                            value={USER_DATA.stats.harvests}
+                            value={userData?.cosechas_id ? 1 : 0}
                             label="Cosechas"
                             delay={300}
                             focusKey={focusKey}
                         />
                         <View style={styles.statDivider} />
                         <StatItem
-                            value={USER_DATA.stats.activeDays}
+                            value={0}
                             label={'Días\nactivo'}
                             delay={400}
                             focusKey={focusKey}
                         />
                         <View style={styles.statDivider} />
                         <StatItem
-                            value={USER_DATA.stats.sharedTips}
+                            value={userData?.tips_compartidos || 0}
                             label={'Tips\ncompartidos'}
                             delay={500}
                             focusKey={focusKey}

@@ -18,20 +18,11 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { perfilAgricultorService } from '../../onboarding/services/perfilAgricultorService';
+import { useCallback } from 'react';
 
-// ═══════════════════════════════════════════
-// ██  MOCK DATA
-// ═══════════════════════════════════════════
 
-const INITIAL_DATA = {
-    initials: 'AO',
-    badge: 'Cultivador a Gran Escala',
-    name: 'Abiel',
-    email: 'ana.lopez@email.com',
-    phone: '+34 612 345 678',
-    bio: '',
-};
 
 // ═══════════════════════════════════════════
 // ██  MAIN SCREEN
@@ -41,10 +32,37 @@ export const EditProfileScreen: React.FC = () => {
     const navigation = useNavigation<any>();
 
     // ── Form state ──
-    const [name, setName] = useState(INITIAL_DATA.name);
-    const [email, setEmail] = useState(INITIAL_DATA.email);
-    const [phone, setPhone] = useState(INITIAL_DATA.phone);
-    const [bio, setBio] = useState(INITIAL_DATA.bio);
+    const [userData, setUserData] = useState<any>(null);
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [perfil, setPerfil] = useState('');
+    const [accesoAgua, setAccesoAgua] = useState('');
+    const [createdAt, setCreatedAt] = useState('');
+
+    useFocusEffect(
+        useCallback(() => {
+            perfilAgricultorService.getMyProfile()
+                .then(data => {
+                    setUserData(data);
+                    setName(`${data.nombre} ${data.apellidos}`);
+                    setEmail(data.correo || '');
+                    setPerfil(data.perfil || '');
+                    setAccesoAgua(data.acceso_agua || '');
+                    
+                    if (data.created_at) {
+                        try {
+                            const date = new Date(data.created_at);
+                            setCreatedAt(date.toLocaleDateString());
+                        } catch (err) {
+                            setCreatedAt(data.created_at);
+                        }
+                    } else {
+                        setCreatedAt('');
+                    }
+                })
+                .catch(e => console.log('Error fetching user for edit profile:', e));
+        }, [])
+    );
 
     // ── Animations ──
     const headerFade = useRef(new Animated.Value(0)).current;
@@ -135,7 +153,7 @@ export const EditProfileScreen: React.FC = () => {
                         <View style={styles.avatarWrapper}>
                             <View style={styles.avatarCircle}>
                                 <Text style={styles.avatarInitials}>
-                                    {INITIAL_DATA.initials}
+                                    {userData ? `${userData.nombre?.[0] || ''}${userData.apellidos?.[0] || ''}`.toUpperCase() : ''}
                                 </Text>
                             </View>
                             <View style={styles.cameraBadge}>
@@ -147,7 +165,7 @@ export const EditProfileScreen: React.FC = () => {
                             </View>
                         </View>
                         <Text style={styles.badgeText}>
-                            {INITIAL_DATA.badge}
+                            {userData?.perfil || 'Cultivador'}
                         </Text>
                     </Animated.View>
 
@@ -191,31 +209,38 @@ export const EditProfileScreen: React.FC = () => {
                             />
                         </View>
 
-                        {/* Teléfono */}
+                        {/* Perfil de Agricultor */}
                         <View style={styles.fieldGroup}>
-                            <Text style={styles.fieldLabel}>Teléfono</Text>
+                            <Text style={styles.fieldLabel}>Perfil de Agricultor</Text>
                             <TextInput
                                 style={styles.textInput}
-                                value={phone}
-                                onChangeText={setPhone}
-                                placeholder="+34 600 000 000"
+                                value={perfil}
+                                onChangeText={setPerfil}
+                                placeholder="Tu perfil"
                                 placeholderTextColor="#BDBDBD"
-                                keyboardType="phone-pad"
                             />
                         </View>
 
-                        {/* Biografía */}
+                        {/* Acceso al Agua */}
                         <View style={styles.fieldGroup}>
-                            <Text style={styles.fieldLabel}>Biografía</Text>
+                            <Text style={styles.fieldLabel}>Sistema de Riego / Acceso al Agua</Text>
                             <TextInput
-                                style={[styles.textInput, styles.bioInput]}
-                                value={bio}
-                                onChangeText={setBio}
-                                placeholder="Cuéntanos sobre ti..."
+                                style={styles.textInput}
+                                value={accesoAgua}
+                                onChangeText={setAccesoAgua}
+                                placeholder="Tipo de riego"
                                 placeholderTextColor="#BDBDBD"
-                                multiline
-                                numberOfLines={4}
-                                textAlignVertical="top"
+                            />
+                        </View>
+
+                        {/* Fecha de Creación */}
+                        <View style={styles.fieldGroup}>
+                            <Text style={styles.fieldLabel}>Miembro desde</Text>
+                            <TextInput
+                                style={styles.textInput}
+                                value={createdAt}
+                                placeholder="..."
+                                placeholderTextColor="#BDBDBD"
                             />
                         </View>
                     </Animated.View>
@@ -382,10 +407,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#E8F5E9',
     },
-    bioInput: {
-        height: 100,
-        paddingTop: 14,
-    },
+
 
     // ── Save Button ──
     saveButton: {

@@ -13,5 +13,9 @@ export const perfilAgricultorService = {
     createProfile: async (data: PerfilAgricultorCreate) => {
         const response = await apiClient.post('/perfil-agricultor', data);
         return response.data;
+    },
+    getMyProfile: async () => {
+        const response = await apiClient.get('/perfil-agricultor/me');
+        return response.data;
     }
 };

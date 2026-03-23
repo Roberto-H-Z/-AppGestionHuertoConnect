@@ -25,7 +25,9 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { apiClient } from '../../../infrastructure/api/apiClient';
 import { Crop, GardenArea, HarvestStatus } from '../types/cropTypes';
+import { useEffect } from 'react';
 import {
     harvestStatusOptions,
     harvestDaysMap,
@@ -111,6 +113,23 @@ export const AddCropModal: React.FC<AddCropModalProps> = ({
     const [totalDays, setTotalDays] = useState(
         harvestDaysMap['Germinación'].toString()
     );
+    // ── Database combos ──
+    const [regiones, setRegiones] = useState<any[]>([]);
+    const [cultivos, setCultivos] = useState<any[]>([]);
+    const [selectedRegion, setSelectedRegion] = useState<any>(null);
+    const [selectedCultivo, setSelectedCultivo] = useState<any>(null);
+
+    useEffect(() => {
+        if (visible) {
+            apiClient.get('/regiones')
+                .then((res: any) => setRegiones(res.data || []))
+                .catch((e: any) => console.log('Error regiones:', e));
+            apiClient.get('/cultivos')
+                .then((res: any) => setCultivos(res.data || []))
+                .catch((e: any) => console.log('Error cultivos:', e));
+        }
+    }, [visible]);
+
     const [description, setDescription] = useState('');
 
     // Watering schedule state
@@ -139,6 +158,8 @@ export const AddCropModal: React.FC<AddCropModalProps> = ({
         setCurrentDay('1');
         setTotalDays(harvestDaysMap['Germinación'].toString());
         setDescription('');
+        setSelectedRegion(null);
+        setSelectedCultivo(null);
         setWateringDate(new Date());
         setWateringFrequency(2);
         setShowDatePicker(false);
@@ -243,9 +264,9 @@ export const AddCropModal: React.FC<AddCropModalProps> = ({
     };
 
     const handleSave = () => {
-        if (!name.trim()) return;
+        if (!selectedCultivo) return;
 
-        let areaId = selectedAreaId;
+        let areaId = selectedRegion?.id || 'sin-region';
         let newArea: GardenArea | undefined;
 
         if (showNewArea && newAreaName.trim()) {
@@ -275,7 +296,7 @@ export const AddCropModal: React.FC<AddCropModalProps> = ({
         const crop: Crop = {
             id: generateId(),
             gardenAreaId: areaId,
-            name: name.trim(),
+            name: selectedCultivo?.nombre || 'Cultivo Nuevo',
             imageUri,
             currentDay: parseInt(currentDay) || 1,
             totalDays: parseInt(totalDays) || 90,
@@ -295,7 +316,7 @@ export const AddCropModal: React.FC<AddCropModalProps> = ({
         resetForm();
     };
 
-    const isValid = name.trim().length > 0;
+    const isValid = selectedCultivo !== null && selectedRegion !== null;
 
     return (
         <Modal
@@ -367,73 +388,39 @@ export const AddCropModal: React.FC<AddCropModalProps> = ({
                         )}
                     </View>
 
-                    {/* ---- Name ---- */}
-                    <FieldLabel text="Nombre del cultivo *" />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Ej: Mis Tomates"
-                        placeholderTextColor="#BDBDBD"
-                        value={name}
-                        onChangeText={setName}
-                    />
-
-                    {/* ---- Garden Area Selector ---- */}
-                    <FieldLabel text="Área de cultivo" />
+                    {/* ---- Región Selector ---- */}
+                    <FieldLabel text="Región" />
                     <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         style={styles.chipsScroll}
                     >
-                        {gardenAreas.map((area) => (
+                        {regiones.map((reg) => (
                             <SelectableChip
-                                key={area.id}
-                                label={area.name}
-                                selected={selectedAreaId === area.id && !showNewArea}
-                                onPress={() => { setSelectedAreaId(area.id); setShowNewArea(false); }}
+                                key={reg.id}
+                                label={reg.nombre}
+                                selected={selectedRegion?.id === reg.id}
+                                onPress={() => { setSelectedRegion(reg); }}
                             />
                         ))}
-                        <SelectableChip
-                            label="+ Nueva área"
-                            selected={showNewArea}
-                            onPress={() => setShowNewArea(true)}
-                        />
                     </ScrollView>
 
-                    {showNewArea && (
-                        <View style={styles.newAreaContainer}>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Nombre del área"
-                                placeholderTextColor="#BDBDBD"
-                                value={newAreaName}
-                                onChangeText={setNewAreaName}
+                    {/* ---- Cultivo Name (from API) ---- */}
+                    <FieldLabel text="Cultivo *" />
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.chipsScroll}
+                    >
+                        {cultivos.map((cul) => (
+                            <SelectableChip
+                                key={cul.id}
+                                label={cul.nombre}
+                                selected={selectedCultivo?.id === cul.id}
+                                onPress={() => { setSelectedCultivo(cul); }}
                             />
-                            <View style={styles.dimensionRow}>
-                                <View style={styles.dimensionField}>
-                                    <Text style={styles.dimensionLabel}>Largo (m)</Text>
-                                    <TextInput
-                                        style={styles.inputSmall}
-                                        placeholder="10"
-                                        placeholderTextColor="#BDBDBD"
-                                        keyboardType="numeric"
-                                        value={newAreaLength}
-                                        onChangeText={setNewAreaLength}
-                                    />
-                                </View>
-                                <View style={styles.dimensionField}>
-                                    <Text style={styles.dimensionLabel}>Ancho (m)</Text>
-                                    <TextInput
-                                        style={styles.inputSmall}
-                                        placeholder="5"
-                                        placeholderTextColor="#BDBDBD"
-                                        keyboardType="numeric"
-                                        value={newAreaWidth}
-                                        onChangeText={setNewAreaWidth}
-                                    />
-                                </View>
-                            </View>
-                        </View>
-                    )}
+                        ))}
+                    </ScrollView>
 
                     {/* ---- Harvest Status ---- */}
                     <FieldLabel text="Estado de cosecha" />
@@ -496,23 +483,6 @@ export const AddCropModal: React.FC<AddCropModalProps> = ({
                             </View>
                         </View>
 
-                        {/* Frequency selector */}
-                        <View style={styles.frequencySection}>
-                            <View style={styles.frequencyHeader}>
-                                <MaterialCommunityIcons name="repeat" size={18} color="#4CAF50" />
-                                <Text style={styles.frequencyLabel}>Repetir cada:</Text>
-                            </View>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                {wateringFrequencyOptions.map((opt) => (
-                                    <SelectableChip
-                                        key={opt.days}
-                                        label={opt.label}
-                                        selected={wateringFrequency === opt.days}
-                                        onPress={() => setWateringFrequency(opt.days)}
-                                    />
-                                ))}
-                            </ScrollView>
-                        </View>
                     </View>
 
                     {/* ---- Tasks ---- */}
