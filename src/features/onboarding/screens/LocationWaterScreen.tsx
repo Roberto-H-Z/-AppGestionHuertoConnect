@@ -13,20 +13,25 @@ import {
     Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button } from '../../../shared/components/ui';
+import { perfilAgricultorService } from '../services/perfilAgricultorService';
 
 const { height: screenHeight } = Dimensions.get('window');
 
 type WaterAccessType = 'constant' | 'scheduled' | 'seasonal' | null;
 
 export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
+    const route = useRoute<any>();
+    const { perfil, area_cultivo } = route.params || {};
+    
     // Location state
     const [locationText, setLocationText] = useState('');
     const [isLoadingLocation, setIsLoadingLocation] = useState(false);
     const [locationObtained, setLocationObtained] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Water access state
     const [selectedWater, setSelectedWater] = useState<WaterAccessType>(null);
@@ -121,9 +126,44 @@ export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation
         setLocationObtained(text.trim().length > 0);
     };
 
-    const handleFinish = () => {
-        navigation?.navigate('Main');
+    const getPerfilLabel = (p: string) => {
+        switch (p) {
+            case 'novice': return 'Agricultor Novato';
+            case 'intermediate': return 'Productor Intermedio';
+            case 'large-scale': return 'Cultivador a Gran Escala';
+            default: return p;
+        }
+    };
 
+    const getWaterLabel = (w: string | null) => {
+        switch (w) {
+            case 'constant': return 'Flujo Constante';
+            case 'scheduled': return 'Riego por Tandeo';
+            case 'seasonal': return 'Dependiente de Temporal';
+            default: return w || 'Flujo Constante';
+        }
+    };
+
+    const handleFinish = async () => {
+        if (!perfil) {
+            Alert.alert('Error', 'Falta información del perfil. Por favor vuelve al inicio.');
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            await perfilAgricultorService.createProfile({
+                perfil: getPerfilLabel(perfil),
+                area_cultivo: area_cultivo || "0 m²",
+                ubicacion: locationText,
+                acceso_agua: getWaterLabel(selectedWater),
+            });
+            navigation?.replace('Main');
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'No se pudo guardar la configuración.');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const waterOptions: { type: WaterAccessType; icon: string; label: string; description: string }[] = [
@@ -328,9 +368,9 @@ export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation
                     ]}
                 >
                     <Button
-                        title="Finalizar Configuración"
+                        title={isSaving ? "Guardando..." : "Finalizar Configuración"}
                         onPress={handleFinish}
-                        disabled={!isValid}
+                        disabled={!isValid || isSaving}
                         style={styles.finishButton}
                     />
                 </Animated.View>
