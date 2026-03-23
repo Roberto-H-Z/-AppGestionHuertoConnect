@@ -17,6 +17,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useAuth } from '../../auth/services/AuthContext';
 
 // ═══════════════════════════════════════════
 // ██  TYPES
@@ -192,6 +193,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ icon, label, subtitle, onPress, del
 
 export const ProfileScreen: React.FC = () => {
     const navigation = useNavigation<any>();
+    const { signOut } = useAuth();
     const [focusKey, setFocusKey] = useState(0);
 
     // ── Animations ──
@@ -256,7 +258,8 @@ export const ProfileScreen: React.FC = () => {
         }, [])
     );
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        await signOut(); // Limpia la sesión y el JWT
         navigation.reset({
             index: 0,
             routes: [{ name: 'Login' }],

@@ -181,7 +181,7 @@ export const Input: React.FC<InputProps> = ({
 
     return (
         <View style={styles.container}>
-            {label && <Text style={styles.label}>{label}</Text>}
+            {Boolean(label) && <Text style={styles.label}>{label}</Text>}
             <Animated.View
                 style={[
                     styles.inputContainer,
@@ -239,7 +239,7 @@ export const Input: React.FC<InputProps> = ({
             </Animated.View>
 
             {/* Validation message */}
-            {validationMessage && validationStatus !== 'idle' && (
+            {Boolean(validationMessage) && validationStatus !== 'idle' && (
                 <Animated.View
                     style={[
                         styles.messageContainer,

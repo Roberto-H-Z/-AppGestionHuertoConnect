@@ -14,10 +14,7 @@ export interface FieldErrors {
 
 // ── Regex patterns ──
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-const USERNAME_REGEX = /^[a-zA-Z0-9_]+$/;
 const NAME_REGEX = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/;
-const PHONE_REGEX = /^\d{10}$/;
-const DIGITS_ONLY_REGEX = /^\d*$/;
 
 // ── Password strength ──
 export type PasswordStrength = 0 | 1 | 2 | 3 | 4;
@@ -101,16 +98,6 @@ export function validateField(
             return IDLE;
         }
 
-        // ── Username ──
-        case 'username': {
-            if (!v) return error('El nombre de usuario es obligatorio');
-            if (v.length < 3) return error('Mínimo 3 caracteres');
-            if (v.length > 20) return error('Máximo 20 caracteres');
-            if (!USERNAME_REGEX.test(v))
-                return error('Solo letras, números y guiones bajos (_)');
-            return valid('Usuario válido');
-        }
-
         // ── Nombre ──
         case 'nombre': {
             if (!v) return error('El nombre es obligatorio');
@@ -120,30 +107,13 @@ export function validateField(
             return valid('Nombre válido');
         }
 
-        // ── Apellido paterno ──
-        case 'apellidoPaterno': {
-            if (!v) return error('El apellido paterno es obligatorio');
+        // ── Apellidos ──
+        case 'apellidos': {
+            if (!v) return error('Los apellidos son obligatorios');
             if (v.length < 2) return error('Mínimo 2 caracteres');
-            if (v.length > 50) return error('Máximo 50 caracteres');
+            if (v.length > 80) return error('Máximo 80 caracteres');
             if (!NAME_REGEX.test(v)) return error('Solo se permiten letras y espacios');
-            return valid('Apellido válido');
-        }
-
-        // ── Apellido materno (optional) ──
-        case 'apellidoMaterno': {
-            if (!v) return IDLE; // optional
-            if (v.length < 2) return error('Mínimo 2 caracteres');
-            if (v.length > 50) return error('Máximo 50 caracteres');
-            if (!NAME_REGEX.test(v)) return error('Solo se permiten letras y espacios');
-            return valid('Apellido válido');
-        }
-
-        // ── Teléfono (optional, stored as string) ──
-        case 'telefono': {
-            if (!v) return IDLE; // optional
-            if (!DIGITS_ONLY_REGEX.test(v)) return error('Solo se permiten dígitos');
-            if (v.length !== 10) return error(`Debe tener 10 dígitos (tienes ${v.length})`);
-            return valid('Teléfono válido');
+            return valid('Apellidos válidos');
         }
 
         // ── Login-only password (less strict) ──

@@ -41,6 +41,7 @@ import { NeuralOverlay } from '../components/NeuralOverlay';
 import { DataFlowLines } from '../components/DataFlowLines';
 import { ParticleProgressBar } from '../components/ParticleProgressBar';
 import { NeuralBackground } from '../components/NeuralBackground';
+import { useAuth } from '../../auth';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -147,7 +148,7 @@ const TitleGlow: React.FC<{
   });
 
   return (
-    <Animated.View style={[styles.titleGlow, style]} pointerEvents="none" />
+    <Animated.View style={[styles.titleGlow, style, { pointerEvents: 'none' } as any]} />
   );
 };
 
@@ -156,6 +157,8 @@ export const SplashScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const progress = useSharedValue(0);
   const buttonPulse = useSharedValue(0);
+
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
     // Main progress: 0 → 1 over 5 seconds
@@ -262,7 +265,11 @@ export const SplashScreen: React.FC = () => {
   });
 
   const handleStart = () => {
-    navigation.replace('Login');
+    if (isAuthenticated) {
+      navigation.replace('Main');
+    } else {
+      navigation.replace('Login');
+    }
   };
 
   return (
@@ -286,7 +293,7 @@ export const SplashScreen: React.FC = () => {
       </Animated.View>
 
       {/* ── Ambient light from plant area ── */}
-      <Animated.View style={[styles.ambientLight, ambientStyle]} pointerEvents="none" />
+      <Animated.View style={[styles.ambientLight, ambientStyle, { pointerEvents: 'none' } as any]} />
 
       {/* ── Subtle neural network background mesh ── */}
       <NeuralBackground />

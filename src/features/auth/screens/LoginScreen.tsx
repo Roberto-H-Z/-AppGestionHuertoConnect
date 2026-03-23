@@ -17,6 +17,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Input, Button } from '../../../shared/components/ui';
 import { useFormValidation } from '../hooks/useFormValidation';
+import { authService } from '../services/authService';
 
 // Logo de HuertoConnect
 const Logo = require('../../../../assets/hurtooo.png');
@@ -35,6 +36,7 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
 
     // ── Animations ──
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -115,7 +117,7 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
     };
 
     // ── Handler ──
-    const handleLogin = () => {
+    const handleLogin = async () => {
         const isValid = validateAllFields([
             { name: 'email', value: email },
             { name: 'loginPassword', value: password },
@@ -127,8 +129,25 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
         }
 
         setError(null);
-        // Navigate on successful validation
-        navigation?.navigate('FarmerProfile');
+        setIsLoading(true);
+
+        try {
+            const result = await authService.login({
+                email,
+                password: password
+            });
+
+            // Navegar a la pantalla de verificación OTP
+            navigation?.navigate('OtpVerification', {
+                challengeId: result.challengeId,
+                email: email,
+                tipo: 'login'
+            });
+        } catch (err: any) {
+            setError(err.message || 'Error al iniciar sesión');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -224,7 +243,10 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                             />
 
                             {/* Link olvidé contraseña */}
-                            <TouchableOpacity style={styles.forgotPassword}>
+                            <TouchableOpacity
+                                style={styles.forgotPassword}
+                                onPress={() => navigation?.navigate('ForgotPassword')}
+                            >
                                 <Text style={styles.forgotPasswordText}>
                                     ¿Olvidaste tu contraseña?
                                 </Text>
@@ -232,8 +254,9 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
 
                             {/* Botón iniciar sesión */}
                             <Button
-                                title="Iniciar Sesión"
+                                title={isLoading ? "Iniciando..." : "Iniciar Sesión"}
                                 onPress={handleLogin}
+                                disabled={isLoading}
                                 style={styles.loginButton}
                             />
 

@@ -22,6 +22,7 @@ import {
     getStrengthLabel,
     getStrengthColor,
 } from '../hooks/useFormValidation';
+import { authService } from '../services/authService';
 
 // Logo de HuertoConnect
 const Logo = require('../../../../assets/hurtooo.png');
@@ -171,15 +172,13 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
     } = useFormValidation();
 
     // ── Form state ──
-    const [username, setUsername] = useState('');
     const [nombre, setNombre] = useState('');
-    const [apellidoPaterno, setApellidoPaterno] = useState('');
-    const [apellidoMaterno, setApellidoMaterno] = useState('');
-    const [telefono, setTelefono] = useState('');
+    const [apellidos, setApellidos] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
 
     // ── Animations ──
     const slideAnim = useRef(new Animated.Value(30)).current;
@@ -238,27 +237,21 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
             markTouched(fieldName);
             handleValidateField(
                 fieldName,
-                fieldName === 'username' ? username :
                 fieldName === 'nombre' ? nombre :
-                fieldName === 'apellidoPaterno' ? apellidoPaterno :
-                fieldName === 'apellidoMaterno' ? apellidoMaterno :
-                fieldName === 'telefono' ? telefono :
-                fieldName === 'email' ? email :
-                fieldName === 'password' ? password :
-                fieldName === 'confirmPassword' ? confirmPassword : '',
+                    fieldName === 'apellidos' ? apellidos :
+                        fieldName === 'email' ? email :
+                            fieldName === 'password' ? password :
+                                fieldName === 'confirmPassword' ? confirmPassword : '',
                 extra?.()
             );
         },
     });
 
     // ── Validation & Submit ──
-    const handleRegister = () => {
+    const handleRegister = async () => {
         const isValid = validateAllFields([
-            { name: 'username', value: username },
             { name: 'nombre', value: nombre },
-            { name: 'apellidoPaterno', value: apellidoPaterno },
-            { name: 'apellidoMaterno', value: apellidoMaterno },
-            { name: 'telefono', value: telefono },
+            { name: 'apellidos', value: apellidos },
             { name: 'email', value: email },
             { name: 'password', value: password },
             { name: 'confirmPassword', value: confirmPassword, extra: { password } },
@@ -270,7 +263,32 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
         }
 
         setError(null);
-        console.log('Register pressed — all validations passed');
+        setIsLoading(true);
+
+        try {
+            const result = await authService.register({
+                nombre,
+                apellidos,
+                email,
+                password: password,
+                confirmPassword: confirmPassword
+            });
+
+            navigation?.navigate('OtpVerification', {
+                challengeId: result.challengeId,
+                email: email,
+                tipo: 'registro'
+            });
+        } catch (err: any) {
+            // Error 409: Ya existe una cuenta
+            if (err.response?.status === 409) {
+                setError('Ya existe una cuenta con este correo.');
+            } else {
+                setError(err.message || 'Error al crear la cuenta. Intenta de nuevo.');
+            }
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     // ── Get statuses ──
@@ -350,17 +368,7 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                             )}
 
                             <Input
-                                label="Usuario *"
-                                placeholder="Nombre de usuario"
-                                autoCapitalize="none"
-                                value={username}
-                                maxLength={20}
-                                {...createFieldHandlers('username', setUsername)}
-                                {...getStatus('username')}
-                            />
-
-                            <Input
-                                label="Nombre *"
+                                label="Nombre(s) *"
                                 placeholder="Tu nombre"
                                 value={nombre}
                                 maxLength={50}
@@ -369,35 +377,12 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                             />
 
                             <Input
-                                label="Apellido paterno *"
-                                placeholder="Apellido paterno"
-                                value={apellidoPaterno}
-                                maxLength={50}
-                                {...createFieldHandlers('apellidoPaterno', setApellidoPaterno)}
-                                {...getStatus('apellidoPaterno')}
-                            />
-
-                            <Input
-                                label="Apellido materno"
-                                placeholder="Apellido materno (opcional)"
-                                value={apellidoMaterno}
-                                maxLength={50}
-                                {...createFieldHandlers('apellidoMaterno', setApellidoMaterno)}
-                                {...getStatus('apellidoMaterno')}
-                            />
-
-                            <Input
-                                label="Teléfono"
-                                placeholder="10 dígitos (opcional)"
-                                keyboardType="phone-pad"
-                                value={telefono}
-                                maxLength={10}
-                                {...createFieldHandlers('telefono', setTelefono)}
-                                onChangeText={(text) => {
-                                    const cleaned = text.replace(/[^0-9]/g, '');
-                                    createFieldHandlers('telefono', setTelefono).onChangeText(cleaned);
-                                }}
-                                {...getStatus('telefono')}
+                                label="Apellidos *"
+                                placeholder="Tus apellidos"
+                                value={apellidos}
+                                maxLength={80}
+                                {...createFieldHandlers('apellidos', setApellidos)}
+                                {...getStatus('apellidos')}
                             />
 
                             <Input
@@ -441,8 +426,9 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
 
                             {/* Botón crear cuenta */}
                             <Button
-                                title="Crear Cuenta"
+                                title={isLoading ? "Creando Cuenta..." : "Crear Cuenta"}
                                 onPress={handleRegister}
+                                disabled={isLoading}
                                 style={styles.registerButton}
                             />
 
