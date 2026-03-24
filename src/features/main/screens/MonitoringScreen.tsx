@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Platform,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { apiClient } from '../../../infrastructure/api/apiClient';
 
 type StageStatus = 'completed' | 'in-progress' | 'pending';
@@ -146,42 +147,51 @@ export const MonitoringScreen: React.FC = () => {
     const [selectedCropId, setSelectedCropId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const loadTimeline = async () => {
-            try {
-                setLoading(true);
-                const response = await apiClient.get('/huertos-realizados/timeline');
-                const mappedTimelines: CropTimeline[] = (response.data || []).map((timeline: any) => ({
-                    cropId: timeline.crop_id,
-                    cropName: timeline.crop_name,
-                    cropIcon: timeline.crop_icon || 'sprout',
-                    stages: (timeline.stages || []).map((stage: any) => ({
-                        id: stage.id,
-                        name: stage.name,
-                        dayLabel: stage.day_label,
-                        status: stage.status,
-                        description: stage.description,
-                        activities: (stage.activities || []).map((activity: any) => ({
-                            id: activity.id,
-                            action: activity.action,
-                            detail: activity.detail,
-                            date: activity.date,
-                            icon: activity.icon,
-                            iconColor: activity.icon_color,
-                        })),
+    const loadTimeline = useCallback(async () => {
+        try {
+            setLoading(true);
+            const response = await apiClient.get('/huertos-realizados/timeline');
+            const mappedTimelines: CropTimeline[] = (response.data || []).map((timeline: any) => ({
+                cropId: timeline.crop_id,
+                cropName: timeline.crop_name,
+                cropIcon: timeline.crop_icon || 'sprout',
+                stages: (timeline.stages || []).map((stage: any) => ({
+                    id: stage.id,
+                    name: stage.name,
+                    dayLabel: stage.day_label,
+                    status: stage.status,
+                    description: stage.description,
+                    activities: (stage.activities || []).map((activity: any) => ({
+                        id: activity.id,
+                        action: activity.action,
+                        detail: activity.detail,
+                        date: activity.date,
+                        icon: activity.icon,
+                        iconColor: activity.icon_color,
                     })),
-                }));
-                setTimelines(mappedTimelines);
-            } catch (error) {
-                console.warn('Timeline fetch failed:', error);
-                setTimelines([]);
-            } finally {
-                setLoading(false);
-            }
-        };
+                })),
+            }));
 
-        loadTimeline();
+            setTimelines(mappedTimelines);
+            setSelectedCropId((currentCropId) =>
+                currentCropId && mappedTimelines.some((timeline) => timeline.cropId === currentCropId)
+                    ? currentCropId
+                    : null
+            );
+        } catch (error) {
+            console.warn('Timeline fetch failed:', error);
+            setTimelines([]);
+            setSelectedCropId(null);
+        } finally {
+            setLoading(false);
+        }
     }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            loadTimeline();
+        }, [loadTimeline])
+    );
 
     const displayedTimelines = useMemo(
         () => (selectedCropId ? timelines.filter((timeline) => timeline.cropId === selectedCropId) : timelines),
