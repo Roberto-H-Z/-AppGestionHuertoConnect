@@ -9,8 +9,10 @@
  * - Description field
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+    Animated,
+    Easing,
     View,
     Text,
     TextInput,
@@ -27,7 +29,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { apiClient } from '../../../infrastructure/api/apiClient';
 import { Crop, GardenArea, HarvestStatus } from '../types/cropTypes';
-import { useEffect } from 'react';
 import {
     harvestStatusOptions,
     harvestDaysMap,
@@ -39,7 +40,7 @@ import {
 interface AddCropModalProps {
     visible: boolean;
     onClose: () => void;
-    onSave: (cropData: any, gardenArea?: GardenArea) => void;
+    onSave: (cropData: any, gardenArea?: GardenArea) => Promise<void>;
     gardenAreas: GardenArea[];
 }
 
@@ -52,16 +53,36 @@ const FieldLabel: React.FC<{ text: string }> = ({ text }) => (
 const SelectableChip: React.FC<{
     label: string;
     selected: boolean;
+    recommended?: boolean;
     onPress: () => void;
-}> = ({ label, selected, onPress }) => (
+}> = ({ label, selected, recommended = false, onPress }) => (
     <TouchableOpacity
-        style={[styles.chip, selected && styles.chipSelected]}
+        style={[
+            styles.chip,
+            recommended && styles.chipRecommended,
+            selected && styles.chipSelected,
+            selected && recommended && styles.chipRecommendedSelected,
+        ]}
         onPress={onPress}
         activeOpacity={0.7}
     >
-        <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+        <Text
+            style={[
+                styles.chipText,
+                recommended && styles.chipTextRecommended,
+                selected && styles.chipTextSelected,
+            ]}
+        >
             {label}
         </Text>
+        {recommended && (
+            <MaterialCommunityIcons
+                name="leaf"
+                size={14}
+                color={selected ? '#1B5E20' : '#2E7D32'}
+                style={styles.chipIcon}
+            />
+        )}
     </TouchableOpacity>
 );
 
@@ -94,6 +115,101 @@ const TaskCheckItem: React.FC<{
     </TouchableOpacity>
 );
 
+const GrowingCropLoader: React.FC = () => {
+    const rotateAnim = useRef(new Animated.Value(0)).current;
+    const pulseAnim = useRef(new Animated.Value(0.92)).current;
+    const swayAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        const rotation = Animated.loop(
+            Animated.timing(rotateAnim, {
+                toValue: 1,
+                duration: 2600,
+                easing: Easing.linear,
+                useNativeDriver: true,
+            })
+        );
+
+        const pulse = Animated.loop(
+            Animated.sequence([
+                Animated.timing(pulseAnim, {
+                    toValue: 1.04,
+                    duration: 850,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(pulseAnim, {
+                    toValue: 0.92,
+                    duration: 850,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ])
+        );
+
+        const sway = Animated.loop(
+            Animated.sequence([
+                Animated.timing(swayAnim, {
+                    toValue: 1,
+                    duration: 700,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(swayAnim, {
+                    toValue: 0,
+                    duration: 700,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ])
+        );
+
+        rotation.start();
+        pulse.start();
+        sway.start();
+
+        return () => {
+            rotation.stop();
+            pulse.stop();
+            sway.stop();
+        };
+    }, [pulseAnim, rotateAnim, swayAnim]);
+
+    const spin = rotateAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', '360deg'],
+    });
+
+    const leftLeafRotate = swayAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['-6deg', '5deg'],
+    });
+
+    const rightLeafRotate = swayAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['6deg', '-5deg'],
+    });
+
+    return (
+        <View style={styles.loaderCard}>
+            <Animated.View style={[styles.loaderOrbit, { transform: [{ rotate: spin }] }]} />
+            <Animated.View style={[styles.loaderCore, { transform: [{ scale: pulseAnim }] }]}>
+                <View style={styles.loaderSoil} />
+                <View style={styles.loaderStem} />
+                <Animated.View style={[styles.loaderLeafLeft, { transform: [{ rotate: leftLeafRotate }] }]} />
+                <Animated.View style={[styles.loaderLeafRight, { transform: [{ rotate: rightLeafRotate }] }]} />
+                <View style={styles.loaderCenter}>
+                    <MaterialCommunityIcons name="sprout" size={34} color="#2E7D32" />
+                </View>
+            </Animated.View>
+            <Text style={styles.loaderTitle}>Sembrando tu cultivo</Text>
+            <Text style={styles.loaderSubtitle}>
+                Estamos preparando tu huerto, espera un momento.
+            </Text>
+        </View>
+    );
+};
+
 // ---- Main Component ----
 
 export const AddCropModal: React.FC<AddCropModalProps> = ({
@@ -103,6 +219,7 @@ export const AddCropModal: React.FC<AddCropModalProps> = ({
     gardenAreas,
 }) => {
     // Form state
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [imageUri, setImageUri] = useState<string | null>(null);
     const [name, setName] = useState('');
     const [selectedAreaId, setSelectedAreaId] = useState<string>(
@@ -124,11 +241,29 @@ export const AddCropModal: React.FC<AddCropModalProps> = ({
             apiClient.get('/regiones')
                 .then((res: any) => setRegiones(res.data || []))
                 .catch((e: any) => console.log('Error regiones:', e));
-            apiClient.get('/cultivos')
-                .then((res: any) => setCultivos(res.data || []))
-                .catch((e: any) => console.log('Error cultivos:', e));
         }
     }, [visible]);
+
+    useEffect(() => {
+        if (!visible) return;
+
+        const endpoint = selectedRegion?.id
+            ? `/cultivos?region_id=${selectedRegion.id}`
+            : '/cultivos';
+
+        apiClient.get(endpoint)
+            .then((res: any) => setCultivos(res.data || []))
+            .catch((e: any) => console.log('Error cultivos:', e));
+    }, [visible, selectedRegion?.id]);
+
+    useEffect(() => {
+        if (!selectedCultivo) return;
+
+        const cultivoActualizado = cultivos.find((cultivo: any) => cultivo.id === selectedCultivo.id);
+        if (cultivoActualizado) {
+            setSelectedCultivo(cultivoActualizado);
+        }
+    }, [cultivos, selectedCultivo]);
 
     const [description, setDescription] = useState('');
 
@@ -263,7 +398,7 @@ export const AddCropModal: React.FC<AddCropModalProps> = ({
         setTotalDays(harvestDaysMap[status].toString());
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!selectedCultivo) return;
 
         let areaId = selectedRegion?.id || 'sin-region';
@@ -297,6 +432,7 @@ export const AddCropModal: React.FC<AddCropModalProps> = ({
             regionId: selectedRegion?.id,
             cultivoId: selectedCultivo?.id,
             name: selectedCultivo?.nombre || 'Cultivo Nuevo',
+            imageUri,
             currentDay: parseInt(currentDay) || 1,
             totalDays: parseInt(totalDays) || 90,
             harvestStatus,
@@ -307,18 +443,30 @@ export const AddCropModal: React.FC<AddCropModalProps> = ({
             description: description.trim(),
         };
 
-        onSave(cropData, newArea);
-        resetForm();
+        try {
+            setIsSubmitting(true);
+            await onSave(cropData, newArea);
+            resetForm();
+            onClose();
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
-    const isValid = selectedCultivo !== null && selectedRegion !== null;
+    const isValid = selectedCultivo !== null && selectedRegion !== null && !isSubmitting;
+    const recommendedCount = useMemo(
+        () => cultivos.filter((cultivo: any) => cultivo.es_recomendado).length,
+        [cultivos]
+    );
 
     return (
         <Modal
             visible={visible}
             animationType="slide"
             presentationStyle="pageSheet"
-            onRequestClose={onClose}
+            onRequestClose={() => {
+                if (!isSubmitting) onClose();
+            }}
         >
             <KeyboardAvoidingView
                 style={styles.modalContainer}
@@ -326,7 +474,11 @@ export const AddCropModal: React.FC<AddCropModalProps> = ({
             >
                 {/* Header */}
                 <View style={styles.modalHeader}>
-                    <TouchableOpacity onPress={() => { resetForm(); onClose(); }} activeOpacity={0.7}>
+                    <TouchableOpacity
+                        onPress={() => { if (!isSubmitting) { resetForm(); onClose(); } }}
+                        activeOpacity={0.7}
+                        disabled={isSubmitting}
+                    >
                         <MaterialCommunityIcons name="close" size={24} color="#9E9E9E" />
                     </TouchableOpacity>
                     <Text style={styles.modalTitle}>Nuevo Cultivo</Text>
@@ -336,7 +488,7 @@ export const AddCropModal: React.FC<AddCropModalProps> = ({
                         activeOpacity={0.7}
                     >
                         <Text style={[styles.saveButton, !isValid && styles.saveButtonDisabled]}>
-                            Guardar
+                            {isSubmitting ? 'Guardando...' : 'Guardar'}
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -402,6 +554,14 @@ export const AddCropModal: React.FC<AddCropModalProps> = ({
 
                     {/* ---- Cultivo Name (from API) ---- */}
                     <FieldLabel text="Cultivo *" />
+                    {selectedRegion && recommendedCount > 0 && (
+                        <View style={styles.recommendationLegend}>
+                            <MaterialCommunityIcons name="leaf" size={16} color="#2E7D32" />
+                            <Text style={styles.recommendationLegendText}>
+                                Los cultivos en verde están recomendados para {selectedRegion.nombre}
+                            </Text>
+                        </View>
+                    )}
                     <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
@@ -412,6 +572,7 @@ export const AddCropModal: React.FC<AddCropModalProps> = ({
                                 key={cul.id}
                                 label={cul.nombre}
                                 selected={selectedCultivo?.id === cul.id}
+                                recommended={Boolean(cul.es_recomendado)}
                                 onPress={() => { setSelectedCultivo(cul); }}
                             />
                         ))}
@@ -549,6 +710,12 @@ export const AddCropModal: React.FC<AddCropModalProps> = ({
 
                     <View style={{ height: 50 }} />
                 </ScrollView>
+
+                {isSubmitting && (
+                    <View style={styles.loaderOverlay}>
+                        <GrowingCropLoader />
+                    </View>
+                )}
             </KeyboardAvoidingView>
         </Modal>
     );
@@ -560,6 +727,13 @@ const styles = StyleSheet.create({
     modalContainer: {
         flex: 1,
         backgroundColor: '#fff',
+    },
+    loaderOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(241, 248, 233, 0.94)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 24,
     },
     modalHeader: {
         flexDirection: 'row',
@@ -668,12 +842,113 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 
+    // Loader
+    loaderCard: {
+        width: '100%',
+        maxWidth: 320,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        paddingVertical: 28,
+        paddingHorizontal: 24,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#DCECCF',
+        shadowColor: '#1B5E20',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.12,
+        shadowRadius: 18,
+        elevation: 8,
+    },
+    loaderOrbit: {
+        position: 'absolute',
+        width: 118,
+        height: 118,
+        borderRadius: 59,
+        borderWidth: 3,
+        borderColor: '#C8E6C9',
+        borderTopColor: '#4CAF50',
+        opacity: 0.9,
+    },
+    loaderCore: {
+        width: 118,
+        height: 118,
+        borderRadius: 59,
+        backgroundColor: '#F1F8E9',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 22,
+        overflow: 'hidden',
+    },
+    loaderCenter: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 3,
+    },
+    loaderSoil: {
+        position: 'absolute',
+        bottom: 24,
+        width: 58,
+        height: 12,
+        borderRadius: 8,
+        backgroundColor: '#8D6E63',
+    },
+    loaderStem: {
+        position: 'absolute',
+        bottom: 41,
+        width: 6,
+        height: 20,
+        borderRadius: 999,
+        backgroundColor: '#43A047',
+        zIndex: 1,
+    },
+    loaderLeafLeft: {
+        position: 'absolute',
+        bottom: 53,
+        left: 39,
+        width: 16,
+        height: 11,
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 3,
+        borderBottomLeftRadius: 3,
+        borderBottomRightRadius: 16,
+        backgroundColor: '#66BB6A',
+        zIndex: 2,
+    },
+    loaderLeafRight: {
+        position: 'absolute',
+        bottom: 53,
+        right: 39,
+        width: 16,
+        height: 11,
+        borderTopLeftRadius: 3,
+        borderTopRightRadius: 16,
+        borderBottomLeftRadius: 16,
+        borderBottomRightRadius: 3,
+        backgroundColor: '#81C784',
+        zIndex: 2,
+    },
+    loaderTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: '#1B5E20',
+        textAlign: 'center',
+    },
+    loaderSubtitle: {
+        marginTop: 8,
+        fontSize: 14,
+        lineHeight: 20,
+        color: '#4E5D52',
+        textAlign: 'center',
+    },
+
     // Chips
     chipsScroll: {
         flexGrow: 0,
         marginBottom: 4,
     },
     chip: {
+        flexDirection: 'row',
+        alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 10,
         borderRadius: 20,
@@ -682,17 +957,50 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#E0E0E0',
     },
+    chipRecommended: {
+        backgroundColor: '#F1F8E9',
+        borderColor: '#A5D6A7',
+    },
     chipSelected: {
         backgroundColor: '#E8F5E9',
         borderColor: '#4CAF50',
+    },
+    chipRecommendedSelected: {
+        backgroundColor: '#DCEDC8',
+        borderColor: '#2E7D32',
     },
     chipText: {
         fontSize: 13,
         color: '#757575',
         fontWeight: '500',
     },
+    chipTextRecommended: {
+        color: '#2E7D32',
+        fontWeight: '600',
+    },
     chipTextSelected: {
         color: '#4CAF50',
+        fontWeight: '600',
+    },
+    chipIcon: {
+        marginLeft: 6,
+    },
+    recommendationLegend: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#F1F8E9',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#C8E6C9',
+    },
+    recommendationLegendText: {
+        flex: 1,
+        fontSize: 12,
+        color: '#2E7D32',
         fontWeight: '600',
     },
 

@@ -6,20 +6,19 @@ import { Platform } from 'react-native';
  * Similar a environment.ts de Angular.
  */
 
-// Web keeps localhost. Physical devices must use the PC LAN IP.
-const WEB_HOST = 'localhost';
-const DEVICE_HOST = '192.168.1.68';
-const API_HOST = Platform.OS === 'web' ? WEB_HOST : DEVICE_HOST;
+const WEB_API_BASE_URL = 'http://localhost:8000/api';
+const MOBILE_API_BASE_URL = 'https://11v8700r-8000.usw3.devtunnels.ms/api';
+const API_BASE_URL = Platform.OS === 'web' ? WEB_API_BASE_URL : MOBILE_API_BASE_URL;
 
 export const environment = {
     production: false,
-    apiUrl: `http://${API_HOST}:8000/api`, // API Gateway
+    apiUrl: API_BASE_URL,
     services: {
-        auth: `http://${API_HOST}:8000/api/auth`,
-        huertos: `http://${API_HOST}:8000/api/huertos`,
-        plagas: `http://${API_HOST}:8000/api/plagas`,
-        chat: `http://${API_HOST}:8000/api/chat`,
-        reportes: `http://${API_HOST}:8000/api/reportes`,
+        auth: `${API_BASE_URL}/auth`,
+        huertos: `${API_BASE_URL}/huertos`,
+        plagas: `${API_BASE_URL}/plagas`,
+        chat: `${API_BASE_URL}/chat`,
+        reportes: `${API_BASE_URL}/reportes`,
     }
 };
 

@@ -12,13 +12,17 @@ export const apiClient = axios.create({
         'Content-Type': 'application/json',
         'Accept': 'application/json'
     },
-    timeout: 10000, // 10 segundos timeout
+    timeout: 20000,
 });
 
 // Interceptor de Peticiones: Añadir Token JWT automáticamente
 apiClient.interceptors.request.use(
     async (config) => {
         try {
+            if (typeof FormData !== 'undefined' && config.data instanceof FormData && config.headers) {
+                delete config.headers['Content-Type'];
+            }
+
             const token = await tokenStorage.getToken();
             if (token && config.headers) {
                 config.headers.Authorization = `Bearer ${token}`;

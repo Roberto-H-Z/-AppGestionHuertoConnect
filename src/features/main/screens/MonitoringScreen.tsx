@@ -1,41 +1,33 @@
-/**
- * MonitoringScreen - Crop timeline / seguimiento.
- * Shows a vertical timeline with stages & activities per crop.
- * Allows filtering by crop via horizontal chips.
- * Mock data is generated from the harvest-status stages.
- */
-
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-    View,
-    Text,
-    StyleSheet,
+    ActivityIndicator,
+    Platform,
     SafeAreaView,
     ScrollView,
+    StyleSheet,
+    Text,
     TouchableOpacity,
-    Platform,
+    View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { HarvestStatus } from '../types/cropTypes';
+import { apiClient } from '../../../infrastructure/api/apiClient';
 
-// ---- Types ----
+type StageStatus = 'completed' | 'in-progress' | 'pending';
 
 interface TimelineActivity {
     id: string;
     action: string;
     detail: string;
-    date: string;          // DD/MM/YYYY
-    icon: string;          // MaterialCommunityIcons name
+    date: string;
+    icon: string;
     iconColor: string;
 }
-
-type StageStatus = 'completed' | 'in-progress' | 'pending';
 
 interface TimelineStage {
     id: string;
     name: string;
-    dayLabel: string;       // e.g. "Día 1"
+    dayLabel: string;
     status: StageStatus;
     description: string;
     activities: TimelineActivity[];
@@ -47,72 +39,6 @@ interface CropTimeline {
     cropIcon: string;
     stages: TimelineStage[];
 }
-
-// ---- Mock Data Builder ----
-
-const stageDefinitions: {
-    name: HarvestStatus;
-    dayStart: number;
-    description: string;
-}[] = [
-        { name: 'Germinación', dayStart: 1, description: 'Siembra y primeros brotes' },
-        { name: 'Crecimiento', dayStart: 15, description: 'Desarrollo vegetativo y hojas' },
-        { name: 'Floración', dayStart: 45, description: 'Aparición de flores y polinización' },
-        { name: 'Fructificación', dayStart: 60, description: 'Desarrollo de frutos' },
-        { name: 'Cosecha', dayStart: 90, description: 'Recolección de frutos maduros' },
-    ];
-
-const buildMockActivities = (stageName: string, baseDate: Date): TimelineActivity[] => {
-    const fmt = (d: Date) => {
-        const dd = d.getDate().toString().padStart(2, '0');
-        const mm = (d.getMonth() + 1).toString().padStart(2, '0');
-        return `${dd}/${mm}/${d.getFullYear()}`;
-    };
-
-    const activityMap: Record<string, TimelineActivity[]> = {
-        Germinación: [
-            { id: 'a1', action: 'Siembra', detail: 'Semillas plantadas en sustrato húmedo', date: fmt(baseDate), icon: 'seed-outline', iconColor: '#8D6E63' },
-            { id: 'a2', action: 'Riego inicial', detail: 'Primer riego después de la siembra', date: fmt(baseDate), icon: 'water', iconColor: '#42A5F5' },
-        ],
-        Crecimiento: [
-            { id: 'a3', action: 'Fertilización', detail: 'Aplicación de abono orgánico', date: fmt(new Date(baseDate.getTime() + 15 * 86400000)), icon: 'leaf', iconColor: '#66BB6A' },
-            { id: 'a4', action: 'Riego', detail: 'Riego programado completado', date: fmt(new Date(baseDate.getTime() + 18 * 86400000)), icon: 'water', iconColor: '#42A5F5' },
-            { id: 'a5', action: 'Poda', detail: 'Poda de hojas inferiores', date: fmt(new Date(baseDate.getTime() + 25 * 86400000)), icon: 'content-cut', iconColor: '#FF7043' },
-        ],
-        Floración: [
-            { id: 'a6', action: 'Control de plagas', detail: 'Inspección y aplicación preventiva', date: fmt(new Date(baseDate.getTime() + 45 * 86400000)), icon: 'bug-outline', iconColor: '#EF5350' },
-        ],
-        Fructificación: [
-            { id: 'a7', action: 'Nutrición', detail: 'Aplicar fertilizante rico en potasio', date: fmt(new Date(baseDate.getTime() + 60 * 86400000)), icon: 'flask-outline', iconColor: '#AB47BC' },
-        ],
-        Cosecha: [
-            { id: 'a8', action: 'Recolección', detail: 'Cosechar frutos maduros', date: fmt(new Date(baseDate.getTime() + 90 * 86400000)), icon: 'basket-outline', iconColor: '#FFA726' },
-        ],
-    };
-
-    return activityMap[stageName] || [];
-};
-
-const getStageStatus = (
-    stageName: string,
-    currentStatus: HarvestStatus,
-    currentDay: number,
-    stageDayStart: number,
-): StageStatus => {
-    const order: HarvestStatus[] = ['Germinación', 'Crecimiento', 'Floración', 'Fructificación', 'Cosecha'];
-    const currentIdx = order.indexOf(currentStatus);
-    const stageIdx = order.indexOf(stageName as HarvestStatus);
-
-    if (stageIdx < currentIdx) return 'completed';
-    if (stageIdx === currentIdx) return 'in-progress';
-    return 'pending';
-};
-
-const buildMockTimelines = (): CropTimeline[] => {
-    return [];
-};
-
-// ---- Status visual helpers ----
 
 const statusConfig: Record<StageStatus, { bg: string; border: string; dotBg: string; dotBorder: string; icon: string; iconColor: string }> = {
     completed: {
@@ -141,8 +67,6 @@ const statusConfig: Record<StageStatus, { bg: string; border: string; dotBg: str
     },
 };
 
-// ---- Components ----
-
 const TimelineDot: React.FC<{ status: StageStatus }> = ({ status }) => {
     const cfg = statusConfig[status];
     return (
@@ -152,22 +76,17 @@ const TimelineDot: React.FC<{ status: StageStatus }> = ({ status }) => {
     );
 };
 
-const StageCard: React.FC<{
-    stage: TimelineStage;
-    isLast: boolean;
-}> = ({ stage, isLast }) => {
+const StageCard: React.FC<{ stage: TimelineStage; isLast: boolean }> = ({ stage, isLast }) => {
     const cfg = statusConfig[stage.status];
     const [expanded, setExpanded] = useState(stage.status === 'in-progress');
 
     return (
         <View style={styles.stageRow}>
-            {/* Timeline rail */}
             <View style={styles.railColumn}>
                 <TimelineDot status={stage.status} />
                 {!isLast && <View style={styles.railLine} />}
             </View>
 
-            {/* Card */}
             <TouchableOpacity
                 style={[
                     styles.stageCard,
@@ -182,22 +101,10 @@ const StageCard: React.FC<{
             >
                 <View style={styles.stageCardHeader}>
                     <View style={{ flex: 1 }}>
-                        <Text
-                            style={[
-                                styles.stageName,
-                                stage.status === 'pending' && styles.stageNamePending,
-                            ]}
-                        >
+                        <Text style={[styles.stageName, stage.status === 'pending' && styles.stageNamePending]}>
                             {stage.name}
                         </Text>
-                        <Text
-                            style={[
-                                styles.stageDesc,
-                                stage.status === 'in-progress' && styles.stageDescActive,
-                            ]}
-                        >
-                            {stage.description}
-                        </Text>
+                        <Text style={styles.stageDesc}>{stage.description}</Text>
                     </View>
                     <View style={styles.dayBadge}>
                         <Text style={styles.dayBadgeLabel}>Día</Text>
@@ -205,13 +112,12 @@ const StageCard: React.FC<{
                     </View>
                 </View>
 
-                {/* Expanded activities */}
                 {expanded && stage.activities.length > 0 && (
                     <View style={styles.activitiesContainer}>
                         <View style={styles.activitiesDivider} />
                         {stage.activities.map((act) => (
                             <View key={act.id} style={styles.activityRow}>
-                                <View style={[styles.activityDot, { backgroundColor: act.iconColor + '20' }]}>
+                                <View style={[styles.activityDot, { backgroundColor: `${act.iconColor}20` }]}>
                                     <MaterialCommunityIcons name={act.icon as any} size={16} color={act.iconColor} />
                                 </View>
                                 <View style={styles.activityInfo}>
@@ -223,33 +129,74 @@ const StageCard: React.FC<{
                         ))}
                     </View>
                 )}
+
+                {expanded && stage.activities.length === 0 && (
+                    <View style={styles.activitiesContainer}>
+                        <View style={styles.activitiesDivider} />
+                        <Text style={styles.emptyActivitiesText}>Aún no hay acciones registradas en esta etapa.</Text>
+                    </View>
+                )}
             </TouchableOpacity>
         </View>
     );
 };
 
-// ---- Main Screen ----
-
 export const MonitoringScreen: React.FC = () => {
-    const timelines = useMemo(() => buildMockTimelines(), []);
+    const [timelines, setTimelines] = useState<CropTimeline[]>([]);
     const [selectedCropId, setSelectedCropId] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
 
-    // "Todos" shows all, or filter by selected crop
-    const displayedTimelines = selectedCropId
-        ? timelines.filter((t) => t.cropId === selectedCropId)
-        : timelines;
+    useEffect(() => {
+        const loadTimeline = async () => {
+            try {
+                setLoading(true);
+                const response = await apiClient.get('/huertos-realizados/timeline');
+                const mappedTimelines: CropTimeline[] = (response.data || []).map((timeline: any) => ({
+                    cropId: timeline.crop_id,
+                    cropName: timeline.crop_name,
+                    cropIcon: timeline.crop_icon || 'sprout',
+                    stages: (timeline.stages || []).map((stage: any) => ({
+                        id: stage.id,
+                        name: stage.name,
+                        dayLabel: stage.day_label,
+                        status: stage.status,
+                        description: stage.description,
+                        activities: (stage.activities || []).map((activity: any) => ({
+                            id: activity.id,
+                            action: activity.action,
+                            detail: activity.detail,
+                            date: activity.date,
+                            icon: activity.icon,
+                            iconColor: activity.icon_color,
+                        })),
+                    })),
+                }));
+                setTimelines(mappedTimelines);
+            } catch (error) {
+                console.warn('Timeline fetch failed:', error);
+                setTimelines([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadTimeline();
+    }, []);
+
+    const displayedTimelines = useMemo(
+        () => (selectedCropId ? timelines.filter((timeline) => timeline.cropId === selectedCropId) : timelines),
+        [selectedCropId, timelines]
+    );
 
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
 
-            {/* Header */}
             <View style={styles.header}>
                 <MaterialCommunityIcons name="timeline-clock-outline" size={22} color="#4CAF50" />
                 <Text style={styles.headerTitle}>Línea de Tiempo del Cultivo</Text>
             </View>
 
-            {/* Crop filter chips */}
             <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -261,65 +208,43 @@ export const MonitoringScreen: React.FC = () => {
                     onPress={() => setSelectedCropId(null)}
                     activeOpacity={0.7}
                 >
-                    <MaterialCommunityIcons
-                        name="view-grid-outline"
-                        size={16}
-                        color={!selectedCropId ? '#fff' : '#4CAF50'}
-                    />
-                    <Text style={[styles.chipText, !selectedCropId && styles.chipTextActive]}>
-                        Todos
-                    </Text>
+                    <MaterialCommunityIcons name="view-grid-outline" size={16} color={!selectedCropId ? '#fff' : '#4CAF50'} />
+                    <Text style={[styles.chipText, !selectedCropId && styles.chipTextActive]}>Todos</Text>
                 </TouchableOpacity>
-                {timelines.map((tl) => {
-                    const active = selectedCropId === tl.cropId;
+                {timelines.map((timeline) => {
+                    const active = selectedCropId === timeline.cropId;
                     return (
                         <TouchableOpacity
-                            key={tl.cropId}
+                            key={timeline.cropId}
                             style={[styles.chip, active && styles.chipActive]}
-                            onPress={() => setSelectedCropId(tl.cropId)}
+                            onPress={() => setSelectedCropId(timeline.cropId)}
                             activeOpacity={0.7}
                         >
-                            <MaterialCommunityIcons
-                                name={tl.cropIcon as any}
-                                size={16}
-                                color={active ? '#fff' : '#4CAF50'}
-                            />
-                            <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                                {tl.cropName}
-                            </Text>
+                            <MaterialCommunityIcons name={timeline.cropIcon as any} size={16} color={active ? '#fff' : '#4CAF50'} />
+                            <Text style={[styles.chipText, active && styles.chipTextActive]}>{timeline.cropName}</Text>
                         </TouchableOpacity>
                     );
                 })}
             </ScrollView>
 
-            {/* Timeline content */}
-            <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-            >
-                {displayedTimelines.length > 0 ? (
-                    displayedTimelines.map((tl) => (
-                        <View key={tl.cropId} style={styles.timelineSection}>
-                            {/* Crop section header (only when showing all) */}
+            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#4CAF50" />
+                        <Text style={styles.loadingText}>Cargando línea de tiempo...</Text>
+                    </View>
+                ) : displayedTimelines.length > 0 ? (
+                    displayedTimelines.map((timeline) => (
+                        <View key={timeline.cropId} style={styles.timelineSection}>
                             {!selectedCropId && (
                                 <View style={styles.cropSectionHeader}>
-                                    <MaterialCommunityIcons
-                                        name={tl.cropIcon as any}
-                                        size={18}
-                                        color="#4CAF50"
-                                    />
-                                    <Text style={styles.cropSectionTitle}>{tl.cropName}</Text>
+                                    <MaterialCommunityIcons name={timeline.cropIcon as any} size={18} color="#4CAF50" />
+                                    <Text style={styles.cropSectionTitle}>{timeline.cropName}</Text>
                                 </View>
                             )}
 
-                            {/* Stages */}
-                            {tl.stages.map((stage, idx) => (
-                                <StageCard
-                                    key={stage.id}
-                                    stage={stage}
-                                    isLast={idx === tl.stages.length - 1}
-                                />
+                            {timeline.stages.map((stage, index) => (
+                                <StageCard key={stage.id} stage={stage} isLast={index === timeline.stages.length - 1} />
                             ))}
                         </View>
                     ))
@@ -327,18 +252,17 @@ export const MonitoringScreen: React.FC = () => {
                     <View style={styles.emptyContainer}>
                         <MaterialCommunityIcons name="sprout-outline" size={48} color="#C8E6C9" />
                         <Text style={styles.emptyTitle}>Línea de tiempo vacía</Text>
-                        <Text style={styles.emptySubtitle}>Aquí verás el progreso de tus cultivos etapa por etapa, una vez que agregues uno.</Text>
+                        <Text style={styles.emptySubtitle}>
+                            Aquí verás el progreso y las acciones registradas de tus cultivos, una vez que agregues uno.
+                        </Text>
                     </View>
                 )}
 
-                {/* Bottom spacer */}
                 <View style={{ height: 100 }} />
             </ScrollView>
         </SafeAreaView>
     );
 };
-
-// ---- Styles ----
 
 const styles = StyleSheet.create({
     container: {
@@ -359,8 +283,6 @@ const styles = StyleSheet.create({
         color: '#1B5E20',
         fontStyle: 'italic',
     },
-
-    // Chips
     chipsScroll: {
         flexGrow: 0,
         paddingVertical: 8,
@@ -385,183 +307,174 @@ const styles = StyleSheet.create({
         borderColor: '#4CAF50',
     },
     chipText: {
-        fontSize: 13,
+        fontSize: 14,
         color: '#4CAF50',
         fontWeight: '600',
     },
     chipTextActive: {
         color: '#fff',
     },
-
-    // Scroll
     scrollView: {
         flex: 1,
     },
     scrollContent: {
-        paddingTop: 10,
-        paddingHorizontal: 10,
+        paddingHorizontal: 20,
+        paddingBottom: 20,
     },
-
-    // Timeline section
+    loadingContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 40,
+    },
+    loadingText: {
+        marginTop: 12,
+        color: '#4E5D52',
+        fontSize: 14,
+    },
     timelineSection: {
-        marginBottom: 12,
+        marginBottom: 24,
     },
     cropSectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        paddingHorizontal: 10,
         marginBottom: 12,
-        marginTop: 4,
     },
     cropSectionTitle: {
         fontSize: 16,
         fontWeight: '700',
         color: '#1B5E20',
     },
-
-    // Stage row
     stageRow: {
         flexDirection: 'row',
-        paddingLeft: 6,
+        alignItems: 'stretch',
     },
-
-    // Rail
     railColumn: {
-        alignItems: 'center',
         width: 32,
+        alignItems: 'center',
+    },
+    railLine: {
+        flex: 1,
+        width: 2,
+        backgroundColor: '#C8E6C9',
+        marginTop: 4,
     },
     dot: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
         borderWidth: 2,
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1,
+        zIndex: 2,
     },
-    railLine: {
-        width: 2,
-        flex: 1,
-        backgroundColor: '#C8E6C9',
-        marginTop: -2,
-        marginBottom: -2,
-    },
-
-    // Stage card
     stageCard: {
         flex: 1,
-        marginLeft: 10,
-        marginBottom: 14,
-        borderRadius: 14,
-        padding: 14,
+        borderRadius: 18,
+        padding: 16,
+        marginBottom: 16,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 1,
+        shadowRadius: 6,
+        elevation: 2,
     },
     stageCardHeader: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
+        gap: 12,
+        alignItems: 'center',
     },
     stageName: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1B5E20',
+    },
+    stageNamePending: {
+        color: '#78909C',
+    },
+    stageDesc: {
+        marginTop: 4,
+        fontSize: 13,
+        color: '#607D8B',
+    },
+    dayBadge: {
+        minWidth: 62,
+        borderRadius: 12,
+        backgroundColor: '#fff',
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        alignItems: 'center',
+    },
+    dayBadgeLabel: {
+        fontSize: 11,
+        color: '#90A4AE',
+    },
+    dayBadgeValue: {
         fontSize: 15,
         fontWeight: '700',
         color: '#1B5E20',
-        marginBottom: 4,
     },
-    stageNamePending: {
-        color: '#9E9E9E',
-    },
-    stageDesc: {
-        fontSize: 13,
-        color: '#9E9E9E',
-        lineHeight: 18,
-    },
-    stageDescActive: {
-        color: '#616161',
-    },
-
-    // Day badge
-    dayBadge: {
-        alignItems: 'center',
-        backgroundColor: '#F1F8E9',
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 10,
-        marginLeft: 8,
-    },
-    dayBadgeLabel: {
-        fontSize: 10,
-        color: '#9E9E9E',
-        fontWeight: '500',
-    },
-    dayBadgeValue: {
-        fontSize: 16,
-        fontWeight: '800',
-        color: '#1B5E20',
-    },
-
-    // Activities
     activitiesContainer: {
-        marginTop: 10,
+        marginTop: 14,
     },
     activitiesDivider: {
         height: 1,
         backgroundColor: '#E8F5E9',
-        marginBottom: 10,
+        marginBottom: 12,
     },
     activityRow: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start',
+        gap: 10,
         paddingVertical: 8,
     },
     activityDot: {
-        width: 30,
-        height: 30,
-        borderRadius: 8,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
     },
     activityInfo: {
         flex: 1,
-        marginLeft: 10,
     },
     activityAction: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#424242',
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#2E3D33',
     },
     activityDetail: {
-        fontSize: 11,
-        color: '#9E9E9E',
-        marginTop: 1,
+        marginTop: 2,
+        fontSize: 13,
+        color: '#607D8B',
     },
     activityDate: {
-        fontSize: 11,
-        color: '#BDBDBD',
-        fontWeight: '500',
+        fontSize: 12,
+        color: '#90A4AE',
+        fontWeight: '600',
     },
-    
-    // Empty state
+    emptyActivitiesText: {
+        fontSize: 13,
+        color: '#90A4AE',
+    },
     emptyContainer: {
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 60,
+        paddingVertical: 48,
+        paddingHorizontal: 24,
     },
     emptyTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#81C784',
         marginTop: 12,
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1B5E20',
     },
     emptySubtitle: {
-        fontSize: 14,
-        color: '#A5D6A7',
-        textAlign: 'center',
-        paddingHorizontal: 30,
         marginTop: 8,
+        textAlign: 'center',
+        fontSize: 14,
+        lineHeight: 20,
+        color: '#607D8B',
     },
 });
 

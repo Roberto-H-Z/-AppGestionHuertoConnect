@@ -15,6 +15,7 @@ import {
     ScrollView,
     TouchableOpacity,
     Platform,
+    Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -70,7 +71,7 @@ export const HomeScreen: React.FC = () => {
                 id: h.id,
                 gardenAreaId: h.region_id,
                 name: h.cultivo_nombre || 'Cultivo', // Backend should ideally provide name or we map it
-                imageUri: null, 
+                imageUri: h.imagen_url || null,
                 currentDay: h.dia_actual,
                 totalDays: h.total_dias,
                 harvestStatus: h.estado_cosecha,
@@ -86,7 +87,7 @@ export const HomeScreen: React.FC = () => {
                     title: t,
                     completed: false
                 })),
-                description: h.description || ''
+                description: h.descripcion || ''
             }));
             setCrops(apiCrops);
         } catch (error) {
@@ -132,6 +133,47 @@ export const HomeScreen: React.FC = () => {
 
     const handleSaveCrop = useCallback(async (cropData: any, newArea?: GardenArea) => {
         try {
+            let imagePayload: { imagen_url?: string; imagen_public_id?: string } = {};
+
+            if (cropData.imageUri) {
+                const imageName = cropData.imageUri.split('/').pop() || `cultivo-${Date.now()}.jpg`;
+                const imageExtension = imageName.split('.').pop()?.toLowerCase();
+                const imageTypeMap: Record<string, string> = {
+                    jpg: 'image/jpeg',
+                    jpeg: 'image/jpeg',
+                    png: 'image/png',
+                    webp: 'image/webp',
+                    gif: 'image/gif',
+                };
+
+                const formData = new FormData();
+                const imageType = imageTypeMap[imageExtension || 'jpg'] || 'image/jpeg';
+
+                if (Platform.OS === 'web') {
+                    const imageResponse = await fetch(cropData.imageUri);
+                    const imageBlob = await imageResponse.blob();
+                    const imageFile = new File([imageBlob], imageName, { type: imageType });
+                    formData.append('imagen', imageFile);
+                } else {
+                    formData.append('imagen', {
+                        uri: cropData.imageUri,
+                        name: imageName,
+                        type: imageType,
+                    } as any);
+                }
+
+                const uploadResponse = await apiClient.post('/huertos-realizados/upload-imagen', formData, {
+                    headers: {
+                        'Accept': 'application/json',
+                    },
+                });
+
+                imagePayload = {
+                    imagen_url: uploadResponse.data?.secure_url,
+                    imagen_public_id: uploadResponse.data?.public_id,
+                };
+            }
+
             // Re-map to match Backend HuertoRealizadoCreate
             const payload = {
                 region_id: cropData.regionId,
@@ -141,7 +183,8 @@ export const HomeScreen: React.FC = () => {
                 total_dias: cropData.totalDays,
                 proximo_riego: cropData.nextWateringISO, // Send ISO date
                 tareas: cropData.tasks.map((t: any) => t.title),
-                descripcion: cropData.description
+                descripcion: cropData.description,
+                ...imagePayload,
             };
 
             console.log('[HomeScreen] Saving crop payload:', JSON.stringify(payload, null, 2));
@@ -151,17 +194,16 @@ export const HomeScreen: React.FC = () => {
             console.log('[HomeScreen] Save response:', res.status, res.data);
             
             if (res.data) {
-                // Refresh list
-                loadCrops();
+                await loadCrops();
             }
 
             if (newArea) {
                 setGardenAreas((prev) => [...prev, newArea]);
             }
-            setModalVisible(false);
         } catch (error) {
             console.error('Error saving crop:', error);
-            alert('Error al guardar el cultivo');
+            Alert.alert('Error', 'No se pudo guardar el cultivo. Revisa tu conexión e inténtalo de nuevo.');
+            throw error;
         }
     }, [gardenAreas]);
 
@@ -242,7 +284,6 @@ export const HomeScreen: React.FC = () => {
                     onPress={() => setNotificationsVisible(true)}
                 >
                     <MaterialCommunityIcons name="bell-outline" size={24} color="#1B5E20" />
-                    <View style={styles.notificationDot} />
                 </TouchableOpacity>
             </View>
 
@@ -377,17 +418,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.06,
         shadowRadius: 4,
         elevation: 2,
-    },
-    notificationDot: {
-        position: 'absolute',
-        top: 10,
-        right: 12,
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#FF5722',
-        borderWidth: 1.5,
-        borderColor: '#fff',
     },
     scrollView: {
         flex: 1,
