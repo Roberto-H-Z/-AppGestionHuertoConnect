@@ -192,16 +192,18 @@ const GrowingCropLoader: React.FC = () => {
 
     return (
         <View style={styles.loaderCard}>
-            <Animated.View style={[styles.loaderOrbit, { transform: [{ rotate: spin }] }]} />
-            <Animated.View style={[styles.loaderCore, { transform: [{ scale: pulseAnim }] }]}>
-                <View style={styles.loaderSoil} />
-                <View style={styles.loaderStem} />
-                <Animated.View style={[styles.loaderLeafLeft, { transform: [{ rotate: leftLeafRotate }] }]} />
-                <Animated.View style={[styles.loaderLeafRight, { transform: [{ rotate: rightLeafRotate }] }]} />
-                <View style={styles.loaderCenter}>
-                    <MaterialCommunityIcons name="sprout" size={34} color="#2E7D32" />
-                </View>
-            </Animated.View>
+            <View style={styles.loaderStage}>
+                <Animated.View style={[styles.loaderOrbit, { transform: [{ rotate: spin }] }]} />
+                <Animated.View style={[styles.loaderCore, { transform: [{ scale: pulseAnim }] }]}>
+                    <View style={styles.loaderSoil} />
+                    <View style={styles.loaderStem} />
+                    <Animated.View style={[styles.loaderLeafLeft, { transform: [{ rotate: leftLeafRotate }] }]} />
+                    <Animated.View style={[styles.loaderLeafRight, { transform: [{ rotate: rightLeafRotate }] }]} />
+                    <View style={styles.loaderCenter}>
+                        <MaterialCommunityIcons name="sprout" size={34} color="#2E7D32" />
+                    </View>
+                </Animated.View>
+            </View>
             <Text style={styles.loaderTitle}>Sembrando tu cultivo</Text>
             <Text style={styles.loaderSubtitle}>
                 Estamos preparando tu huerto, espera un momento.
@@ -859,6 +861,14 @@ const styles = StyleSheet.create({
         shadowRadius: 18,
         elevation: 8,
     },
+    loaderStage: {
+        width: 136,
+        height: 136,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 14,
+        position: 'relative',
+    },
     loaderOrbit: {
         position: 'absolute',
         width: 118,
@@ -876,7 +886,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#F1F8E9',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 22,
         overflow: 'hidden',
     },
     loaderCenter: {
