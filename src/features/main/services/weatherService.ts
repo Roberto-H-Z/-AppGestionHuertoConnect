@@ -71,23 +71,20 @@ const getUvLabel = (uv: number): string => {
 
 const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
+const DEFAULT_WEATHER_LOCATION = {
+    latitude: 19.5312,
+    longitude: -96.9276,
+    name: 'Xalapa',
+};
+
 // ---- API Calls ----
 
-export const fetchWeatherByLocation = async (): Promise<WeatherData> => {
-    // Request location permission
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-        throw new Error('Permiso de ubicación denegado');
-    }
-
-    const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-    });
-
-    const { latitude, longitude } = location.coords;
-
-    // Get location name (reverse geocode)
-    let locationName = 'Tu ubicación';
+const fetchWeatherByCoordinates = async (
+    latitude: number,
+    longitude: number,
+    fallbackName: string
+): Promise<WeatherData> => {
+    let locationName = fallbackName;
     try {
         const [geo] = await Location.reverseGeocodeAsync({ latitude, longitude });
         if (geo) {
@@ -151,4 +148,34 @@ export const fetchWeatherByLocation = async (): Promise<WeatherData> => {
         locationName,
         lastUpdated,
     };
+};
+
+export const fetchWeatherByLocation = async (): Promise<WeatherData> => {
+    try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+            return fetchWeatherByCoordinates(
+                DEFAULT_WEATHER_LOCATION.latitude,
+                DEFAULT_WEATHER_LOCATION.longitude,
+                DEFAULT_WEATHER_LOCATION.name
+            );
+        }
+
+        const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+        });
+
+        return fetchWeatherByCoordinates(
+            location.coords.latitude,
+            location.coords.longitude,
+            'Tu ubicación'
+        );
+    } catch {
+        // Fallback necesario para emuladores sin GPS o pruebas sin permisos de ubicacion.
+        return fetchWeatherByCoordinates(
+            DEFAULT_WEATHER_LOCATION.latitude,
+            DEFAULT_WEATHER_LOCATION.longitude,
+            DEFAULT_WEATHER_LOCATION.name
+        );
+    }
 };

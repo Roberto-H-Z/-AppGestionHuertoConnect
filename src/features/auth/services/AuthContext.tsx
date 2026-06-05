@@ -18,17 +18,6 @@ interface AuthProviderProps {
     children: ReactNode;
 }
 
-const DEMO_USER: UserResponse = {
-    id: 'demo-huertoconnect',
-    email: 'demo.huertoconnect@app.local',
-    nombre: 'Agricultor',
-    apellidos: 'Demo',
-    rol: 'usuario',
-    activo: true,
-};
-
-const DEMO_SESSION_TOKEN = 'demo-local-session';
-
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [user, setUser] = useState<UserResponse | null>(null);
     const [token, setToken] = useState<string | null>(null);
@@ -49,15 +38,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 setToken(storedToken);
                 setUser(userData);
             } else {
-                // Sesion demo local para arrancar la app mientras el login esta desactivado.
-                setToken(DEMO_SESSION_TOKEN);
-                setUser(DEMO_USER);
+                setToken(null);
+                setUser(null);
             }
         } catch (error) {
             console.log('Sesión inválida o expirada:', error);
             await tokenStorage.clearAll();
-            setToken(DEMO_SESSION_TOKEN);
-            setUser(DEMO_USER);
+            setToken(null);
+            setUser(null);
         } finally {
             setIsLoading(false);
         }
@@ -91,13 +79,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const signOut = async () => {
         try {
             // Solo avisa al servidor cuando existe una sesion real guardada.
-            if (token && token !== DEMO_SESSION_TOKEN) {
+            if (token) {
                 await authService.logout().catch(e => console.warn('Logout API falló', e));
             }
         } finally {
             await tokenStorage.clearAll();
-            setToken(DEMO_SESSION_TOKEN);
-            setUser(DEMO_USER);
+            setToken(null);
+            setUser(null);
         }
     };
 
