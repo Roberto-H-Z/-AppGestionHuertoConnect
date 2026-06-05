@@ -28,7 +28,8 @@ export default function App() {
     <AuthProvider>
       <NavigationContainer>
         <Stack.Navigator
-          initialRouteName="Splash"
+          // Bypass temporal de autenticación: inicia directo en la app principal.
+          initialRouteName="Main"
           screenOptions={{ headerShown: false }}
         >
           <Stack.Screen name="Splash" component={SplashScreen} />
