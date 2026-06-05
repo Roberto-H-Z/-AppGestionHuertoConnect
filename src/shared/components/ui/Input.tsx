@@ -8,6 +8,7 @@ import {
     StyleSheet,
     Animated,
     ViewStyle,
+    TextStyle,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
@@ -18,7 +19,9 @@ interface InputProps extends TextInputProps {
     isPassword?: boolean;
     validationStatus?: ValidationStatus;
     validationMessage?: string;
+    containerStyle?: ViewStyle;
     inputContainerStyle?: ViewStyle;
+    labelStyle?: TextStyle;
 }
 
 // Icono de ojo abierto
@@ -67,7 +70,9 @@ export const Input: React.FC<InputProps> = ({
     isPassword = false,
     validationStatus = 'idle',
     validationMessage,
+    containerStyle,
     inputContainerStyle,
+    labelStyle,
     style,
     onFocus,
     onBlur,
@@ -183,8 +188,8 @@ export const Input: React.FC<InputProps> = ({
     const messageColor = validationStatus === 'error' ? '#ff6b6b' : '#6ee7b7';
 
     return (
-        <View style={styles.container}>
-            {Boolean(label) && <Text style={styles.label}>{label}</Text>}
+        <View style={[styles.container, containerStyle]}>
+            {Boolean(label) && <Text style={[styles.label, labelStyle]}>{label}</Text>}
             <Animated.View
                 style={[
                     styles.inputContainer,

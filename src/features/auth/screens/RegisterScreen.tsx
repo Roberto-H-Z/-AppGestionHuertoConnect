@@ -87,8 +87,8 @@ const PasswordStrengthBar: React.FC<{ password: string }> = ({ password }) => {
 
 const strengthStyles = StyleSheet.create({
     container: {
-        marginTop: -8,
-        marginBottom: 8,
+        marginTop: -6,
+        marginBottom: 6,
         paddingHorizontal: 2,
     },
     barBackground: {
@@ -149,8 +149,8 @@ const matchStyles = StyleSheet.create({
     container: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: -8,
-        marginBottom: 10,
+        marginTop: -6,
+        marginBottom: 6,
         paddingHorizontal: 2,
     },
     text: {
@@ -316,6 +316,7 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
+                    scrollEnabled={false}
                 >
                     {/* Logo y título */}
                     <Animated.View
@@ -345,7 +346,6 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                         <Text style={styles.subtitle}>Forma parte de nuestra comunidad </Text>
                     </Animated.View>
 
-                    {/* Formulario con glassmorphism */}
                     <Animated.View
                         style={[
                             styles.formContainer,
@@ -354,7 +354,9 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                             },
                         ]}
                     >
-                        <View style={styles.formGlass}>
+                        <View style={styles.formShell}>
+                            <View style={styles.formGlow} />
+                            <View style={styles.formGlass}>
                             {/* Error message */}
                             {error && (
                                 <View style={styles.errorContainer}>
@@ -367,23 +369,33 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                                 </View>
                             )}
 
-                            <Input
-                                label="Nombre(s) *"
-                                placeholder="Tu nombre"
-                                value={nombre}
-                                maxLength={50}
-                                {...createFieldHandlers('nombre', setNombre)}
-                                {...getStatus('nombre')}
-                            />
+                            <View style={styles.nameRow}>
+                                <Input
+                                    label="Nombre *"
+                                    placeholder="Tu nombre"
+                                    value={nombre}
+                                    maxLength={50}
+                                    containerStyle={styles.halfField}
+                                    inputContainerStyle={styles.compactInput}
+                                    labelStyle={styles.compactLabel}
+                                    style={styles.compactInputText}
+                                    {...createFieldHandlers('nombre', setNombre)}
+                                    {...getStatus('nombre')}
+                                />
 
-                            <Input
-                                label="Apellidos *"
-                                placeholder="Tus apellidos"
-                                value={apellidos}
-                                maxLength={80}
-                                {...createFieldHandlers('apellidos', setApellidos)}
-                                {...getStatus('apellidos')}
-                            />
+                                <Input
+                                    label="Apellido *"
+                                    placeholder="Tus apellidos"
+                                    value={apellidos}
+                                    maxLength={80}
+                                    containerStyle={styles.halfField}
+                                    inputContainerStyle={styles.compactInput}
+                                    labelStyle={styles.compactLabel}
+                                    style={styles.compactInputText}
+                                    {...createFieldHandlers('apellidos', setApellidos)}
+                                    {...getStatus('apellidos')}
+                                />
+                            </View>
 
                             <Input
                                 label="Correo electrónico *"
@@ -391,6 +403,10 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                                 keyboardType="email-address"
                                 autoCapitalize="none"
                                 value={email}
+                                containerStyle={styles.compactField}
+                                inputContainerStyle={styles.compactInput}
+                                labelStyle={styles.compactLabel}
+                                style={styles.compactInputText}
                                 {...createFieldHandlers('email', setEmail)}
                                 {...getStatus('email')}
                             />
@@ -400,6 +416,10 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                                 placeholder="••••••••"
                                 isPassword
                                 value={password}
+                                containerStyle={styles.compactField}
+                                inputContainerStyle={styles.compactInput}
+                                labelStyle={styles.compactLabel}
+                                style={styles.compactInputText}
                                 {...createFieldHandlers('password', setPassword)}
                                 {...getStatus('password')}
                             />
@@ -412,6 +432,10 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                                 placeholder="••••••••"
                                 isPassword
                                 value={confirmPassword}
+                                containerStyle={styles.compactField}
+                                inputContainerStyle={styles.compactInput}
+                                labelStyle={styles.compactLabel}
+                                style={styles.compactInputText}
                                 {...createFieldHandlers('confirmPassword', setConfirmPassword, () => ({
                                     password,
                                 }))}
@@ -455,19 +479,10 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                                     <Text style={styles.loginLinkBold}>Inicia sesión</Text>
                                 </Text>
                             </TouchableOpacity>
+                            </View>
                         </View>
                     </Animated.View>
 
-                    {/* Footer */}
-                    <Animated.View
-                        style={[
-                            styles.footer,
-                        ]}
-                    >
-                        <Text style={styles.footerText}>
-                            © 2026 HuertoConnect. Todos los derechos reservados.
-                        </Text>
-                    </Animated.View>
                 </ScrollView>
             </KeyboardAvoidingView>
         </ImageBackground>
@@ -486,46 +501,47 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         flexGrow: 1,
-        paddingHorizontal: 24,
-        paddingTop: height * 0.05,
-        paddingBottom: 30,
+        justifyContent: 'center',
+        paddingHorizontal: 22,
+        paddingTop: height * 0.025,
+        paddingBottom: 16,
     },
 
     // Header
     headerContainer: {
         alignItems: 'center',
-        marginBottom: 20,
-    },
-    logoContainer: {
         marginBottom: 12,
     },
+    logoContainer: {
+        marginBottom: 8,
+    },
     logoCircle: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: 'rgba(255, 255, 255, 0.16)',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 2,
-        borderColor: 'rgba(255, 255, 255, 0.2)',
+        borderColor: 'rgba(209, 250, 229, 0.35)',
         shadowColor: '#6ee7b7',
         shadowOffset: {
             width: 0,
             height: 4,
         },
         shadowOpacity: 0.3,
-        shadowRadius: 8,
+        shadowRadius: 10,
         elevation: 8,
         overflow: 'hidden',
     },
     logoImage: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
+        width: 64,
+        height: 64,
+        borderRadius: 32,
     },
     title: {
-        fontSize: 24,
-        fontWeight: '700',
+        fontSize: 23,
+        fontWeight: '800',
         color: '#fff',
         marginBottom: 6,
         textShadowColor: 'rgba(0, 0, 0, 0.3)',
@@ -533,29 +549,70 @@ const styles = StyleSheet.create({
         textShadowRadius: 4,
     },
     subtitle: {
-        fontSize: 14,
-        color: 'rgba(255, 255, 255, 0.7)',
+        fontSize: 13,
+        color: 'rgba(232, 255, 244, 0.78)',
         fontWeight: '400',
     },
 
     // Formulario
     formContainer: {
-        marginTop: 5,
+        marginTop: 0,
     },
-    formGlass: {
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        borderRadius: 24,
-        padding: 24,
+    formShell: {
+        // Fondo sólido para evitar manchas del asset y mantener un solo panel legible.
+        backgroundColor: '#0b3f2a',
+        borderRadius: 30,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.12)',
+        borderColor: 'rgba(209, 250, 229, 0.28)',
         shadowColor: '#000',
         shadowOffset: {
             width: 0,
-            height: 8,
+            height: 12,
         },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
-        elevation: 10,
+        shadowOpacity: 0.28,
+        shadowRadius: 22,
+        elevation: 12,
+        overflow: 'hidden',
+    },
+    formGlow: {
+        // Brillo superior sutil para dar profundidad sin crear una segunda tarjeta.
+        position: 'absolute',
+        top: 0,
+        left: 26,
+        right: 26,
+        height: 1,
+        backgroundColor: 'rgba(236, 253, 245, 0.55)',
+    },
+    formGlass: {
+        paddingHorizontal: 18,
+        paddingTop: 18,
+        paddingBottom: 16,
+    },
+    nameRow: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    halfField: {
+        flex: 1,
+        width: 'auto',
+        marginBottom: 10,
+    },
+    compactField: {
+        marginBottom: 10,
+    },
+    compactInput: {
+        minHeight: 48,
+        borderRadius: 20,
+        backgroundColor: 'rgba(236, 253, 245, 0.10)',
+        borderColor: 'rgba(167, 243, 208, 0.26)',
+    },
+    compactInputText: {
+        paddingVertical: 10,
+        fontSize: 15,
+    },
+    compactLabel: {
+        marginBottom: 6,
+        fontSize: 13,
     },
     // Error
     errorContainer: {
@@ -577,56 +634,45 @@ const styles = StyleSheet.create({
     },
     registerButton: {
         width: '100%',
-        marginBottom: 16,
-        marginTop: 8,
+        marginBottom: 10,
+        marginTop: 6,
     },
     termsText: {
-        color: 'rgba(255, 255, 255, 0.5)',
-        fontSize: 12,
+        color: 'rgba(232, 255, 244, 0.58)',
+        fontSize: 11,
         textAlign: 'center',
-        marginBottom: 8,
+        marginBottom: 4,
     },
     termsLink: {
-        color: '#6ee7b7',
-        fontWeight: '600',
+        color: '#8ff5cb',
+        fontWeight: '700',
     },
     separator: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginVertical: 12,
+        marginVertical: 8,
     },
     separatorLine: {
         flex: 1,
         height: 1,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        backgroundColor: 'rgba(209, 250, 229, 0.24)',
     },
     separatorText: {
-        color: 'rgba(255, 255, 255, 0.5)',
+        color: 'rgba(232, 255, 244, 0.62)',
         paddingHorizontal: 16,
         fontSize: 14,
     },
     loginLink: {
         alignItems: 'center',
-        paddingVertical: 8,
+        paddingVertical: 4,
     },
     loginLinkText: {
-        color: 'rgba(255, 255, 255, 0.7)',
-        fontSize: 14,
+        color: 'rgba(232, 255, 244, 0.78)',
+        fontSize: 13,
     },
     loginLinkBold: {
-        color: '#6ee7b7',
-        fontWeight: '600',
-    },
-
-    // Footer
-    footer: {
-        alignItems: 'center',
-        marginTop: 20,
-        paddingBottom: 20,
-    },
-    footerText: {
-        color: 'rgba(255, 255, 255, 0.4)',
-        fontSize: 12,
+        color: '#8ff5cb',
+        fontWeight: '700',
     },
 });
 
