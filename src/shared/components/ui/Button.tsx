@@ -128,10 +128,10 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.4,
         shadowRadius: 8,
         elevation: 8,
-        borderRadius: 12,
+        borderRadius: 20,
     },
     buttonWrapper: {
-        borderRadius: 12,
+        borderRadius: 20,
         overflow: 'hidden',
     },
     gradient: {
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 32,
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 12,
+        borderRadius: 20,
     },
     text: {
         color: '#fff',
@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 32,
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 12,
+        borderRadius: 20,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.3)',
         backgroundColor: 'rgba(255,255,255,0.05)',
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 32,
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 12,
+        borderRadius: 20,
         backgroundColor: 'rgba(255,255,255,0.1)',
     },
     secondaryText: {

@@ -206,7 +206,10 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                             },
                         ]}
                     >
-                        <View style={styles.formGlass}>
+                        <View style={styles.formShell}>
+                            <View style={styles.formGlow} />
+                            <View style={styles.formGlass}>
+
                             {/* Error message */}
                             {error && (
                                 <View style={styles.errorContainer}>
@@ -229,6 +232,7 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                                 onBlur={handleEmailBlur}
                                 validationStatus={isTouched('email') ? emailStatus.status : 'idle'}
                                 validationMessage={isTouched('email') ? emailStatus.message : undefined}
+                                inputContainerStyle={styles.softInput}
                             />
 
                             <Input
@@ -240,19 +244,23 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                                 onBlur={handlePasswordBlur}
                                 validationStatus={isTouched('loginPassword') ? passwordStatus.status : 'idle'}
                                 validationMessage={isTouched('loginPassword') ? passwordStatus.message : undefined}
+                                inputContainerStyle={styles.softInput}
                             />
 
-                            {/* Link olvidé contraseña */}
                             <TouchableOpacity
                                 style={styles.forgotPassword}
                                 onPress={() => navigation?.navigate('ForgotPassword')}
                             >
+                                <MaterialCommunityIcons
+                                    name="lock-reset"
+                                    size={16}
+                                    color="rgba(209, 250, 229, 0.78)"
+                                />
                                 <Text style={styles.forgotPasswordText}>
                                     ¿Olvidaste tu contraseña?
                                 </Text>
                             </TouchableOpacity>
 
-                            {/* Botón iniciar sesión */}
                             <Button
                                 title={isLoading ? "Iniciando..." : "Iniciar Sesión"}
                                 onPress={handleLogin}
@@ -277,6 +285,7 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                                     <Text style={styles.registerTextBold}>Regístrate aquí</Text>
                                 </Text>
                             </TouchableOpacity>
+                            </View>
                         </View>
                     </Animated.View>
 
@@ -309,46 +318,46 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         flexGrow: 1,
-        paddingHorizontal: 24,
-        paddingTop: height * 0.08,
-        paddingBottom: 30,
+        paddingHorizontal: 22,
+        paddingTop: height * 0.055,
+        paddingBottom: 28,
     },
 
     // Header
     headerContainer: {
         alignItems: 'center',
-        marginBottom: 30,
+        marginBottom: 24,
     },
     logoContainer: {
-        marginBottom: 20,
+        marginBottom: 16,
     },
     logoCircle: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        width: 116,
+        height: 116,
+        borderRadius: 58,
+        backgroundColor: 'rgba(255, 255, 255, 0.16)',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 2,
-        borderColor: 'rgba(255, 255, 255, 0.2)',
+        borderColor: 'rgba(209, 250, 229, 0.35)',
         shadowColor: '#6ee7b7',
         shadowOffset: {
             width: 0,
             height: 4,
         },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
+        shadowOpacity: 0.34,
+        shadowRadius: 12,
         elevation: 8,
         overflow: 'hidden',
     },
     logoImage: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
+        width: 116,
+        height: 116,
+        borderRadius: 58,
     },
     title: {
-        fontSize: 28,
-        fontWeight: '700',
+        fontSize: 31,
+        fontWeight: '800',
         color: '#fff',
         marginBottom: 8,
         textShadowColor: 'rgba(0, 0, 0, 0.3)',
@@ -357,27 +366,47 @@ const styles = StyleSheet.create({
     },
     subtitle: {
         fontSize: 16,
-        color: 'rgba(255, 255, 255, 0.7)',
+        color: 'rgba(232, 255, 244, 0.78)',
         fontWeight: '400',
     },
     // Formulario
     formContainer: {
-        marginTop: 10,
+        marginTop: 6,
     },
-    formGlass: {
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        borderRadius: 24,
-        padding: 24,
+    formShell: {
+        // Fondo sólido para ocultar manchas del asset y mantener un panel limpio.
+        backgroundColor: '#0b3f2a',
+        borderRadius: 34,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.12)',
+        borderColor: 'rgba(209, 250, 229, 0.28)',
         shadowColor: '#000',
         shadowOffset: {
             width: 0,
-            height: 8,
+            height: 14,
         },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
-        elevation: 10,
+        shadowOpacity: 0.28,
+        shadowRadius: 24,
+        elevation: 12,
+        overflow: 'hidden',
+    },
+    formGlow: {
+        // Brillo superior sutil para que el panel no se perciba plano.
+        position: 'absolute',
+        top: 0,
+        left: 28,
+        right: 28,
+        height: 1,
+        backgroundColor: 'rgba(236, 253, 245, 0.55)',
+    },
+    formGlass: {
+        paddingHorizontal: 22,
+        paddingTop: 28,
+        paddingBottom: 24,
+    },
+    softInput: {
+        minHeight: 58,
+        backgroundColor: 'rgba(236, 253, 245, 0.10)',
+        borderColor: 'rgba(167, 243, 208, 0.26)',
     },
     // Error
     errorContainer: {
@@ -398,17 +427,21 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     forgotPassword: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
         alignSelf: 'flex-end',
-        marginBottom: 20,
-        marginTop: -8,
+        marginBottom: 22,
+        marginTop: -2,
     },
     forgotPasswordText: {
-        color: 'rgba(255, 255, 255, 0.7)',
+        color: 'rgba(232, 255, 244, 0.78)',
         fontSize: 14,
+        fontWeight: '500',
     },
     loginButton: {
         width: '100%',
-        marginBottom: 20,
+        marginBottom: 22,
     },
     separator: {
         flexDirection: 'row',
@@ -418,10 +451,10 @@ const styles = StyleSheet.create({
     separatorLine: {
         flex: 1,
         height: 1,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        backgroundColor: 'rgba(209, 250, 229, 0.24)',
     },
     separatorText: {
-        color: 'rgba(255, 255, 255, 0.5)',
+        color: 'rgba(232, 255, 244, 0.62)',
         paddingHorizontal: 16,
         fontSize: 14,
     },
@@ -430,12 +463,12 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
     },
     registerText: {
-        color: 'rgba(255, 255, 255, 0.7)',
+        color: 'rgba(232, 255, 244, 0.78)',
         fontSize: 14,
     },
     registerTextBold: {
-        color: '#6ee7b7',
-        fontWeight: '600',
+        color: '#8ff5cb',
+        fontWeight: '700',
     },
     // Footer
     footer: {
@@ -444,7 +477,7 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
     },
     footerText: {
-        color: 'rgba(255, 255, 255, 0.4)',
+        color: 'rgba(232, 255, 244, 0.42)',
         fontSize: 12,
     },
 });
