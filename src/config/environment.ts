@@ -7,7 +7,7 @@ import { Platform } from 'react-native';
  */
 
 const WEB_API_BASE_URL = 'http://localhost:8000/api';
-const MOBILE_API_BASE_URL = 'https://11v8700r-8000.usw3.devtunnels.ms/api';
+const MOBILE_API_BASE_URL = 'http://3.17.60.253:8000/api';
 const API_BASE_URL = Platform.OS === 'web' ? WEB_API_BASE_URL : MOBILE_API_BASE_URL;
 
 export const environment = {
