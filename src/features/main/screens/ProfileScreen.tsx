@@ -158,8 +158,8 @@ const MenuItem: React.FC<MenuItemProps> = ({ icon, label, subtitle, onPress, del
                     <View style={styles.menuIconContainer}>
                         <MaterialCommunityIcons
                             name={icon as any}
-                            size={22}
-                            color="#4CAF50"
+                            size={20}
+                            color="#059669"
                         />
                     </View>
                     <View style={styles.menuTextContainer}>
@@ -171,8 +171,8 @@ const MenuItem: React.FC<MenuItemProps> = ({ icon, label, subtitle, onPress, del
                 </View>
                 <MaterialCommunityIcons
                     name="chevron-right"
-                    size={22}
-                    color="#BDBDBD"
+                    size={20}
+                    color="#D1D5DB"
                 />
             </TouchableOpacity>
         </Animated.View>
@@ -406,206 +406,130 @@ export const ProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F1F8E9',
+        backgroundColor: '#FAFAFA',
     },
 
-    // ── Header ──
+    // ── Header ──────────────────────────────────────────────────────────
     header: {
-        paddingHorizontal: 20,
+        paddingHorizontal: 16,
         paddingTop: Platform.OS === 'web' ? 20 : 10,
-        paddingBottom: 12,
+        paddingBottom: 14,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F0F0F0',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.07,
+        shadowRadius: 6,
     },
     headerTitle: {
-        fontSize: 22,
+        fontSize: 18,
         fontWeight: '700',
-        color: '#1B5E20',
+        color: '#111827',
+        letterSpacing: -0.3,
     },
 
-    // ── Scroll ──
-    scrollView: {
-        flex: 1,
-    },
-    scrollContent: {
-        paddingHorizontal: 16,
-    },
+    // ── Scroll ──────────────────────────────────────────────────────────
+    scrollView: { flex: 1 },
+    scrollContent: { paddingHorizontal: 14, paddingTop: 14 },
 
-    // ── User Card ──
+    // ── User Card ────────────────────────────────────────────────────────
     userCard: {
-        backgroundColor: '#fff',
-        borderRadius: 20,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 22,
         paddingVertical: 28,
         paddingHorizontal: 20,
         alignItems: 'center',
-        marginBottom: 16,
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.06,
-                shadowRadius: 10,
-            },
-            android: { elevation: 3 },
-            web: {
-                // @ts-ignore
-                boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-            },
-        }),
+        marginBottom: 14,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 12,
     },
 
-    // ── Avatar ──
-    avatarContainer: {
-        marginBottom: 14,
-    },
+    // ── Avatar ──────────────────────────────────────────────────────────
+    avatarContainer: { marginBottom: 14 },
     avatarCircle: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: '#4CAF50',
+        width: 84,
+        height: 84,
+        borderRadius: 42,
+        backgroundColor: '#059669',
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 3,
-        borderColor: '#E8F5E9',
+        borderWidth: 4,
+        borderColor: '#ECFDF5',
     },
 
-    // ── User Info ──
+    // ── User Info ────────────────────────────────────────────────────────
     userName: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#1B5E20',
+        color: '#111827',
         marginBottom: 6,
+        letterSpacing: -0.4,
     },
     badgeContainer: {
-        backgroundColor: '#E8F5E9',
+        backgroundColor: '#ECFDF5',
         paddingHorizontal: 14,
         paddingVertical: 5,
-        borderRadius: 16,
-        marginBottom: 20,
-    },
-    badgeText: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#4CAF50',
-    },
-
-    // ── Stats ──
-    statsRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: '100%',
-        paddingTop: 8,
-    },
-    statItem: {
-        flex: 1,
-        alignItems: 'center',
-    },
-    statValue: {
-        fontSize: 26,
-        fontWeight: '800',
-        color: '#1B5E20',
-    },
-    statLabel: {
-        fontSize: 12,
-        color: '#757575',
-        marginTop: 2,
-        textAlign: 'center',
-    },
-    statDivider: {
-        width: 1,
-        height: 36,
-        backgroundColor: '#E0E0E0',
-    },
-
-    // ── Menu Card ──
-    menuCard: {
-        backgroundColor: '#fff',
         borderRadius: 20,
-        paddingVertical: 6,
         marginBottom: 20,
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.06,
-                shadowRadius: 10,
-            },
-            android: { elevation: 3 },
-            web: {
-                // @ts-ignore
-                boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-            },
-        }),
+        borderWidth: 1,
+        borderColor: '#D1FAE5',
+    },
+    badgeText: { fontSize: 13, fontWeight: '600', color: '#059669' },
+
+    // ── Stats ────────────────────────────────────────────────────────────
+    statsRow: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        width: '100%', paddingTop: 8,
+    },
+    statItem: { flex: 1, alignItems: 'center' },
+    statValue: { fontSize: 26, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
+    statLabel: { fontSize: 12, color: '#6B7280', marginTop: 2, textAlign: 'center' },
+    statDivider: { width: 1, height: 36, backgroundColor: '#E5E7EB' },
+
+    // ── Menu Card ────────────────────────────────────────────────────────
+    menuCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 22,
+        paddingVertical: 6,
+        marginBottom: 14,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 12,
     },
     menuItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 18,
-        paddingVertical: 16,
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingHorizontal: 16, paddingVertical: 14,
     },
-    menuItemLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
-    },
+    menuItemLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
     menuIconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        backgroundColor: '#E8F5E9',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 14,
+        width: 42, height: 42, borderRadius: 13,
+        backgroundColor: '#ECFDF5', alignItems: 'center', justifyContent: 'center', marginRight: 14,
     },
-    menuTextContainer: {
-        flex: 1,
-    },
-    menuLabel: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#212121',
-    },
-    menuSubtitle: {
-        fontSize: 12,
-        color: '#9E9E9E',
-        marginTop: 2,
-    },
-    menuDivider: {
-        height: 1,
-        backgroundColor: '#F5F5F5',
-        marginHorizontal: 18,
-    },
+    menuTextContainer: { flex: 1 },
+    menuLabel: { fontSize: 15, fontWeight: '600', color: '#1F2937' },
+    menuSubtitle: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
+    menuDivider: { height: 1, backgroundColor: '#F9FAFB', marginHorizontal: 16 },
 
-    // ── Logout ──
+    // ── Logout ───────────────────────────────────────────────────────────
     logoutButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        paddingVertical: 16,
-        borderWidth: 1,
-        borderColor: '#FFCDD2',
-        gap: 8,
-        ...Platform.select({
-            ios: {
-                shadowColor: '#E53935',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.08,
-                shadowRadius: 4,
-            },
-            android: { elevation: 1 },
-            web: {
-                // @ts-ignore
-                boxShadow: '0 1px 6px rgba(229,57,53,0.08)',
-            },
-        }),
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        backgroundColor: '#FFFFFF', borderRadius: 18, paddingVertical: 16,
+        borderWidth: 1, borderColor: '#FEE2E2', gap: 8,
+        elevation: 2, shadowColor: '#EF4444', shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.08, shadowRadius: 6,
     },
-    logoutText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#E53935',
-    },
+    logoutText: { fontSize: 16, fontWeight: '700', color: '#EF4444' },
 });
 
 export default ProfileScreen;
