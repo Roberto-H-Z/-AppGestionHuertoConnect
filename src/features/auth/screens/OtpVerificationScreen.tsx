@@ -65,6 +65,8 @@ export const OtpVerificationScreen: React.FC = () => {
         }, [])
     );
 
+
+
     // Timer logic
     useEffect(() => {
         let interval: NodeJS.Timeout;
@@ -147,6 +149,7 @@ export const OtpVerificationScreen: React.FC = () => {
             const result = await authService.resendOtp(currentChallengeId);
             setCurrentChallengeId(result.challengeId);
             setResendCooldown(RESEND_COOLDOWN);
+
             setOtp(Array(OTP_LENGTH).fill(''));
             inputRefs.current[0]?.focus();
         } catch (err: any) {
