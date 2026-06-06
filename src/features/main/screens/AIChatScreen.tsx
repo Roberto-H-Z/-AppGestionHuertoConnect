@@ -1,12 +1,10 @@
 /**
  * AIChatScreen — Asistente IA de HuertoConnect
  *
- * 3 modos de operación:
- *   🤖 Asistente General  → Texto libre + respuestas inteligentes
- *   🌽 Cultivos           → POST /huertos/recomendar (Random Forest + Clima)
- *   🐛 Plagas             → POST /plagas/detectar    (YOLOv8)
- *
- * Colorimetría: alineada con el resto de la app (#F1F8E9, #4CAF50, #1B5E20, #fff)
+ * 3 modos:
+ *   🤖 Asistente   → Texto libre con respuestas inteligentes
+ *   🌽 Cultivos IA → POST /huertos/recomendar (Random Forest + Clima real)
+ *   🐛 Detectar    → POST /plagas/detectar (YOLOv8 Visión Artificial)
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -32,6 +30,7 @@ import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { chatbotService, ConversacionOut, MensajeOut } from '../services/chatbotService';
 import { aiModelService, CultivoRecomendado, PlagaDetectada } from '../services/aiModelService';
+import { geocodeMunicipio } from '../services/geocodingService';
 
 const { width } = Dimensions.get('window');
 
@@ -52,6 +51,7 @@ interface Message {
     plagasData?: PlagaDetectada[];
     imagenUrl?: string;
     municipio?: string;
+    region?: string;
 }
 
 // ══════════════════════════════════════════════════════
@@ -63,7 +63,7 @@ const MODE_CONFIG = {
         label: 'Asistente',
         icon: 'robot-outline' as const,
         color: '#4CAF50',
-        bg: '#E8F5E9',
+        lightBg: '#E8F5E9',
         placeholder: 'Escribe tu pregunta sobre el huerto...',
         hint: 'Pregúntame sobre riego, plagas, cultivos o fertilización',
     },
@@ -71,19 +71,37 @@ const MODE_CONFIG = {
         label: 'Cultivos IA',
         icon: 'sprout-outline' as const,
         color: '#2E7D32',
-        bg: '#F1F8E9',
-        placeholder: 'Escribe tu municipio (ej: Xalapa)...',
-        hint: 'El modelo Random Forest analizará el clima de tu zona',
+        lightBg: '#F1F8E9',
+        placeholder: 'Escribe tu municipio (ej: Xalapa, Monterrey)...',
+        hint: 'IA: Random Forest + datos climáticos reales de tu zona',
     },
     plagas: {
         label: 'Detectar Plaga',
         icon: 'bug-outline' as const,
-        color: '#F57F17',
-        bg: '#FFF8E1',
-        placeholder: 'Pega la URL pública de tu foto de planta...',
-        hint: 'El modelo YOLOv8 detectará plagas en la imagen',
+        color: '#E65100',
+        lightBg: '#FFF3E0',
+        placeholder: 'Pega la URL pública de la foto de tu planta...',
+        hint: 'IA: YOLOv8 detectará plagas en la imagen',
     },
 };
+
+// ══════════════════════════════════════════════════════
+//  CHIPS DE ACCIONES RÁPIDAS
+// ══════════════════════════════════════════════════════
+
+const QUICK_CHIPS_CHAT = [
+    { label: '💧 Cómo regar', prompt: '¿Cómo debo regar mis plantas?' },
+    { label: '🐛 Hay plaga', prompt: '¿Cómo identifico si hay una plaga?' },
+    { label: '🍅 Cultivar tomate', prompt: '¿Cómo cultivo tomates?' },
+    { label: '🌱 Abono orgánico', prompt: '¿Qué abono uso para mi huerto?' },
+];
+
+const QUICK_CHIPS_CULTIVOS = [
+    { label: '📍 Xalapa, Ver', prompt: 'Xalapa' },
+    { label: '📍 Monterrey, NL', prompt: 'Monterrey' },
+    { label: '📍 Mérida, Yuc', prompt: 'Mérida' },
+    { label: '📍 Oaxaca, Oax', prompt: 'Oaxaca' },
+];
 
 // ══════════════════════════════════════════════════════
 //  RESPUESTAS DEL ASISTENTE GENERAL
@@ -92,18 +110,22 @@ const MODE_CONFIG = {
 const getAssistantResponse = (input: string): string => {
     const n = input.toLowerCase();
     if (n.includes('hojas plateadas') || n.includes('trips') || n.includes('puntos negros'))
-        return 'Los síntomas coinciden con presencia de trips. Las zonas plateadas aparecen por daño al tejido y los puntos negros son sus excrementos.\n\nAcciones recomendadas:\n• Revisa el envés de las hojas con una lupa\n• Retira las hojas muy afectadas\n• Coloca trampas adhesivas azules o amarillas\n• Aplica jabón potásico al atardecer';
-    if (n.includes('riego') || n.includes('regar'))
-        return 'Guía de riego:\n\n• Riega temprano por la mañana\n• Dirige el agua a la base de la planta\n• Revisa los 2-3 cm superiores del suelo antes de regar\n• Prefiere riegos profundos y espaciados';
-    if (n.includes('plaga') || n.includes('pulgón') || n.includes('mosca blanca'))
-        return 'Para identificar la plaga:\n\n• Revisa el envés de las hojas\n• Busca huevos, larvas o excrementos\n\nManejo inicial:\n• Retira las partes muy afectadas\n• Usa trampas adhesivas amarillas\n• Aplica jabón potásico al atardecer';
+        return 'Los síntomas coinciden con trips. Las zonas plateadas son daño al tejido y los puntos negros son sus excrementos.\n\nAcciones:\n• Revisa el envés con una lupa\n• Retira hojas muy afectadas\n• Coloca trampas adhesivas azules o amarillas\n• Aplica jabón potásico al atardecer';
+    if (n.includes('riego') || n.includes('regar') || n.includes('agua'))
+        return 'Guía de riego:\n\n• Riega temprano por la mañana\n• Dirige el agua a la base, no a las hojas\n• Revisa los 3 cm superiores del suelo antes de regar — si están húmedos, espera\n• Prefiere riegos profundos y espaciados sobre muchos superficiales\n• En verano, riega más seguido; en invierno reduce la frecuencia';
+    if (n.includes('plaga') || n.includes('pulgón') || n.includes('mosca blanca') || n.includes('insecto'))
+        return 'Para identificar una plaga:\n\n• Revisa el envés de las hojas (ahí se esconden)\n• Busca huevos, larvas o excrementos\n• Observa si las hojas están amarillas, deformadas o con manchas\n\nManejo inicial:\n• Retira las partes muy afectadas\n• Usa trampas adhesivas amarillas\n• Aplica jabón potásico al atardecer\n\n💡 Para un análisis preciso, usa el modo "Detectar Plaga" y sube una foto';
     if (n.includes('tomate') || n.includes('jitomate'))
-        return 'Cultivo de tomate:\n\n• Necesita 6-8 horas de sol directo\n• Suelo con buen drenaje\n• Riego profundo sin mojar las hojas\n• Elimina hojas que toquen el suelo';
-    if (n.includes('abono') || n.includes('fertilizante') || n.includes('compost'))
-        return 'Fertilización orgánica:\n\n• Comienza con compost maduro o humus de lombriz\n• Aplica alrededor de la planta sin tocar el tallo\n• Cantidades moderadas al principio\n• Demasiado nitrógeno = muchas hojas, pocos frutos';
-    if (n.includes('clima') || n.includes('temperatura'))
-        return 'Para recomendaciones personalizadas según tu clima, usa el modo "Cultivos IA" — el modelo analizará las condiciones meteorológicas de tu municipio.';
-    return 'Soy el asistente IA de HuertoConnect. Puedo ayudarte con:\n\n• Riego y nutrición de plantas\n• Identificación de plagas\n• Selección de cultivos\n• Clima y temporadas de siembra\n\nO usa los modos especializados arriba para análisis con inteligencia artificial real.';
+        return 'Cultivo de tomate:\n\n• Necesita 6-8 horas de sol directo\n• Suelo rico en materia orgánica con buen drenaje\n• Riega profundo sin mojar las hojas\n• Mantén humedad estable para evitar grietas\n• Elimina las hojas que toquen el suelo\n• Temperatura ideal: 18-26°C';
+    if (n.includes('abono') || n.includes('fertiliz') || n.includes('compost') || n.includes('nutriente'))
+        return 'Fertilización orgánica:\n\n• Compost maduro o humus de lombriz son los mejores\n• Aplica alrededor de la planta sin tocar el tallo\n• Comienza con poca cantidad y observa la respuesta\n• Demasiado nitrógeno = muchas hojas, pocos frutos\n• Fertiliza cada 3-4 semanas en temporada de crecimiento';
+    if (n.includes('clima') || n.includes('temperatura') || n.includes('cultiv') || n.includes('sembrar') || n.includes('plantar'))
+        return '🌽 Para recomendaciones de cultivos según el clima de TU zona, usa el modo "Cultivos IA" — el modelo de Inteligencia Artificial analizará los datos meteorológicos de tu municipio y te dirá qué plantar.';
+    if (n.includes('url') || n.includes('foto') || n.includes('imagen') || n.includes('fotograf'))
+        return '🐛 Para analizar fotos de tu planta con IA, cambia al modo "Detectar Plaga" en los botones de arriba. Ahí podrás pegar la URL de una foto pública de tu planta y el modelo YOLOv8 detectará plagas.';
+    if (n.length < 20 && /^[a-záéíóúñA-ZÁÉÍÓÚÑ\s]+$/.test(input.trim()))
+        return '🌿 Parece que escribiste el nombre de una ciudad. Si quieres recomendaciones de cultivos para esa zona, usa el modo "Cultivos IA" en los botones de arriba y vuelve a escribir el municipio ahí.';
+    return 'Soy el asistente de HuertoConnect. Puedo ayudarte con:\n\n• 💧 Riego y nutrición de plantas\n• 🐛 Identificación y control de plagas\n• 🌱 Selección de cultivos\n• 🌤️ Clima y temporadas de siembra\n\nPara análisis con IA real:\n• Cultivos IA → escribe tu municipio\n• Detectar Plaga → pega la URL de una foto';
 };
 
 // ══════════════════════════════════════════════════════
@@ -157,10 +179,9 @@ const TypingIndicator: React.FC = () => {
     }, []);
 
     const dot = (anim: Animated.Value, key: string) => (
-        <Animated.View key={key} style={[
-            styles.typingDot,
-            { transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [0, -5] }) }] }
-        ]} />
+        <Animated.View key={key} style={[styles.typingDot, {
+            transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [0, -5] }) }]
+        }]} />
     );
 
     return (
@@ -170,16 +191,17 @@ const TypingIndicator: React.FC = () => {
             </View>
             <View style={styles.typingBubble}>
                 {dot(d1, 'a')}{dot(d2, 'b')}{dot(d3, 'c')}
+                <Text style={styles.typingLabel}>Analizando...</Text>
             </View>
         </View>
     );
 };
 
 // ══════════════════════════════════════════════════════
-//  TARJETA CULTIVOS (resultado Random Forest)
+//  TARJETA CULTIVOS
 // ══════════════════════════════════════════════════════
 
-const CultivosCard: React.FC<{ cultivos: CultivoRecomendado[]; municipio?: string }> = ({ cultivos, municipio }) => (
+const CultivosCard: React.FC<{ cultivos: CultivoRecomendado[]; municipio?: string; region?: string }> = ({ cultivos, municipio, region }) => (
     <View style={styles.resultCard}>
         <View style={styles.resultCardHeader}>
             <View style={styles.resultCardIconGreen}>
@@ -187,14 +209,17 @@ const CultivosCard: React.FC<{ cultivos: CultivoRecomendado[]; municipio?: strin
             </View>
             <View style={{ flex: 1 }}>
                 <Text style={styles.resultCardTitle}>Cultivos Recomendados</Text>
-                {municipio ? (
-                    <Text style={styles.resultCardSub}>Para {municipio} · Modelo Random Forest</Text>
-                ) : null}
+                <Text style={styles.resultCardSub}>
+                    {municipio}{region ? `, ${region}` : ''} · Random Forest + Clima
+                </Text>
             </View>
         </View>
 
         {cultivos.length === 0 ? (
-            <Text style={styles.resultEmpty}>No se encontraron recomendaciones para esta zona.</Text>
+            <View style={styles.emptyResult}>
+                <MaterialCommunityIcons name="sprout-outline" size={28} color="#C8E6C9" />
+                <Text style={styles.emptyResultText}>No se encontraron recomendaciones.{'\n'}Intenta con otro municipio.</Text>
+            </View>
         ) : cultivos.map((c, i) => {
             const conf = getConfianzaPct(c.probabilidad ?? c.score ?? c.confianza);
             return (
@@ -219,7 +244,7 @@ const CultivosCard: React.FC<{ cultivos: CultivoRecomendado[]; municipio?: strin
 );
 
 // ══════════════════════════════════════════════════════
-//  TARJETA PLAGAS (resultado YOLOv8)
+//  TARJETA PLAGAS
 // ══════════════════════════════════════════════════════
 
 const PlagasCard: React.FC<{ plagas: PlagaDetectada[]; imagenUrl?: string }> = ({ plagas, imagenUrl }) => (
@@ -240,8 +265,8 @@ const PlagasCard: React.FC<{ plagas: PlagaDetectada[]; imagenUrl?: string }> = (
 
         {plagas.length === 0 ? (
             <View style={styles.plagaOk}>
-                <MaterialCommunityIcons name="shield-check-outline" size={28} color="#4CAF50" />
-                <Text style={styles.plagaOkText}>No se detectaron plagas en la imagen</Text>
+                <MaterialCommunityIcons name="shield-check-outline" size={32} color="#4CAF50" />
+                <Text style={styles.plagaOkText}>No se detectaron plagas ✅{'\n'}La planta parece sana</Text>
             </View>
         ) : plagas.map((p, i) => {
             const conf = getConfianzaPct(p.confianza ?? p.confidence ?? p.score);
@@ -259,9 +284,7 @@ const PlagasCard: React.FC<{ plagas: PlagaDetectada[]; imagenUrl?: string }> = (
                             <View style={[styles.confBarFill, { width: `${pct}%` as any, backgroundColor: barColor }]} />
                         </View>
                     )}
-                    {p.tratamiento ? (
-                        <Text style={styles.plagaTratamiento}>Tratamiento: {String(p.tratamiento)}</Text>
-                    ) : null}
+                    {p.tratamiento ? <Text style={styles.plagaTratamiento}>Tratamiento: {String(p.tratamiento)}</Text> : null}
                 </View>
             );
         })}
@@ -299,14 +322,12 @@ const MessageBubble: React.FC<{ msg: Message; accentColor: string }> = ({ msg, a
             )}
 
             <View style={[styles.msgContentWrapper, isUser && { alignItems: 'flex-end' }]}>
-                {/* Tarjetas especiales IA */}
                 {msg.type === 'cultivos_result' && msg.cultivosData && (
-                    <CultivosCard cultivos={msg.cultivosData} municipio={msg.municipio} />
+                    <CultivosCard cultivos={msg.cultivosData} municipio={msg.municipio} region={msg.region} />
                 )}
                 {msg.type === 'plagas_result' && msg.plagasData && (
                     <PlagasCard plagas={msg.plagasData} imagenUrl={msg.imagenUrl} />
                 )}
-                {/* Burbuja de texto */}
                 {(msg.type === 'text' || msg.type === 'error' || msg.type === 'system') && (
                     <View style={[
                         styles.msgBubble,
@@ -322,7 +343,11 @@ const MessageBubble: React.FC<{ msg: Message; accentColor: string }> = ({ msg, a
             </View>
 
             {isUser && (
-                <View style={[styles.aiAvatarSmall, { backgroundColor: accentColor + '22', borderColor: accentColor + '55', marginBottom: 18 }]}>
+                <View style={[styles.aiAvatarSmall, {
+                    backgroundColor: accentColor + '22',
+                    borderColor: accentColor + '55',
+                    marginBottom: 18,
+                }]}>
                     <MaterialCommunityIcons name="account" size={14} color={accentColor} />
                 </View>
             )}
@@ -347,7 +372,7 @@ const HistoryModal: React.FC<{
             <View style={styles.modalSheet}>
                 <View style={styles.modalHandle} />
                 <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>Historial</Text>
+                    <Text style={styles.modalTitle}>Historial de conversaciones</Text>
                     <TouchableOpacity onPress={onClose} style={styles.modalClose}>
                         <MaterialCommunityIcons name="close" size={20} color="#757575" />
                     </TouchableOpacity>
@@ -417,12 +442,12 @@ export const AIChatScreen: React.FC = () => {
     const scrollRef = useRef<ScrollView>(null);
     const modeConfig = MODE_CONFIG[mode];
 
-    // Mensaje de bienvenida al cambiar modo
+    // Mensaje de bienvenida y chips al cambiar modo
     useEffect(() => {
         const welcomes: Record<ChatMode, string> = {
-            chat: '¡Hola! Soy tu asistente de horticultura. Pregúntame lo que necesites sobre tu huerto: riego, plagas, cultivos o fertilización.',
-            cultivos: 'Modo Recomendación de Cultivos activado.\n\nEscribe el nombre de tu municipio y el modelo de IA (Random Forest + datos climáticos) te recomendará los mejores cultivos para tu zona.',
-            plagas: 'Modo Detección de Plagas activado.\n\nPega la URL pública de una foto de tu planta y el modelo YOLOv8 de visión artificial detectará posibles plagas.',
+            chat: '¡Hola! Soy tu asistente de horticultura 🌿\n\nPuedo ayudarte con riego, plagas, cultivos y fertilización.\n\nO usa los modos de IA arriba para análisis con Inteligencia Artificial real.',
+            cultivos: '🌽 Modo Cultivos IA activado\n\nEscribe el nombre de tu municipio (puede ser cualquier ciudad de México) y el modelo de IA analizará el clima real de esa zona para recomendarte los mejores cultivos.',
+            plagas: '🐛 Modo Detección de Plagas activado\n\nPega la URL pública de una foto de tu planta. El modelo YOLOv8 analizará la imagen y detectará posibles plagas con un nivel de confianza.',
         };
         setMessages([{
             id: `welcome-${mode}-${Date.now()}`,
@@ -455,9 +480,7 @@ export const AIChatScreen: React.FC = () => {
             }
             await chatbotService.createMensaje(id, { contenido: texto, rol });
             return id;
-        } catch {
-            return currentId;
-        }
+        } catch { return currentId; }
     }, []);
 
     const loadHistory = useCallback(async () => {
@@ -465,9 +488,7 @@ export const AIChatScreen: React.FC = () => {
         try {
             const data = await chatbotService.listConversaciones(0, 30);
             setConversations(data);
-        } catch { /* silent */ } finally {
-            setHistoryLoading(false);
-        }
+        } catch { /* silent */ } finally { setHistoryLoading(false); }
     }, []);
 
     const loadConversation = useCallback(async (conv: ConversacionOut) => {
@@ -487,58 +508,89 @@ export const AIChatScreen: React.FC = () => {
         }
     }, [scrollToBottom]);
 
-    // ── ENVÍO DE MENSAJE ──────────────────────────────
-    const handleSend = useCallback(async () => {
-        const text = inputText.trim();
-        if (!text || isTyping) return;
+    const sendMessage = useCallback(async (text: string) => {
+        const trimmed = text.trim();
+        if (!trimmed || isTyping) return;
 
         setInputText('');
         setIsTyping(true);
-        addMessage({ text, sender: 'user', type: 'text' });
+        addMessage({ text: trimmed, sender: 'user', type: 'text' });
         let currentId = convId;
 
         try {
+            // ── CULTIVOS: geocodificación real + modelo ──────────
             if (mode === 'cultivos') {
-                currentId = await persistMessage(text, 'user', currentId) ?? currentId;
-                const response = await aiModelService.recommendGarden({ lat: 19.5312, lon: -96.9276, municipio: text });
-                const cultivos = extractCultivos(response);
-                const reply = cultivos.length > 0
-                    ? `Encontré ${cultivos.length} cultivos recomendados para ${text}`
-                    : `No encontré recomendaciones específicas para "${text}". Intenta con otro municipio.`;
-                addMessage({ text: reply, sender: 'ai', type: 'cultivos_result', cultivosData: cultivos, municipio: text });
-                await persistMessage(reply, 'assistant', currentId);
+                currentId = await persistMessage(trimmed, 'user', currentId) ?? currentId;
 
-            } else if (mode === 'plagas') {
-                if (!text.startsWith('http')) {
-                    addMessage({ text: 'Por favor pega una URL válida de imagen (debe comenzar con https://...)', sender: 'ai', type: 'error' });
+                // Geocodificación: convierte el municipio a coordenadas reales
+                const geo = await geocodeMunicipio(trimmed);
+
+                if (!geo) {
+                    const errMsg = `No pude encontrar las coordenadas de "${trimmed}". Intenta con el nombre completo (ej: "Xalapa", "Ciudad de México", "Guadalajara").`;
+                    addMessage({ text: errMsg, sender: 'ai', type: 'error' });
+                    await persistMessage(errMsg, 'assistant', currentId);
                     return;
                 }
-                currentId = await persistMessage(`Analizar imagen: ${text}`, 'user', currentId) ?? currentId;
-                const response = await aiModelService.detectPest({ imagen_url: text });
-                const plagas = extractPlagas(response);
-                const reply = plagas.length > 0
-                    ? `Se detectaron ${plagas.length} posibles plagas en la imagen`
-                    : 'No se detectaron plagas en la imagen analizada';
-                addMessage({ text: reply, sender: 'ai', type: 'plagas_result', plagasData: plagas, imagenUrl: text });
+
+                const response = await aiModelService.recommendGarden({
+                    lat: geo.lat,
+                    lon: geo.lon,
+                    municipio: geo.name,
+                });
+
+                const cultivos = extractCultivos(response);
+                const reply = cultivos.length > 0
+                    ? `Encontré ${cultivos.length} cultivos recomendados para ${geo.name}${geo.region ? `, ${geo.region}` : ''}`
+                    : `No encontré recomendaciones específicas para "${geo.name}". La API puede no tener datos climáticos de esta zona todavía.`;
+
+                addMessage({
+                    text: reply, sender: 'ai', type: 'cultivos_result',
+                    cultivosData: cultivos, municipio: geo.name, region: geo.region,
+                });
                 await persistMessage(reply, 'assistant', currentId);
 
+            // ── PLAGAS: YOLOv8 ───────────────────────────────────
+            } else if (mode === 'plagas') {
+                if (!trimmed.startsWith('http')) {
+                    addMessage({
+                        text: 'La URL debe comenzar con https://...\n\nEjemplo:\nhttps://images.unsplash.com/photo-xxx.jpg',
+                        sender: 'ai', type: 'error',
+                    });
+                    return;
+                }
+                currentId = await persistMessage(`Analizar imagen: ${trimmed}`, 'user', currentId) ?? currentId;
+                const response = await aiModelService.detectPest({ imagen_url: trimmed });
+                const plagas = extractPlagas(response);
+                const reply = plagas.length > 0
+                    ? `Detecté ${plagas.length} posible${plagas.length > 1 ? 's' : ''} plaga${plagas.length > 1 ? 's' : ''} en la imagen`
+                    : 'La imagen fue analizada. No se detectaron plagas — la planta parece sana.';
+                addMessage({ text: reply, sender: 'ai', type: 'plagas_result', plagasData: plagas, imagenUrl: trimmed });
+                await persistMessage(reply, 'assistant', currentId);
+
+            // ── ASISTENTE: texto libre ───────────────────────────
             } else {
-                currentId = await persistMessage(text, 'user', currentId) ?? currentId;
-                const reply = getAssistantResponse(text);
+                currentId = await persistMessage(trimmed, 'user', currentId) ?? currentId;
+                const reply = getAssistantResponse(trimmed);
                 addMessage({ text: reply, sender: 'ai', type: 'text' });
                 await persistMessage(reply, 'assistant', currentId);
             }
 
         } catch (error: any) {
-            const msg = error?.response?.data?.detail || error?.message || 'Error al conectar con el servidor.';
-            addMessage({ text: msg, sender: 'ai', type: 'error' });
+            const msg = error?.response?.data?.detail || error?.message || 'Error de conexión. Verifica tu internet e intenta de nuevo.';
+            addMessage({ text: `Error: ${msg}`, sender: 'ai', type: 'error' });
         } finally {
             setIsTyping(false);
             scrollToBottom();
         }
-    }, [inputText, isTyping, mode, convId, addMessage, persistMessage, scrollToBottom]);
+    }, [isTyping, mode, convId, addMessage, persistMessage, scrollToBottom]);
+
+    const handleSend = useCallback(() => sendMessage(inputText), [sendMessage, inputText]);
+    const handleChip = useCallback((prompt: string) => sendMessage(prompt), [sendMessage]);
 
     // ── RENDER ────────────────────────────────────────
+
+    const quickChips = mode === 'cultivos' ? QUICK_CHIPS_CULTIVOS : mode === 'chat' ? QUICK_CHIPS_CHAT : [];
+    const showChips = messages.length <= 1 && quickChips.length > 0;
 
     return (
         <SafeAreaView style={styles.root}>
@@ -559,20 +611,10 @@ export const AIChatScreen: React.FC = () => {
                     </View>
                 </View>
                 <View style={styles.headerActions}>
-                    <TouchableOpacity
-                        style={styles.headerBtn}
-                        onPress={() => {
-                            setMessages([]);
-                            setConvId(null);
-                            setMode('chat');
-                        }}
-                    >
+                    <TouchableOpacity style={styles.headerBtn} onPress={() => { setMessages([]); setConvId(null); setMode('chat'); }}>
                         <MaterialCommunityIcons name="chat-plus-outline" size={20} color="#4CAF50" />
                     </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.headerBtn}
-                        onPress={() => { loadHistory(); setHistoryVisible(true); }}
-                    >
+                    <TouchableOpacity style={styles.headerBtn} onPress={() => { loadHistory(); setHistoryVisible(true); }}>
                         <MaterialCommunityIcons name="history" size={20} color="#757575" />
                     </TouchableOpacity>
                 </View>
@@ -590,31 +632,21 @@ export const AIChatScreen: React.FC = () => {
                             onPress={() => setMode(m)}
                             activeOpacity={0.8}
                         >
-                            <MaterialCommunityIcons
-                                name={cfg.icon}
-                                size={15}
-                                color={active ? '#fff' : '#9E9E9E'}
-                            />
-                            <Text style={[styles.modeTabLabel, { color: active ? '#fff' : '#9E9E9E' }]}>
-                                {cfg.label}
-                            </Text>
+                            <MaterialCommunityIcons name={cfg.icon} size={14} color={active ? '#fff' : '#9E9E9E'} />
+                            <Text style={[styles.modeTabLabel, { color: active ? '#fff' : '#9E9E9E' }]}>{cfg.label}</Text>
                         </TouchableOpacity>
                     );
                 })}
             </View>
 
             {/* ── HINT ── */}
-            <View style={[styles.hintBar, { backgroundColor: modeConfig.bg }]}>
+            <View style={[styles.hintBar, { backgroundColor: modeConfig.lightBg }]}>
                 <MaterialCommunityIcons name="information-outline" size={13} color={modeConfig.color} />
                 <Text style={[styles.hintText, { color: modeConfig.color }]}>{modeConfig.hint}</Text>
             </View>
 
             {/* ── MENSAJES + INPUT ── */}
-            <KeyboardAvoidingView
-                style={{ flex: 1 }}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-            >
+            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
                 <ScrollView
                     ref={scrollRef}
                     style={styles.msgList}
@@ -625,8 +657,27 @@ export const AIChatScreen: React.FC = () => {
                     {messages.map(msg => (
                         <MessageBubble key={msg.id} msg={msg} accentColor={modeConfig.color} />
                     ))}
+
+                    {/* Chips de acciones rápidas */}
+                    {showChips && !isTyping && (
+                        <View style={styles.chipsContainer}>
+                            <Text style={styles.chipsLabel}>Prueba con:</Text>
+                            <View style={styles.chipsRow}>
+                                {quickChips.map((chip, i) => (
+                                    <TouchableOpacity
+                                        key={i}
+                                        style={[styles.chip, { borderColor: modeConfig.color + '55' }]}
+                                        onPress={() => handleChip(chip.prompt)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={[styles.chipText, { color: modeConfig.color }]}>{chip.label}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+                    )}
+
                     {isTyping && <TypingIndicator />}
-                    {/* Espacio extra para la barra de navegación */}
                     <View style={{ height: 8 }} />
                 </ScrollView>
 
@@ -647,29 +698,22 @@ export const AIChatScreen: React.FC = () => {
                             onChangeText={setInputText}
                             multiline
                             maxLength={500}
-                            returnKeyType="send"
                             blurOnSubmit={false}
                         />
                         <TouchableOpacity
-                            style={[
-                                styles.sendBtn,
-                                { backgroundColor: modeConfig.color },
-                                (!inputText.trim() || isTyping) && styles.sendBtnDisabled,
-                            ]}
+                            style={[styles.sendBtn, { backgroundColor: modeConfig.color }, (!inputText.trim() || isTyping) && styles.sendBtnDisabled]}
                             onPress={handleSend}
                             disabled={!inputText.trim() || isTyping}
                             activeOpacity={0.8}
                         >
                             {isTyping
                                 ? <ActivityIndicator size="small" color="#fff" />
-                                : <MaterialCommunityIcons name="send" size={18} color="#fff" />
-                            }
+                                : <MaterialCommunityIcons name="send" size={18} color="#fff" />}
                         </TouchableOpacity>
                     </View>
                 </View>
             </KeyboardAvoidingView>
 
-            {/* ── HISTORIAL MODAL ── */}
             <HistoryModal
                 visible={historyVisible}
                 onClose={() => setHistoryVisible(false)}
@@ -683,288 +727,165 @@ export const AIChatScreen: React.FC = () => {
 };
 
 // ══════════════════════════════════════════════════════
-//  ESTILOS — colorimetría de la app (#F1F8E9, #4CAF50, #1B5E20)
+//  ESTILOS
 // ══════════════════════════════════════════════════════
 
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: '#F1F8E9' },
 
-    // Header
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: '#fff',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E8F5E9',
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.06,
-        shadowRadius: 4,
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 12,
+        borderBottomWidth: 1, borderBottomColor: '#E8F5E9',
+        elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4,
     },
     headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     headerIconBg: {
-        width: 42, height: 42, borderRadius: 21,
-        backgroundColor: '#E8F5E9',
-        alignItems: 'center', justifyContent: 'center',
-        borderWidth: 1.5, borderColor: '#C8E6C9',
+        width: 42, height: 42, borderRadius: 21, backgroundColor: '#E8F5E9',
+        alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#C8E6C9',
     },
     headerTitle: { fontSize: 16, fontWeight: '700', color: '#1B5E20' },
     headerStatus: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 },
     statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#4CAF50' },
     statusLabel: { fontSize: 11, color: '#66BB6A' },
     headerActions: { flexDirection: 'row', gap: 6 },
-    headerBtn: {
-        width: 36, height: 36, borderRadius: 18,
-        backgroundColor: '#F5F5F5',
-        alignItems: 'center', justifyContent: 'center',
-    },
+    headerBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center' },
 
-    // Selector de modo
     modeBar: {
-        flexDirection: 'row',
-        backgroundColor: '#fff',
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        gap: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E8F5E9',
+        flexDirection: 'row', backgroundColor: '#fff',
+        paddingHorizontal: 12, paddingVertical: 10, gap: 8,
+        borderBottomWidth: 1, borderBottomColor: '#E8F5E9',
     },
     modeTab: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 5,
-        paddingVertical: 8,
-        borderRadius: 10,
-        backgroundColor: '#F5F5F5',
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
+        flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        gap: 4, paddingVertical: 8, borderRadius: 10,
+        backgroundColor: '#F5F5F5', borderWidth: 1, borderColor: '#E0E0E0',
     },
     modeTabLabel: { fontSize: 11, fontWeight: '700' },
 
-    // Hint
-    hintBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-    },
+    hintBar: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8 },
     hintText: { fontSize: 11, flex: 1, fontWeight: '500' },
 
-    // Lista de mensajes
     msgList: { flex: 1, backgroundColor: '#F8FDF8' },
-    msgListContent: {
-        paddingHorizontal: 12,
-        paddingTop: 12,
-        paddingBottom: 8,
-        gap: 8,
-    },
+    msgListContent: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 8, gap: 8 },
 
     msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
     msgRowUser: { justifyContent: 'flex-end' },
     msgRowAI: { justifyContent: 'flex-start' },
 
     aiAvatarSmall: {
-        width: 28, height: 28, borderRadius: 14,
-        backgroundColor: '#E8F5E9',
-        alignItems: 'center', justifyContent: 'center',
-        borderWidth: 1, borderColor: '#C8E6C9',
-        flexShrink: 0,
+        width: 28, height: 28, borderRadius: 14, backgroundColor: '#E8F5E9',
+        alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#C8E6C9', flexShrink: 0,
     },
     msgContentWrapper: { flex: 1, maxWidth: width * 0.72, gap: 3 },
 
-    msgBubble: {
-        borderRadius: 18,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        maxWidth: '100%',
-    },
+    msgBubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
     userBubble: { borderBottomRightRadius: 4 },
     aiBubble: {
-        backgroundColor: '#fff',
-        borderBottomLeftRadius: 4,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-        elevation: 1,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 2,
+        backgroundColor: '#fff', borderBottomLeftRadius: 4,
+        borderWidth: 1, borderColor: '#E0E0E0', elevation: 1,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2,
     },
-    errorBubble: {
-        backgroundColor: '#FFF3E0',
-        borderWidth: 1,
-        borderColor: '#FFB74D',
-        borderBottomLeftRadius: 4,
-    },
+    errorBubble: { backgroundColor: '#FFF3E0', borderWidth: 1, borderColor: '#FFB74D', borderBottomLeftRadius: 4 },
     msgText: { fontSize: 14, lineHeight: 21 },
     userMsgText: { color: '#fff' },
     aiMsgText: { color: '#212121' },
     msgTime: { fontSize: 10, color: '#BDBDBD', marginTop: 1 },
 
-    // Typing
     typingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     typingBubble: {
-        flexDirection: 'row', gap: 4, alignItems: 'center',
-        backgroundColor: '#fff',
-        borderRadius: 18, paddingHorizontal: 14, paddingVertical: 12,
-        borderWidth: 1, borderColor: '#E0E0E0',
-        elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2,
+        flexDirection: 'row', gap: 5, alignItems: 'center',
+        backgroundColor: '#fff', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12,
+        borderWidth: 1, borderColor: '#E0E0E0', elevation: 1,
     },
     typingDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4CAF50' },
+    typingLabel: { fontSize: 11, color: '#9E9E9E', marginLeft: 4 },
 
-    // Input bar — paddingBottom = tab bar height
-    inputBar: {
+    // Chips de acciones rápidas
+    chipsContainer: { paddingTop: 4, paddingBottom: 8, gap: 8 },
+    chipsLabel: { fontSize: 11, color: '#9E9E9E', fontWeight: '500', marginLeft: 2 },
+    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    chip: {
+        paddingHorizontal: 12, paddingVertical: 8,
+        borderRadius: 20, borderWidth: 1.5,
         backgroundColor: '#fff',
-        paddingHorizontal: 12,
-        paddingTop: 10,
-        paddingBottom: 90, // Espacio para la barra de navegación inferior
-        borderTopWidth: 1,
-        borderTopColor: '#E8F5E9',
-        elevation: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 6,
+        elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2,
+    },
+    chipText: { fontSize: 12, fontWeight: '600' },
+
+    inputBar: {
+        backgroundColor: '#fff', paddingHorizontal: 12, paddingTop: 10,
+        paddingBottom: 90, borderTopWidth: 1, borderTopColor: '#E8F5E9',
+        elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.06, shadowRadius: 6,
     },
     inputWrapper: {
-        flexDirection: 'row',
-        alignItems: 'flex-end',
-        backgroundColor: '#F5F5F5',
-        borderRadius: 24,
-        borderWidth: 1.5,
-        paddingLeft: 12,
-        paddingRight: 6,
-        paddingVertical: 6,
-        gap: 8,
+        flexDirection: 'row', alignItems: 'flex-end',
+        backgroundColor: '#F5F5F5', borderRadius: 24, borderWidth: 1.5,
+        paddingLeft: 12, paddingRight: 6, paddingVertical: 6, gap: 8,
     },
     inputPrefixIcon: { paddingBottom: 3, flexShrink: 0 },
-    input: {
-        flex: 1,
-        fontSize: 14,
-        color: '#212121',
-        maxHeight: 100,
-        paddingVertical: 4,
-        lineHeight: 20,
-    },
-    sendBtn: {
-        width: 38, height: 38, borderRadius: 19,
-        alignItems: 'center', justifyContent: 'center',
-        flexShrink: 0,
-    },
+    input: { flex: 1, fontSize: 14, color: '#212121', maxHeight: 100, paddingVertical: 4, lineHeight: 20 },
+    sendBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
     sendBtnDisabled: { opacity: 0.4 },
 
-    // Tarjetas de resultado IA
+    // Tarjetas resultado IA
     resultCard: {
-        backgroundColor: '#fff',
-        borderRadius: 14,
-        padding: 14,
-        borderWidth: 1,
-        borderColor: '#C8E6C9',
-        gap: 10,
-        elevation: 2,
-        shadowColor: '#4CAF50',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 6,
+        backgroundColor: '#fff', borderRadius: 14, padding: 14,
+        borderWidth: 1, borderColor: '#C8E6C9', gap: 10,
+        elevation: 2, shadowColor: '#4CAF50', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6,
         maxWidth: width * 0.78,
     },
-    resultCardPlagas: {
-        borderColor: '#FFCC80',
-        shadowColor: '#FF9800',
-    },
+    resultCardPlagas: { borderColor: '#FFCC80', shadowColor: '#FF9800' },
     resultCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    resultCardIconGreen: {
-        width: 34, height: 34, borderRadius: 10,
-        backgroundColor: '#4CAF50', alignItems: 'center', justifyContent: 'center',
-    },
-    resultCardIconOrange: {
-        width: 34, height: 34, borderRadius: 10,
-        backgroundColor: '#FF9800', alignItems: 'center', justifyContent: 'center',
-    },
+    resultCardIconGreen: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#4CAF50', alignItems: 'center', justifyContent: 'center' },
+    resultCardIconOrange: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#FF9800', alignItems: 'center', justifyContent: 'center' },
     resultCardTitle: { fontSize: 13, fontWeight: '700', color: '#1B5E20' },
     resultCardSub: { fontSize: 10, color: '#9E9E9E', marginTop: 1 },
-    resultEmpty: { fontSize: 12, color: '#9E9E9E', textAlign: 'center', paddingVertical: 8 },
 
-    // Cultivos
-    cultivoItem: {
-        flexDirection: 'row', alignItems: 'center',
-        backgroundColor: '#F1F8E9', borderRadius: 10,
-        padding: 10, gap: 10,
-    },
-    cultivoNumber: {
-        width: 24, height: 24, borderRadius: 12,
-        backgroundColor: '#C8E6C9', alignItems: 'center', justifyContent: 'center',
-    },
+    emptyResult: { alignItems: 'center', gap: 8, paddingVertical: 12 },
+    emptyResultText: { fontSize: 12, color: '#9E9E9E', textAlign: 'center' },
+
+    cultivoItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1F8E9', borderRadius: 10, padding: 10, gap: 10 },
+    cultivoNumber: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#C8E6C9', alignItems: 'center', justifyContent: 'center' },
     cultivoNumberText: { fontSize: 11, fontWeight: '700', color: '#2E7D32' },
     cultivoName: { fontSize: 13, fontWeight: '600', color: '#1B5E20' },
     cultivoDesc: { fontSize: 11, color: '#757575', marginTop: 2 },
     cultivoMeta: { fontSize: 10, color: '#9E9E9E', marginTop: 2 },
-    confBadge: {
-        backgroundColor: '#E8F5E9', borderRadius: 8,
-        paddingHorizontal: 8, paddingVertical: 3,
-    },
+    confBadge: { backgroundColor: '#E8F5E9', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
     confBadgeText: { fontSize: 11, fontWeight: '700', color: '#4CAF50' },
 
-    // Plagas
     plagaPreview: { width: '100%', height: 130, borderRadius: 10 },
-    plagaOk: { alignItems: 'center', gap: 6, paddingVertical: 6 },
+    plagaOk: { alignItems: 'center', gap: 8, paddingVertical: 8 },
     plagaOkText: { fontSize: 13, color: '#4CAF50', fontWeight: '500', textAlign: 'center' },
-    plagaItem: {
-        backgroundColor: '#FFF8E1', borderRadius: 10,
-        padding: 10, gap: 6,
-    },
+    plagaItem: { backgroundColor: '#FFF8E1', borderRadius: 10, padding: 10, gap: 6 },
     plagaItemHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     plagaName: { flex: 1, fontSize: 13, fontWeight: '600', color: '#E65100' },
     plagaConf: { fontSize: 12, color: '#FF9800', fontWeight: '700' },
-    confBar: {
-        height: 4, backgroundColor: '#E0E0E0',
-        borderRadius: 2, overflow: 'hidden',
-    },
+    confBar: { height: 4, backgroundColor: '#E0E0E0', borderRadius: 2, overflow: 'hidden' },
     confBarFill: { height: 4, borderRadius: 2 },
     plagaTratamiento: { fontSize: 11, color: '#757575' },
 
-    // Historial modal
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
     modalSheet: {
-        backgroundColor: '#fff',
-        borderTopLeftRadius: 24, borderTopRightRadius: 24,
-        paddingHorizontal: 20, paddingBottom: 30,
-        maxHeight: '75%',
+        backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+        paddingHorizontal: 20, paddingBottom: 30, maxHeight: '75%',
         borderTopWidth: 1, borderColor: '#E8F5E9',
     },
-    modalHandle: {
-        width: 40, height: 4, borderRadius: 2, backgroundColor: '#E0E0E0',
-        alignSelf: 'center', marginTop: 12, marginBottom: 16,
-    },
+    modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E0E0E0', alignSelf: 'center', marginTop: 12, marginBottom: 16 },
     modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
     modalTitle: { fontSize: 16, fontWeight: '700', color: '#1B5E20' },
-    modalClose: {
-        width: 32, height: 32, borderRadius: 16,
-        backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center',
-    },
+    modalClose: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center' },
     modalCenter: { alignItems: 'center', paddingVertical: 40, gap: 10 },
     modalCenterText: { fontSize: 14, color: '#9E9E9E' },
 
     historyItem: {
-        flexDirection: 'row', alignItems: 'center',
-        backgroundColor: '#F9F9F9', borderRadius: 12,
-        padding: 14, marginBottom: 8,
-        borderWidth: 1, borderColor: '#EEEEEE',
+        flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9F9F9',
+        borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: '#EEEEEE',
     },
     historyItemActive: { borderColor: '#A5D6A7', backgroundColor: '#F1F8E9' },
     historyItemTitle: { fontSize: 13, color: '#212121', fontWeight: '500' },
     historyItemDate: { fontSize: 11, color: '#9E9E9E', marginTop: 3 },
-    closedBadge: {
-        backgroundColor: '#F5F5F5', borderRadius: 6,
-        paddingHorizontal: 6, paddingVertical: 2, marginRight: 6,
-    },
+    closedBadge: { backgroundColor: '#F5F5F5', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginRight: 6 },
     closedBadgeText: { fontSize: 10, color: '#9E9E9E' },
 });
 
