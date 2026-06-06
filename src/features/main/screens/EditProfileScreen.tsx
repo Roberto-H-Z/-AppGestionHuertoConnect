@@ -1,6 +1,6 @@
 /**
  * EditProfileScreen — Edit user profile form with avatar,
- * badge, and editable fields. Static demo with mock data.
+ * badge, and editable fields. Real data from AuthContext + local storage.
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
@@ -25,15 +25,10 @@ import { useAuth } from '../../auth/services/AuthContext';
 import { tokenStorage } from '../../../infrastructure/storage/tokenStorage';
 import { apiClient } from '../../../infrastructure/api/apiClient';
 
-// ═══════════════════════════════════════════
-// ██  MAIN SCREEN
-// ═══════════════════════════════════════════
-
 export const EditProfileScreen: React.FC = () => {
     const navigation = useNavigation<any>();
     const { user, checkSession } = useAuth();
 
-    // ── Form state ──
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [perfil, setPerfil] = useState('');
@@ -43,24 +38,16 @@ export const EditProfileScreen: React.FC = () => {
 
     useFocusEffect(
         useCallback(() => {
-            // Load user data from context
             if (user) {
                 setName(`${user.nombre} ${user.apellidos}`.trim());
                 setEmail(user.email || '');
-
                 if (user.created_at) {
                     const date = new Date(user.created_at);
-                    setCreatedAt(
-                        Number.isNaN(date.getTime())
-                            ? user.created_at
-                            : date.toLocaleDateString('es-MX')
-                    );
+                    setCreatedAt(Number.isNaN(date.getTime()) ? user.created_at : date.toLocaleDateString('es-MX'));
                 } else {
                     setCreatedAt('');
                 }
             }
-
-            // Load local farmer settings
             Promise.all([
                 tokenStorage.getItem('huertoconnect_farmer_perfil'),
                 tokenStorage.getItem('huertoconnect_farmer_acceso_agua')
@@ -79,45 +66,13 @@ export const EditProfileScreen: React.FC = () => {
     const buttonFade = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        // Header
-        Animated.timing(headerFade, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-        }).start();
-
-        // Avatar bounce
-        Animated.spring(avatarScale, {
-            toValue: 1,
-            friction: 5,
-            tension: 80,
-            delay: 150,
-            useNativeDriver: true,
-        }).start();
-
-        // Form card
+        Animated.timing(headerFade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+        Animated.spring(avatarScale, { toValue: 1, friction: 5, tension: 80, delay: 150, useNativeDriver: true }).start();
         Animated.parallel([
-            Animated.timing(formFade, {
-                toValue: 1,
-                duration: 500,
-                delay: 250,
-                useNativeDriver: true,
-            }),
-            Animated.timing(formSlide, {
-                toValue: 0,
-                duration: 500,
-                delay: 250,
-                useNativeDriver: true,
-            }),
+            Animated.timing(formFade, { toValue: 1, duration: 500, delay: 250, useNativeDriver: true }),
+            Animated.timing(formSlide, { toValue: 0, duration: 500, delay: 250, useNativeDriver: true }),
         ]).start();
-
-        // Save button
-        Animated.timing(buttonFade, {
-            toValue: 1,
-            duration: 400,
-            delay: 500,
-            useNativeDriver: true,
-        }).start();
+        Animated.timing(buttonFade, { toValue: 1, duration: 400, delay: 500, useNativeDriver: true }).start();
     }, []);
 
     const handleSave = async () => {
@@ -127,12 +82,10 @@ export const EditProfileScreen: React.FC = () => {
         }
         setIsSaving(true);
         try {
-            // Split name into nombre and apellidos
             const parts = name.trim().split(/\s+/);
             const nombre = parts[0] || '';
             const apellidos = parts.slice(1).join(' ') || '';
 
-            // 1. Update Core User details in backend using PATCH /api/usuarios/{user_id}
             if (user?.id) {
                 await apiClient.patch(`/usuarios/${user.id}`, {
                     nombre,
@@ -140,16 +93,11 @@ export const EditProfileScreen: React.FC = () => {
                     email: email.trim() || undefined
                 });
             }
-
-            // 2. Update local storage for farmer-specific fields
             await Promise.all([
                 tokenStorage.setItem('huertoconnect_farmer_perfil', perfil.trim()),
                 tokenStorage.setItem('huertoconnect_farmer_acceso_agua', accesoAgua.trim())
             ]);
-
-            // 3. Refresh user session in context
             await checkSession();
-
             Alert.alert('Éxito', 'Perfil actualizado correctamente.');
             navigation.goBack();
         } catch (error: any) {
@@ -164,39 +112,24 @@ export const EditProfileScreen: React.FC = () => {
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
 
-            {/* ── Header ── */}
+            {/* Header */}
             <Animated.View style={[styles.header, { opacity: headerFade }]}>
-                <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={styles.backButton}
-                    activeOpacity={0.6}
-                >
-                    <MaterialCommunityIcons
-                        name="arrow-left"
-                        size={24}
-                        color="#1B5E20"
-                    />
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} activeOpacity={0.7}>
+                    <MaterialCommunityIcons name="arrow-left" size={22} color="#374151" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Editar Perfil</Text>
+                <View style={{ width: 40 }} />
             </Animated.View>
 
-            <KeyboardAvoidingView
-                style={{ flex: 1 }}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            >
+            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <ScrollView
                     style={styles.scrollView}
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
                 >
-                    {/* ── Avatar Section ── */}
-                    <Animated.View
-                        style={[
-                            styles.avatarSection,
-                            { transform: [{ scale: avatarScale }] },
-                        ]}
-                    >
+                    {/* Avatar Section */}
+                    <Animated.View style={[styles.avatarSection, { transform: [{ scale: avatarScale }] }]}>
                         <View style={styles.avatarWrapper}>
                             <View style={styles.avatarCircle}>
                                 <Text style={styles.avatarInitials}>
@@ -204,100 +137,28 @@ export const EditProfileScreen: React.FC = () => {
                                 </Text>
                             </View>
                             <View style={styles.cameraBadge}>
-                                <MaterialCommunityIcons
-                                    name="camera"
-                                    size={14}
-                                    color="#fff"
-                                />
+                                <MaterialCommunityIcons name="camera" size={13} color="#fff" />
                             </View>
                         </View>
-                        <Text style={styles.badgeText}>
-                            {perfil || 'Cultivador'}
-                        </Text>
-                    </Animated.View>
-
-                    {/* ── Form Card ── */}
-                    <Animated.View
-                        style={[
-                            styles.formCard,
-                            {
-                                opacity: formFade,
-                                transform: [{ translateY: formSlide }],
-                            },
-                        ]}
-                    >
-                        {/* Nombre completo */}
-                        <View style={styles.fieldGroup}>
-                            <Text style={styles.fieldLabel}>
-                                Nombre completo
-                            </Text>
-                            <TextInput
-                                style={styles.textInput}
-                                value={name}
-                                onChangeText={setName}
-                                placeholder="Tu nombre"
-                                placeholderTextColor="#BDBDBD"
-                            />
-                        </View>
-
-                        {/* Correo electrónico */}
-                        <View style={styles.fieldGroup}>
-                            <Text style={styles.fieldLabel}>
-                                Correo electrónico
-                            </Text>
-                            <TextInput
-                                style={styles.textInput}
-                                value={email}
-                                onChangeText={setEmail}
-                                placeholder="correo@ejemplo.com"
-                                placeholderTextColor="#BDBDBD"
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                            />
-                        </View>
-
-                        {/* Perfil de Agricultor */}
-                        <View style={styles.fieldGroup}>
-                            <Text style={styles.fieldLabel}>Perfil de Agricultor</Text>
-                            <TextInput
-                                style={styles.textInput}
-                                value={perfil}
-                                onChangeText={setPerfil}
-                                placeholder="Tu perfil"
-                                placeholderTextColor="#BDBDBD"
-                            />
-                        </View>
-
-                        {/* Acceso al Agua */}
-                        <View style={styles.fieldGroup}>
-                            <Text style={styles.fieldLabel}>Sistema de Riego / Acceso al Agua</Text>
-                            <TextInput
-                                style={styles.textInput}
-                                value={accesoAgua}
-                                onChangeText={setAccesoAgua}
-                                placeholder="Tipo de riego"
-                                placeholderTextColor="#BDBDBD"
-                            />
-                        </View>
-
-                        {/* Fecha de Creación */}
-                        <View style={styles.fieldGroup}>
-                            <Text style={styles.fieldLabel}>Miembro desde</Text>
-                            <TextInput
-                                style={[styles.textInput, { color: '#9E9E9E' }]}
-                                value={createdAt}
-                                placeholder="..."
-                                placeholderTextColor="#BDBDBD"
-                                editable={false}
-                            />
+                        <View style={styles.perfilBadge}>
+                            <Text style={styles.perfilBadgeText}>{perfil || 'Cultivador'}</Text>
                         </View>
                     </Animated.View>
 
-                    {/* ── Save Button ── */}
+                    {/* Form Card */}
+                    <Animated.View style={[styles.formCard, { opacity: formFade, transform: [{ translateY: formSlide }] }]}>
+                        <FieldInput label="Nombre completo" icon="account-outline" value={name} onChangeText={setName} placeholder="Tu nombre completo" />
+                        <FieldInput label="Correo electrónico" icon="email-outline" value={email} onChangeText={setEmail} placeholder="correo@ejemplo.com" keyboardType="email-address" autoCapitalize="none" />
+                        <FieldInput label="Perfil de Agricultor" icon="sprout-outline" value={perfil} onChangeText={setPerfil} placeholder="Ej: Cultivador, Experto..." />
+                        <FieldInput label="Sistema de Riego / Acceso al Agua" icon="water-outline" value={accesoAgua} onChangeText={setAccesoAgua} placeholder="Tipo de riego" />
+                        <FieldInput label="Miembro desde" icon="calendar-outline" value={createdAt} onChangeText={() => {}} placeholder="..." editable={false} muted />
+                    </Animated.View>
+
+                    {/* Save Button */}
                     <Animated.View style={{ opacity: buttonFade }}>
                         <TouchableOpacity
                             style={[styles.saveButton, isSaving && { opacity: 0.7 }]}
-                            activeOpacity={0.8}
+                            activeOpacity={0.85}
                             onPress={handleSave}
                             disabled={isSaving}
                         >
@@ -305,14 +166,8 @@ export const EditProfileScreen: React.FC = () => {
                                 <ActivityIndicator size="small" color="#fff" />
                             ) : (
                                 <>
-                                    <MaterialCommunityIcons
-                                        name="content-save-outline"
-                                        size={20}
-                                        color="#fff"
-                                    />
-                                    <Text style={styles.saveButtonText}>
-                                        Guardar Cambios
-                                    </Text>
+                                    <MaterialCommunityIcons name="content-save-outline" size={20} color="#fff" />
+                                    <Text style={styles.saveButtonText}>Guardar Cambios</Text>
                                 </>
                             )}
                         </TouchableOpacity>
@@ -325,174 +180,107 @@ export const EditProfileScreen: React.FC = () => {
     );
 };
 
+// ── Field Input helper component
+const FieldInput: React.FC<{
+    label: string;
+    icon: string;
+    value: string;
+    onChangeText: (v: string) => void;
+    placeholder: string;
+    keyboardType?: any;
+    autoCapitalize?: any;
+    editable?: boolean;
+    muted?: boolean;
+}> = ({ label, icon, value, onChangeText, placeholder, keyboardType, autoCapitalize, editable = true, muted = false }) => (
+    <View style={styles.fieldGroup}>
+        <Text style={styles.fieldLabel}>{label}</Text>
+        <View style={[styles.inputWrapper, muted && styles.inputWrapperMuted]}>
+            <MaterialCommunityIcons name={icon as any} size={18} color={muted ? '#D1D5DB' : '#059669'} style={styles.inputIcon} />
+            <TextInput
+                style={[styles.textInput, muted && { color: '#9CA3AF' }]}
+                value={value}
+                onChangeText={onChangeText}
+                placeholder={placeholder}
+                placeholderTextColor="#9CA3AF"
+                keyboardType={keyboardType}
+                autoCapitalize={autoCapitalize}
+                editable={editable}
+            />
+        </View>
+    </View>
+);
+
 // ═══════════════════════════════════════════
 // ██  STYLES
 // ═══════════════════════════════════════════
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F1F8E9',
-    },
+    container: { flex: 1, backgroundColor: '#FAFAFA' },
 
-    // ── Header ──
+    // ── Header ──────────────────────────────────────────────
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingTop: Platform.OS === 'web' ? 20 : 10,
-        paddingBottom: 12,
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingHorizontal: 16, paddingTop: Platform.OS === 'web' ? 20 : 10, paddingBottom: 14,
+        backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
+        elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.07, shadowRadius: 6,
     },
-    backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 8,
-    },
-    headerTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#1B5E20',
-    },
+    backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
+    headerTitle: { fontSize: 17, fontWeight: '700', color: '#111827', letterSpacing: -0.3 },
 
-    // ── Scroll ──
-    scrollView: {
-        flex: 1,
-    },
-    scrollContent: {
-        paddingHorizontal: 16,
-    },
+    // ── Scroll ───────────────────────────────────────────────
+    scrollView: { flex: 1 },
+    scrollContent: { paddingHorizontal: 14, paddingTop: 20 },
 
-    // ── Avatar Section ──
+    // ── Avatar Section ───────────────────────────────────────
     avatarSection: {
-        alignItems: 'center',
-        paddingVertical: 24,
-        backgroundColor: '#fff',
-        borderRadius: 20,
-        marginBottom: 16,
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.06,
-                shadowRadius: 10,
-            },
-            android: { elevation: 3 },
-            web: {
-                // @ts-ignore
-                boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-            },
-        }),
+        alignItems: 'center', paddingVertical: 28,
+        backgroundColor: '#FFFFFF', borderRadius: 22, marginBottom: 14,
+        borderWidth: 1, borderColor: '#F3F4F6',
+        elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 12,
     },
-    avatarWrapper: {
-        position: 'relative',
-        marginBottom: 10,
-    },
+    avatarWrapper: { position: 'relative', marginBottom: 12 },
     avatarCircle: {
-        width: 90,
-        height: 90,
-        borderRadius: 45,
-        backgroundColor: '#4CAF50',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 3,
-        borderColor: '#E8F5E9',
+        width: 92, height: 92, borderRadius: 46,
+        backgroundColor: '#059669', alignItems: 'center', justifyContent: 'center',
+        borderWidth: 4, borderColor: '#ECFDF5',
     },
-    avatarInitials: {
-        fontSize: 32,
-        fontWeight: '800',
-        color: '#fff',
-    },
+    avatarInitials: { fontSize: 32, fontWeight: '800', color: '#fff' },
     cameraBadge: {
-        position: 'absolute',
-        bottom: 0,
-        right: 0,
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        backgroundColor: '#FFC107',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 2,
-        borderColor: '#fff',
+        position: 'absolute', bottom: 0, right: 0,
+        width: 30, height: 30, borderRadius: 15,
+        backgroundColor: '#F59E0B', alignItems: 'center', justifyContent: 'center',
+        borderWidth: 2, borderColor: '#fff',
     },
-    badgeText: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#4CAF50',
+    perfilBadge: {
+        backgroundColor: '#ECFDF5', paddingHorizontal: 16, paddingVertical: 6,
+        borderRadius: 20, borderWidth: 1, borderColor: '#D1FAE5',
     },
+    perfilBadgeText: { fontSize: 13, fontWeight: '600', color: '#059669' },
 
-    // ── Form Card ──
+    // ── Form Card ────────────────────────────────────────────
     formCard: {
-        backgroundColor: '#fff',
-        borderRadius: 20,
-        padding: 20,
-        marginBottom: 20,
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.06,
-                shadowRadius: 10,
-            },
-            android: { elevation: 3 },
-            web: {
-                // @ts-ignore
-                boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-            },
-        }),
+        backgroundColor: '#FFFFFF', borderRadius: 22, padding: 18, marginBottom: 14,
+        borderWidth: 1, borderColor: '#F3F4F6',
+        elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 12,
     },
-    fieldGroup: {
-        marginBottom: 18,
+    fieldGroup: { marginBottom: 16 },
+    fieldLabel: { fontSize: 12.5, fontWeight: '600', color: '#6B7280', marginBottom: 7, letterSpacing: 0.2 },
+    inputWrapper: {
+        flexDirection: 'row', alignItems: 'center',
+        backgroundColor: '#F9FAFB', borderRadius: 14, borderWidth: 1.5, borderColor: '#E5E7EB',
+        paddingHorizontal: 12, paddingVertical: 12,
     },
-    fieldLabel: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#757575',
-        marginBottom: 8,
-    },
-    textInput: {
-        backgroundColor: '#F5F5F5',
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        fontSize: 15,
-        color: '#4CAF50',
-        borderWidth: 1,
-        borderColor: '#E8F5E9',
-    },
+    inputWrapperMuted: { backgroundColor: '#F9FAFB', borderColor: '#F3F4F6' },
+    inputIcon: { marginRight: 10 },
+    textInput: { flex: 1, fontSize: 15, color: '#1F2937', fontWeight: '500' },
 
-
-    // ── Save Button ──
+    // ── Save Button ──────────────────────────────────────────
     saveButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#4CAF50',
-        borderRadius: 16,
-        paddingVertical: 16,
-        gap: 8,
-        ...Platform.select({
-            ios: {
-                shadowColor: '#4CAF50',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3,
-                shadowRadius: 8,
-            },
-            android: { elevation: 4 },
-            web: {
-                // @ts-ignore
-                boxShadow: '0 4px 16px rgba(76,175,80,0.3)',
-            },
-        }),
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        backgroundColor: '#059669', borderRadius: 18, paddingVertical: 16, gap: 8,
+        shadowColor: '#059669', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6,
     },
-    saveButtonText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#fff',
-    },
+    saveButtonText: { fontSize: 16, fontWeight: '700', color: '#fff' },
 });
 
 export default EditProfileScreen;
