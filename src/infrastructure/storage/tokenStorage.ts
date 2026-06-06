@@ -105,12 +105,60 @@ export const tokenStorage = {
     },
 
     /**
+     * Guarda un valor de texto arbitrario localmente
+     */
+    setItem: async (key: string, value: string): Promise<void> => {
+        try {
+            if (Platform.OS === 'web') {
+                localStorage.setItem(key, value);
+            } else {
+                await SecureStore.setItemAsync(key, value);
+            }
+        } catch (error) {
+            console.error(`Error al guardar item ${key}:`, error);
+        }
+    },
+
+    /**
+     * Obtiene un valor de texto guardado localmente
+     */
+    getItem: async (key: string): Promise<string | null> => {
+        try {
+            if (Platform.OS === 'web') {
+                return localStorage.getItem(key);
+            } else {
+                return await SecureStore.getItemAsync(key);
+            }
+        } catch (error) {
+            console.error(`Error al obtener item ${key}:`, error);
+            return null;
+        }
+    },
+
+    /**
+     * Elimina un valor de texto guardado localmente
+     */
+    removeItem: async (key: string): Promise<void> => {
+        try {
+            if (Platform.OS === 'web') {
+                localStorage.removeItem(key);
+            } else {
+                await SecureStore.deleteItemAsync(key);
+            }
+        } catch (error) {
+            console.error(`Error al eliminar item ${key}:`, error);
+        }
+    },
+
+    /**
      * Limpia completamente todos los datos de sesión seguros
      */
     clearAll: async (): Promise<void> => {
         await Promise.all([
             tokenStorage.deleteToken(),
-            tokenStorage.deleteUserId()
+            tokenStorage.deleteUserId(),
+            tokenStorage.removeItem('huertoconnect_farmer_perfil'),
+            tokenStorage.removeItem('huertoconnect_farmer_acceso_agua')
         ]);
     }
 };

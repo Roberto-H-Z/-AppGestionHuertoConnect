@@ -1,8 +1,14 @@
 /**
  * AIChatScreen — Premium AI assistant chat interface.
- * Futuristic, minimalist design with animated typing indicator,
- * glassmorphism message bubbles, and smooth entrance animations.
- * Static demo with mock AI responses about garden care.
+ * Connected to the production chatbot API:
+ *   POST /chatbot/conversaciones          — Start a conversation
+ *   POST /chatbot/conversaciones/{id}/mensajes  — Store messages
+ *   GET  /chatbot/conversaciones          — List past conversations
+ *   PATCH /chatbot/conversaciones/{id}/cerrar   — Close a conversation
+ *
+ * Keeps the futuristic design: animated typing indicator,
+ * glassmorphism message bubbles, smooth entrance animations,
+ * and a conversation history drawer.
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -19,9 +25,17 @@ import {
     KeyboardAvoidingView,
     Platform,
     Dimensions,
+    Alert,
+    ActivityIndicator,
+    Modal,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import {
+    chatbotService,
+    ConversacionOut,
+    MensajeOut,
+} from '../services/chatbotService';
 
 const { width } = Dimensions.get('window');
 
@@ -36,27 +50,46 @@ interface Message {
     timestamp: Date;
 }
 
-// ═══════════════════════════════════════════
-// ██  MOCK AI RESPONSES
-// ═══════════════════════════════════════════
+const getAssistantResponse = (input: string): string => {
+    const normalized = input.toLowerCase();
 
-const AI_RESPONSES: Record<string, string> = {
-    'hola': '¡Hola! 🌿 Soy tu asistente de HuertoConnect. Estoy aquí para ayudarte con el cuidado de tu huerto. ¿En qué puedo ayudarte hoy?',
-    'riego': '💧 Para un riego óptimo, te recomiendo:\n\n• **Tomates**: Regar cada 2-3 días, 2L por planta\n• **Lechugas**: Riego diario ligero, mantener suelo húmedo\n• **Chiles**: Cada 3-4 días, evitar encharcamiento\n\n¿Necesitas información específica sobre algún cultivo?',
-    'plagas': '🐛 Control de plagas orgánico:\n\n• **Pulgones**: Solución de jabón potásico al 1%\n• **Mosca blanca**: Trampas amarillas adhesivas\n• **Orugas**: Bacillus thuringiensis (Bt)\n• **Caracoles**: Trampas de cerveza\n\n¿Te preocupa alguna plaga en específico?',
-    'tomate': '🍅 Guía completa del tomate:\n\n• **Temperatura ideal**: 20-25°C\n• **Luz solar**: 6-8 horas directas\n• **Riego**: Profundo cada 2-3 días\n• **Poda**: Eliminar chupones semanalmente\n• **Cosecha**: 60-85 días después del trasplante\n\n¡Tu cultivo de tomate se ve prometedor!',
-    'abono': '🌱 Fertilización recomendada:\n\n• **Compost casero**: Aplicar cada 3 semanas\n• **Humus de lombriz**: Ideal para semilleros\n• **Té de plátano**: Rico en potasio para floración\n• **Ceniza de madera**: Aporta calcio y potasio\n\n¿Quieres que te explique cómo preparar alguno?',
-    'clima': '🌤️ Según los datos actuales de tu zona:\n\n• La temperatura es adecuada para la mayoría de hortalizas\n• Humedad relativa favorable\n• Sin riesgo de heladas en los próximos 7 días\n\nTe recomiendo aprovechar para sembrar cultivos de temporada.',
-};
-
-const DEFAULT_RESPONSE = '🤔 Interesante pregunta. Como tu asistente de huerto, puedo ayudarte con:\n\n• 💧 **Riego** — Frecuencia y cantidad\n• 🐛 **Plagas** — Identificación y control\n• 🌱 **Abono** — Fertilización orgánica\n• 🍅 **Cultivos** — Guías específicas\n• 🌤️ **Clima** — Recomendaciones\n\n¿Sobre qué tema te gustaría saber más?';
-
-const getAIResponse = (input: string): string => {
-    const lower = input.toLowerCase().trim();
-    for (const [key, response] of Object.entries(AI_RESPONSES)) {
-        if (lower.includes(key)) return response;
+    if (
+        normalized.includes('hojas plateadas') ||
+        normalized.includes('puntos negros') ||
+        normalized.includes('trips')
+    ) {
+        return 'Los síntomas coinciden con una posible presencia de trips. Las zonas plateadas aparecen por el daño al tejido y los puntos negros suelen ser sus excrementos. Revisa el envés con una lupa, retira las hojas muy afectadas y coloca trampas adhesivas azules o amarillas. Puedes aplicar jabón potásico o aceite de neem al atardecer, repitiendo según las indicaciones del producto.';
     }
-    return DEFAULT_RESPONSE;
+
+    if (normalized.includes('riego') || normalized.includes('regar')) {
+        return 'Riega temprano por la mañana y dirige el agua a la base de la planta. Comprueba primero los 2 o 3 cm superiores del suelo: si siguen húmedos, espera. Es mejor un riego profundo y espaciado que muchos riegos superficiales.';
+    }
+
+    if (
+        normalized.includes('plaga') ||
+        normalized.includes('pulgón') ||
+        normalized.includes('mosca blanca')
+    ) {
+        return 'Revisa el envés de las hojas para identificar la plaga. Como manejo inicial, retira las partes muy afectadas, usa trampas adhesivas y aplica jabón potásico al atardecer. Evita mezclar tratamientos sin revisar antes las indicaciones del producto.';
+    }
+
+    if (normalized.includes('tomate') || normalized.includes('jitomate')) {
+        return 'El tomate necesita entre 6 y 8 horas de sol, suelo con buen drenaje y riego profundo sin mojar demasiado las hojas. Mantén una humedad estable para reducir el agrietamiento y elimina hojas enfermas o que toquen el suelo.';
+    }
+
+    if (
+        normalized.includes('abono') ||
+        normalized.includes('fertilizante') ||
+        normalized.includes('compost')
+    ) {
+        return 'Puedes comenzar con compost maduro o humus de lombriz alrededor de la planta, sin pegarlo al tallo. Aplica cantidades moderadas y observa la respuesta del cultivo; demasiado nitrógeno produce muchas hojas y pocos frutos.';
+    }
+
+    if (normalized.includes('clima') || normalized.includes('temperatura')) {
+        return 'La recomendación depende del cultivo y de tu temperatura local. Protege las plantas del sol intenso del mediodía, vigila que el suelo no se seque con viento o calor y evita regar de noche cuando hay mucha humedad.';
+    }
+
+    return 'Puedo ayudarte con riego, plagas, cultivos, fertilización y clima. Cuéntame qué planta tienes, qué síntomas observas, desde cuándo aparecen y cómo la estás regando para darte una recomendación más precisa.';
 };
 
 // ═══════════════════════════════════════════
@@ -200,18 +233,22 @@ const MessageBubble: React.FC<{ message: Message; index: number }> = ({ message,
 // ═══════════════════════════════════════════
 
 const suggestions = [
-    { label: '💧 Riego', query: 'riego' },
-    { label: '🐛 Plagas', query: 'plagas' },
-    { label: '🍅 Tomates', query: 'tomate' },
-    { label: '🌱 Abono', query: 'abono' },
-    { label: '🌤️ Clima', query: 'clima' },
+    { label: '💧 Riego', query: '¿Cómo debo regar mis cultivos?' },
+    { label: '🐛 Plagas', query: '¿Cómo controlar plagas en mi huerto?' },
+    { label: '🍅 Tomates', query: '¿Cómo cultivar tomates correctamente?' },
+    { label: '🌱 Abono', query: '¿Qué abono debo usar para mi huerto?' },
+    { label: '🌤️ Clima', query: '¿Cómo afecta el clima a mis cultivos?' },
 ];
 
 // ═══════════════════════════════════════════
 // ██  HEADER with subtle glow
 // ═══════════════════════════════════════════
 
-const ChatHeader: React.FC = () => {
+const ChatHeader: React.FC<{
+    onNewChat: () => void;
+    onShowHistory: () => void;
+    hasActiveConversation: boolean;
+}> = ({ onNewChat, onShowHistory, hasActiveConversation }) => {
     const glowAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
@@ -255,9 +292,16 @@ const ChatHeader: React.FC = () => {
                     </View>
                 </View>
             </View>
-            <TouchableOpacity style={styles.headerAction}>
-                <MaterialCommunityIcons name="dots-vertical" size={22} color="#66BB6A" />
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+                {hasActiveConversation && (
+                    <TouchableOpacity style={styles.headerAction} onPress={onNewChat}>
+                        <MaterialCommunityIcons name="chat-plus-outline" size={22} color="#66BB6A" />
+                    </TouchableOpacity>
+                )}
+                <TouchableOpacity style={styles.headerAction} onPress={onShowHistory}>
+                    <MaterialCommunityIcons name="history" size={22} color="#66BB6A" />
+                </TouchableOpacity>
+            </View>
         </View>
     );
 };
@@ -319,6 +363,111 @@ const WelcomeState: React.FC<{ onSuggestionPress: (q: string) => void }> = ({ on
 };
 
 // ═══════════════════════════════════════════
+// ██  CONVERSATION HISTORY MODAL
+// ═══════════════════════════════════════════
+
+const ConversationHistoryModal: React.FC<{
+    visible: boolean;
+    onClose: () => void;
+    conversations: ConversacionOut[];
+    onSelect: (conv: ConversacionOut) => void;
+    isLoading: boolean;
+    activeConvId?: string;
+}> = ({ visible, onClose, conversations, onSelect, isLoading, activeConvId }) => {
+    return (
+        <Modal visible={visible} animationType="slide" transparent>
+            <View style={styles.historyOverlay}>
+                <View style={styles.historyContainer}>
+                    {/* Header */}
+                    <View style={styles.historyHeader}>
+                        <Text style={styles.historyTitle}>Conversaciones</Text>
+                        <TouchableOpacity onPress={onClose} style={styles.historyCloseBtn}>
+                            <MaterialCommunityIcons name="close" size={22} color="#666" />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Content */}
+                    {isLoading ? (
+                        <View style={styles.historyLoading}>
+                            <ActivityIndicator size="large" color="#4CAF50" />
+                            <Text style={styles.historyLoadingText}>Cargando conversaciones...</Text>
+                        </View>
+                    ) : conversations.length === 0 ? (
+                        <View style={styles.historyEmpty}>
+                            <MaterialCommunityIcons name="chat-outline" size={48} color="#C8E6C9" />
+                            <Text style={styles.historyEmptyText}>No hay conversaciones previas</Text>
+                        </View>
+                    ) : (
+                        <ScrollView style={styles.historyList} showsVerticalScrollIndicator={false}>
+                            {conversations.map((conv) => (
+                                <TouchableOpacity
+                                    key={conv.id}
+                                    style={[
+                                        styles.historyItem,
+                                        conv.id === activeConvId && styles.historyItemActive,
+                                    ]}
+                                    onPress={() => onSelect(conv)}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={styles.historyItemIcon}>
+                                        <MaterialCommunityIcons
+                                            name={isConvActive(conv.estado) ? 'chat-processing-outline' : 'chat-outline'}
+                                            size={22}
+                                            color={isConvActive(conv.estado) ? '#4CAF50' : '#9E9E9E'}
+                                        />
+                                    </View>
+                                    <View style={styles.historyItemContent}>
+                                        <Text style={styles.historyItemTema} numberOfLines={2}>
+                                            {conv.tema}
+                                        </Text>
+                                        <View style={styles.historyItemMeta}>
+                                            <Text style={styles.historyItemDate}>
+                                                {conv.fecha
+                                                    ? new Date(conv.fecha).toLocaleDateString('es-MX', {
+                                                        day: '2-digit',
+                                                        month: 'short',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                    })
+                                                    : 'Reciente'}
+                                            </Text>
+                                            {!isConvActive(conv.estado) && (
+                                                <View style={styles.historyClosedBadge}>
+                                                    <Text style={styles.historyClosedText}>Cerrada</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    </View>
+                                    <MaterialCommunityIcons name="chevron-right" size={20} color="#C8E6C9" />
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    )}
+                </View>
+            </View>
+        </Modal>
+    );
+};
+
+// ═══════════════════════════════════════════
+// ██  HELPER: Convert API messages to UI messages
+// ═══════════════════════════════════════════
+
+const apiMessageToUI = (msg: MensajeOut): Message => ({
+    id: msg.id,
+    text: msg.contenido,
+    sender: msg.rol === 'user' ? 'user' : 'ai',
+    timestamp: msg.fecha ? new Date(msg.fecha) : new Date(),
+});
+
+/** Helper to check if a conversation status represents an active chat */
+const isConvActive = (estado?: string): boolean => {
+    if (!estado) return false;
+    const norm = estado.toLowerCase().trim();
+    return norm === 'activa' || norm === 'activo' || norm === 'abierta' || norm === 'abierto';
+};
+
+// ═══════════════════════════════════════════
 // ██  MAIN SCREEN
 // ═══════════════════════════════════════════
 
@@ -326,6 +475,11 @@ export const AIChatScreen: React.FC = () => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputText, setInputText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [conversationId, setConversationId] = useState<string | null>(null);
+    const [conversationActive, setConversationActive] = useState(true);
+    const [conversations, setConversations] = useState<ConversacionOut[]>([]);
+    const [historyVisible, setHistoryVisible] = useState(false);
+    const [historyLoading, setHistoryLoading] = useState(false);
     const scrollRef = useRef<ScrollView>(null);
     const inputRef = useRef<TextInput>(null);
 
@@ -335,35 +489,101 @@ export const AIChatScreen: React.FC = () => {
         }, 100);
     }, []);
 
-    const sendMessage = useCallback((text: string) => {
-        if (!text.trim()) return;
+    // ── Load conversation history when modal opens ──
+    const loadConversations = useCallback(async () => {
+        setHistoryLoading(true);
+        try {
+            const convs = await chatbotService.listConversaciones(0, 50);
+            setConversations(convs);
+        } catch (error) {
+            console.warn('[AIChatScreen] Error loading conversations:', error);
+        } finally {
+            setHistoryLoading(false);
+        }
+    }, []);
 
+    // ── Load messages from a specific conversation ──
+    const loadConversation = useCallback(async (conv: ConversacionOut) => {
+        try {
+            const msgs = await chatbotService.listMensajes(conv.id);
+            setMessages(msgs.map(apiMessageToUI));
+            setConversationId(conv.id);
+            setConversationActive(isConvActive(conv.estado));
+            setHistoryVisible(false);
+            scrollToBottom();
+        } catch (error: any) {
+            Alert.alert('Error', error?.message || 'No se pudieron cargar los mensajes.');
+        }
+    }, [scrollToBottom]);
+
+    // ── Start a new conversation ──
+    const startNewChat = useCallback(() => {
+        setMessages([]);
+        setConversationId(null);
+        setConversationActive(true);
+        setInputText('');
+    }, []);
+
+    // ── Send message ──
+    const sendMessage = useCallback(async (text: string) => {
+        if (!text.trim() || isTyping) return;
+
+        const userText = text.trim();
+
+        // Show user message immediately
         const userMsg: Message = {
-            id: Date.now().toString(),
-            text: text.trim(),
+            id: 'temp-' + Date.now(),
+            text: userText,
             sender: 'user',
             timestamp: new Date(),
         };
-
         setMessages(prev => [...prev, userMsg]);
         setInputText('');
         setIsTyping(true);
         scrollToBottom();
 
-        // Simulate AI "thinking" delay
-        const delay = 1000 + Math.random() * 1500;
-        setTimeout(() => {
-            const aiMsg: Message = {
-                id: (Date.now() + 1).toString(),
-                text: getAIResponse(text),
+        try {
+            let convId = conversationId;
+
+            // 1. If no active conversation, create one with the first message as the topic
+            if (!convId) {
+                const tema = userText.length > 60 ? userText.substring(0, 60) + '...' : userText;
+                const newConv = await chatbotService.createConversacion({ tema });
+                convId = newConv.id;
+                setConversationId(convId);
+                setConversationActive(isConvActive(newConv.estado));
+            }
+
+            // The API stores messages but does not generate assistant replies.
+            await chatbotService.createMensaje(convId, {
+                contenido: userText,
+                rol: 'user',
+            });
+
+            const assistantText = getAssistantResponse(userText);
+            await chatbotService.createMensaje(convId, {
+                contenido: assistantText,
+                rol: 'assistant',
+            });
+
+            const updatedMessages = await chatbotService.listMensajes(convId);
+            setMessages(updatedMessages.map(apiMessageToUI));
+        } catch (error: any) {
+            console.error('[AIChatScreen] Error sending message:', error);
+
+            // Show error as an AI message so the user sees feedback
+            const errorMsg: Message = {
+                id: 'error-' + Date.now(),
+                text: '❌ No se pudo enviar el mensaje. Verifica tu conexión e inténtalo de nuevo.',
                 sender: 'ai',
                 timestamp: new Date(),
             };
+            setMessages(prev => [...prev, errorMsg]);
+        } finally {
             setIsTyping(false);
-            setMessages(prev => [...prev, aiMsg]);
             scrollToBottom();
-        }, delay);
-    }, [scrollToBottom]);
+        }
+    }, [conversationId, isTyping, scrollToBottom]);
 
     const handleSend = useCallback(() => {
         sendMessage(inputText);
@@ -373,12 +593,25 @@ export const AIChatScreen: React.FC = () => {
         sendMessage(query);
     }, [sendMessage]);
 
+    const handleShowHistory = useCallback(() => {
+        setHistoryVisible(true);
+        loadConversations();
+    }, [loadConversations]);
+
+    const handleSelectConversation = useCallback((conv: ConversacionOut) => {
+        loadConversation(conv);
+    }, [loadConversation]);
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
 
             {/* Header */}
-            <ChatHeader />
+            <ChatHeader
+                onNewChat={startNewChat}
+                onShowHistory={handleShowHistory}
+                hasActiveConversation={conversationId !== null}
+            />
 
             {/* Chat area */}
             <KeyboardAvoidingView
@@ -406,7 +639,7 @@ export const AIChatScreen: React.FC = () => {
                 </ScrollView>
 
                 {/* Quick suggestions when chat is active */}
-                {messages.length > 0 && !isTyping && (
+                {messages.length > 0 && !isTyping && conversationActive && (
                     <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
@@ -426,6 +659,17 @@ export const AIChatScreen: React.FC = () => {
                     </ScrollView>
                 )}
 
+                {/* Conversation closed banner */}
+                {!conversationActive && conversationId && (
+                    <View style={styles.closedBanner}>
+                        <MaterialCommunityIcons name="lock-outline" size={16} color="#FF9800" />
+                        <Text style={styles.closedBannerText}>Esta conversación está cerrada.</Text>
+                        <TouchableOpacity onPress={startNewChat}>
+                            <Text style={styles.closedBannerLink}>Nueva conversación</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
                 {/* Input bar */}
                 <View style={styles.inputBar}>
                     <View style={styles.inputContainer}>
@@ -439,25 +683,40 @@ export const AIChatScreen: React.FC = () => {
                             multiline
                             maxLength={500}
                             returnKeyType="default"
+                            editable={conversationActive}
                         />
                     </View>
                     <TouchableOpacity
                         style={[
                             styles.sendButton,
-                            !inputText.trim() && styles.sendButtonDisabled,
+                            (!inputText.trim() || !conversationActive) && styles.sendButtonDisabled,
                         ]}
                         onPress={handleSend}
-                        disabled={!inputText.trim() || isTyping}
+                        disabled={!inputText.trim() || isTyping || !conversationActive}
                         activeOpacity={0.7}
                     >
-                        <MaterialCommunityIcons
-                            name="send"
-                            size={20}
-                            color={inputText.trim() ? '#fff' : '#A5D6A7'}
-                        />
+                        {isTyping ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                            <MaterialCommunityIcons
+                                name="send"
+                                size={20}
+                                color={inputText.trim() && conversationActive ? '#fff' : '#A5D6A7'}
+                            />
+                        )}
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
+
+            {/* Conversation History Modal */}
+            <ConversationHistoryModal
+                visible={historyVisible}
+                onClose={() => setHistoryVisible(false)}
+                conversations={conversations}
+                onSelect={handleSelectConversation}
+                isLoading={historyLoading}
+                activeConvId={conversationId || undefined}
+            />
         </SafeAreaView>
     );
 };
@@ -544,6 +803,11 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#66BB6A',
         fontWeight: '500',
+    },
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
     },
     headerAction: {
         padding: 6,
@@ -779,6 +1043,30 @@ const styles = StyleSheet.create({
         color: '#2E7D32',
     },
 
+    // ── Closed conversation banner ──
+    closedBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        backgroundColor: '#FFF8E1',
+        borderTopWidth: 1,
+        borderTopColor: '#FFE082',
+        gap: 8,
+    },
+    closedBannerText: {
+        fontSize: 13,
+        color: '#F57F17',
+        fontWeight: '500',
+    },
+    closedBannerLink: {
+        fontSize: 13,
+        color: '#4CAF50',
+        fontWeight: '700',
+        textDecorationLine: 'underline',
+    },
+
     // ── Input bar ──
     inputBar: {
         flexDirection: 'row',
@@ -839,6 +1127,111 @@ const styles = StyleSheet.create({
             ios: { shadowOpacity: 0 },
             android: { elevation: 0 },
         }),
+    },
+
+    // ── Conversation History Modal ──
+    historyOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        justifyContent: 'flex-end',
+    },
+    historyContainer: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        maxHeight: '75%',
+        paddingBottom: 30,
+    },
+    historyHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 18,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E8F5E9',
+    },
+    historyTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1B5E20',
+    },
+    historyCloseBtn: {
+        padding: 4,
+    },
+    historyLoading: {
+        alignItems: 'center',
+        paddingVertical: 40,
+    },
+    historyLoadingText: {
+        marginTop: 12,
+        fontSize: 14,
+        color: '#9E9E9E',
+    },
+    historyEmpty: {
+        alignItems: 'center',
+        paddingVertical: 40,
+    },
+    historyEmptyText: {
+        marginTop: 12,
+        fontSize: 14,
+        color: '#9E9E9E',
+    },
+    historyList: {
+        paddingHorizontal: 16,
+        paddingTop: 8,
+    },
+    historyItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 12,
+        borderRadius: 14,
+        marginBottom: 6,
+        backgroundColor: '#FAFFF5',
+    },
+    historyItemActive: {
+        backgroundColor: '#E8F5E9',
+        borderWidth: 1.5,
+        borderColor: '#4CAF50',
+    },
+    historyItemIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#E8F5E9',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    historyItemContent: {
+        flex: 1,
+    },
+    historyItemTema: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#1B5E20',
+        marginBottom: 4,
+    },
+    historyItemMeta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    historyItemDate: {
+        fontSize: 12,
+        color: '#9E9E9E',
+    },
+    historyClosedBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 8,
+        backgroundColor: '#FFF3E0',
+    },
+    historyClosedText: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: '#FF9800',
     },
 });
 

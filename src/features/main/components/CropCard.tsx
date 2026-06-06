@@ -1,15 +1,13 @@
 /**
- * CropCard - Collapsible card displaying crop information.
- * Shows a compact view (image + name + day progress), expandable
- * to show harvest progress bar and summary grid.
- * The "Próximo Riego" item is tappable to open the WateringModal.
+ * HuertoCard — Collapsible card displaying huerto information.
+ * Compact: icon + nombre + estado badge + salud bar
+ * Expanded: region, siembras list, weather, specs link
  */
 
 import React, { useState, useRef } from 'react';
 import {
     View,
     Text,
-    Image,
     StyleSheet,
     TouchableOpacity,
     Animated,
@@ -18,34 +16,75 @@ import {
     UIManager,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Crop, GardenArea } from '../types/cropTypes';
+import { HuertoConDetalles, ESTADO_COLORS, SiembraConCultivo } from '../types/cropTypes';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-interface CropCardProps {
-    crop: Crop;
-    gardenArea?: GardenArea;
+interface HuertoCardProps {
+    data: HuertoConDetalles;
     defaultExpanded?: boolean;
-    onWateringPress?: (crop: Crop) => void;
     onWeatherPress?: () => void;
-    onTasksPress?: (crop: Crop) => void;
-    onSpecsPress?: (crop: Crop) => void;
+    onSpecsPress?: (cultivoNombre: string) => void;
+    onDeletePress?: (huertoId: string) => void;
     weatherText?: string;
 }
 
-interface SummaryItemProps {
+// ── Siembra row ──
+
+const SiembraItem: React.FC<{
+    siembra: SiembraConCultivo;
+    onSpecsPress?: (nombre: string) => void;
+}> = ({ siembra, onSpecsPress }) => {
+    const estadoColors: Record<string, string> = {
+        Activo: '#4CAF50',
+        Cosechado: '#FF9800',
+        Perdido: '#EF5350',
+    };
+
+    const nombre = siembra.cultivo?.nombre || 'Cultivo desconocido';
+    const fecha = siembra.fecha_siembra
+        ? new Date(siembra.fecha_siembra + 'T12:00:00').toLocaleDateString('es-MX', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+        })
+        : 'Sin fecha';
+
+    return (
+        <TouchableOpacity
+            style={styles.siembraItem}
+            activeOpacity={onSpecsPress ? 0.7 : 1}
+            onPress={() => onSpecsPress?.(nombre)}
+        >
+            <View style={styles.siembraIcon}>
+                <MaterialCommunityIcons name="sprout" size={18} color="#66BB6A" />
+            </View>
+            <View style={styles.siembraInfo}>
+                <Text style={styles.siembraNombre}>{nombre}</Text>
+                <Text style={styles.siembraFecha}>{fecha}</Text>
+            </View>
+            <View style={[styles.siembraEstadoBadge, { backgroundColor: (estadoColors[siembra.estado] || '#9E9E9E') + '20' }]}>
+                <View style={[styles.siembraEstadoDot, { backgroundColor: estadoColors[siembra.estado] || '#9E9E9E' }]} />
+                <Text style={[styles.siembraEstadoText, { color: estadoColors[siembra.estado] || '#9E9E9E' }]}>
+                    {siembra.estado}
+                </Text>
+            </View>
+        </TouchableOpacity>
+    );
+};
+
+// ── Summary item ──
+
+const SummaryItem: React.FC<{
     icon: string;
     label: string;
     value: string;
     color?: string;
     onPress?: () => void;
-}
-
-/** Reusable summary item for the info grid */
-const SummaryItem: React.FC<SummaryItemProps> = ({ icon, label, value, color = '#4CAF50', onPress }) => {
+}> = ({ icon, label, value, color = '#4CAF50', onPress }) => {
     const content = (
         <View style={[styles.summaryItem, onPress && styles.summaryItemTappable]}>
             <MaterialCommunityIcons name={icon as any} size={22} color={color} />
@@ -61,22 +100,24 @@ const SummaryItem: React.FC<SummaryItemProps> = ({ icon, label, value, color = '
             </TouchableOpacity>
         );
     }
-
     return content;
 };
 
-export const CropCard: React.FC<CropCardProps> = ({
-    crop,
-    gardenArea,
+// ── Main component ──
+
+export const HuertoCard: React.FC<HuertoCardProps> = ({
+    data,
     defaultExpanded = false,
-    onWateringPress,
     onWeatherPress,
-    onTasksPress,
     onSpecsPress,
+    onDeletePress,
     weatherText = '-- °C',
 }) => {
+    const { huerto, region, siembras } = data;
     const [expanded, setExpanded] = useState(defaultExpanded);
     const rotateAnim = useRef(new Animated.Value(defaultExpanded ? 1 : 0)).current;
+
+    const estadoStyle = ESTADO_COLORS[huerto.estado] || ESTADO_COLORS.Optimo;
 
     const toggleExpand = () => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -88,13 +129,12 @@ export const CropCard: React.FC<CropCardProps> = ({
         setExpanded(!expanded);
     };
 
-    const progress = crop.totalDays > 0 ? crop.currentDay / crop.totalDays : 0;
-    const progressPercent = Math.min(progress * 100, 100);
-
     const chevronRotation = rotateAnim.interpolate({
         inputRange: [0, 1],
         outputRange: ['0deg', '180deg'],
     });
+
+    const saludPercent = Math.min(100, Math.max(0, huerto.salud));
 
     return (
         <View style={styles.card}>
@@ -104,20 +144,23 @@ export const CropCard: React.FC<CropCardProps> = ({
                 activeOpacity={0.8}
                 style={styles.cardHeader}
             >
-                <View style={styles.imageContainer}>
-                    {crop.imageUri ? (
-                        <Image source={{ uri: crop.imageUri }} style={styles.cropImage} />
-                    ) : (
-                        <View style={styles.imagePlaceholder}>
-                            <MaterialCommunityIcons name="sprout" size={32} color="#66BB6A" />
-                        </View>
-                    )}
+                <View style={[styles.iconContainer, { backgroundColor: estadoStyle.bg }]}>
+                    <MaterialCommunityIcons name="sprout" size={28} color={estadoStyle.text} />
                 </View>
                 <View style={styles.headerInfo}>
-                    <Text style={styles.cropName}>{crop.name}</Text>
-                    <Text style={styles.dayText}>
-                        Día {crop.currentDay} de {crop.totalDays}
-                    </Text>
+                    <View style={styles.headerTopRow}>
+                        <Text style={styles.huertoName} numberOfLines={1}>{huerto.nombre}</Text>
+                        <View style={[styles.estadoBadge, { backgroundColor: estadoStyle.bg }]}>
+                            <Text style={[styles.estadoText, { color: estadoStyle.text }]}>{huerto.estado}</Text>
+                        </View>
+                    </View>
+                    {huerto.municipio ? (
+                        <Text style={styles.municipioText}>{huerto.municipio}</Text>
+                    ) : null}
+                    {/* Compact salud bar */}
+                    <View style={styles.saludBarCompact}>
+                        <View style={[styles.saludBarFill, { width: `${saludPercent}%`, backgroundColor: estadoStyle.bar }]} />
+                    </View>
                 </View>
                 <Animated.View style={{ transform: [{ rotate: chevronRotation }] }}>
                     <MaterialCommunityIcons name="chevron-down" size={24} color="#9E9E9E" />
@@ -127,31 +170,54 @@ export const CropCard: React.FC<CropCardProps> = ({
             {/* Expanded content */}
             {expanded && (
                 <View style={styles.expandedContent}>
-                    {/* Harvest progress */}
-                    <View style={styles.progressSection}>
-                        <Text style={styles.progressTitle}>Estado de la Cosecha</Text>
-                        <View style={styles.progressBarBg}>
-                            <View
-                                style={[
-                                    styles.progressBarFill,
-                                    { width: `${progressPercent}%` },
-                                ]}
-                            />
+                    {/* Salud section */}
+                    <View style={styles.saludSection}>
+                        <Text style={styles.sectionLabel}>Salud del Huerto</Text>
+                        <View style={styles.saludRow}>
+                            <View style={styles.saludBarBg}>
+                                <View
+                                    style={[styles.saludBarFillLarge, { width: `${saludPercent}%`, backgroundColor: estadoStyle.bar }]}
+                                />
+                            </View>
+                            <Text style={[styles.saludPercent, { color: estadoStyle.text }]}>{saludPercent}%</Text>
                         </View>
-                        <Text style={styles.progressText}>
-                            {crop.currentDay}/{crop.totalDays} días
-                        </Text>
                     </View>
 
+                    {/* Region badge */}
+                    {region && (
+                        <View style={styles.regionBadge}>
+                            <MaterialCommunityIcons name="map-marker-outline" size={16} color="#66BB6A" />
+                            <Text style={styles.regionText}>{region.nombre}</Text>
+                            <View style={[
+                                styles.actividadDot,
+                                {
+                                    backgroundColor: region.actividad === 'Alta' ? '#4CAF50'
+                                        : region.actividad === 'Media' ? '#FFC107' : '#EF5350',
+                                },
+                            ]} />
+                            <Text style={styles.actividadText}>{region.actividad}</Text>
+                        </View>
+                    )}
+
+                    {/* Siembras list */}
+                    {siembras.length > 0 && (
+                        <View style={styles.siembrasSection}>
+                            <Text style={styles.sectionLabel}>
+                                Cultivos Sembrados ({siembras.length})
+                            </Text>
+                            {siembras.map((s) => (
+                                <SiembraItem
+                                    key={s.id}
+                                    siembra={s}
+                                    onSpecsPress={onSpecsPress}
+                                />
+                            ))}
+                        </View>
+                    )}
+
                     {/* Summary grid */}
-                    <Text style={styles.summaryTitle}>Resumen</Text>
+                    <Text style={styles.summaryTitle}>Información</Text>
                     <View style={styles.summaryGrid}>
-                        <SummaryItem
-                            icon="water-outline"
-                            label="Próximo Riego"
-                            value={crop.nextWatering}
-                            onPress={onWateringPress ? () => onWateringPress(crop) : undefined}
-                        />
                         <SummaryItem
                             icon="white-balance-sunny"
                             label="Clima"
@@ -160,36 +226,25 @@ export const CropCard: React.FC<CropCardProps> = ({
                             onPress={onWeatherPress}
                         />
                         <SummaryItem
-                            icon="clipboard-check-outline"
-                            label="Tareas de Hoy"
-                            value={crop.tasks.length > 0
-                                ? crop.tasks.filter(t => !t.completed)[0]?.title || 'Todo listo'
-                                : 'Sin tareas'
+                            icon="calendar-clock"
+                            label="Creado"
+                            value={huerto.created_at
+                                ? new Date(huerto.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })
+                                : 'Reciente'
                             }
-                            onPress={onTasksPress ? () => onTasksPress(crop) : undefined}
-                        />
-                        <SummaryItem
-                            icon="information-outline"
-                            label="Info. de Planta"
-                            value="Ver especificaciones"
-                            onPress={onSpecsPress ? () => onSpecsPress(crop) : undefined}
                         />
                     </View>
 
-                    {/* Description */}
-                    {crop.description ? (
-                        <View style={styles.descriptionSection}>
-                            <Text style={styles.descriptionLabel}>Descripción</Text>
-                            <Text style={styles.descriptionText}>{crop.description}</Text>
-                        </View>
-                    ) : null}
-
-                    {/* Garden area badge */}
-                    {gardenArea && (
-                        <View style={styles.areaBadge}>
-                            <MaterialCommunityIcons name="map-marker-outline" size={14} color="#66BB6A" />
-                            <Text style={styles.areaBadgeText}>{gardenArea.name}</Text>
-                        </View>
+                    {/* Delete button */}
+                    {onDeletePress && (
+                        <TouchableOpacity
+                            style={styles.deleteBtn}
+                            onPress={() => onDeletePress(huerto.id)}
+                            activeOpacity={0.7}
+                        >
+                            <MaterialCommunityIcons name="delete-outline" size={18} color="#EF5350" />
+                            <Text style={styles.deleteBtnText}>Eliminar huerto</Text>
+                        </TouchableOpacity>
                     )}
                 </View>
             )}
@@ -215,79 +270,183 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 14,
     },
-    imageContainer: {
-        width: 72,
-        height: 72,
-        borderRadius: 12,
-        overflow: 'hidden',
-        marginRight: 14,
-    },
-    cropImage: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'cover',
-    },
-    imagePlaceholder: {
-        width: '100%',
-        height: '100%',
-        backgroundColor: '#E8F5E9',
+    iconContainer: {
+        width: 56,
+        height: 56,
+        borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 12,
+        marginRight: 14,
     },
     headerInfo: {
         flex: 1,
     },
-    cropName: {
-        fontSize: 18,
+    headerTopRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 2,
+    },
+    huertoName: {
+        fontSize: 17,
         fontWeight: '700',
         color: '#1B5E20',
-        marginBottom: 4,
+        flex: 1,
+        marginRight: 8,
     },
-    dayText: {
-        fontSize: 13,
+    estadoBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 10,
+    },
+    estadoText: {
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    municipioText: {
+        fontSize: 12,
         color: '#9E9E9E',
         fontWeight: '500',
+        marginBottom: 4,
     },
+    saludBarCompact: {
+        height: 4,
+        backgroundColor: '#E0E0E0',
+        borderRadius: 2,
+        overflow: 'hidden',
+        marginTop: 2,
+    },
+    saludBarFill: {
+        height: '100%',
+        borderRadius: 2,
+    },
+
+    // Expanded
     expandedContent: {
         paddingHorizontal: 14,
         paddingBottom: 16,
     },
-    progressSection: {
-        backgroundColor: '#FAFAFA',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 16,
-    },
-    progressTitle: {
+    sectionLabel: {
         fontSize: 14,
         fontWeight: '600',
         color: '#424242',
-        marginBottom: 10,
+        marginBottom: 8,
     },
-    progressBarBg: {
-        height: 8,
+    saludSection: {
+        backgroundColor: '#FAFAFA',
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 12,
+    },
+    saludRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    saludBarBg: {
+        flex: 1,
+        height: 10,
         backgroundColor: '#E0E0E0',
-        borderRadius: 4,
-        marginBottom: 6,
+        borderRadius: 5,
         overflow: 'hidden',
     },
-    progressBarFill: {
+    saludBarFillLarge: {
         height: '100%',
-        backgroundColor: '#4CAF50',
+        borderRadius: 5,
+    },
+    saludPercent: {
+        fontSize: 16,
+        fontWeight: '800',
+        minWidth: 42,
+        textAlign: 'right',
+    },
+
+    // Region
+    regionBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        backgroundColor: '#E8F5E9',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        gap: 6,
+        marginBottom: 14,
+    },
+    regionText: {
+        fontSize: 13,
+        color: '#2E7D32',
+        fontWeight: '600',
+    },
+    actividadDot: {
+        width: 8,
+        height: 8,
         borderRadius: 4,
     },
-    progressText: {
-        fontSize: 13,
-        color: '#9E9E9E',
-        textAlign: 'center',
+    actividadText: {
+        fontSize: 11,
+        color: '#66BB6A',
         fontWeight: '500',
     },
+
+    // Siembras
+    siembrasSection: {
+        marginBottom: 14,
+    },
+    siembraItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FAFAFA',
+        borderRadius: 10,
+        padding: 10,
+        marginBottom: 6,
+    },
+    siembraIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: '#E8F5E9',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+    },
+    siembraInfo: {
+        flex: 1,
+    },
+    siembraNombre: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#1B5E20',
+    },
+    siembraFecha: {
+        fontSize: 11,
+        color: '#9E9E9E',
+        marginTop: 1,
+    },
+    siembraEstadoBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        gap: 4,
+    },
+    siembraEstadoDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+    },
+    siembraEstadoText: {
+        fontSize: 11,
+        fontWeight: '600',
+    },
+
+    // Summary grid
     summaryTitle: {
         fontSize: 16,
         fontWeight: '700',
         color: '#1B5E20',
-        marginBottom: 12,
+        marginBottom: 10,
     },
     summaryGrid: {
         flexDirection: 'row',
@@ -318,38 +477,24 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         marginTop: 2,
     },
-    descriptionSection: {
-        backgroundColor: '#FAFAFA',
-        borderRadius: 12,
-        padding: 14,
-        marginBottom: 10,
-    },
-    descriptionLabel: {
-        fontSize: 12,
-        color: '#9E9E9E',
-        fontWeight: '600',
-        marginBottom: 4,
-    },
-    descriptionText: {
-        fontSize: 13,
-        color: '#424242',
-        lineHeight: 18,
-    },
-    areaBadge: {
+
+    // Delete
+    deleteBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        alignSelf: 'flex-start',
-        backgroundColor: '#E8F5E9',
-        paddingHorizontal: 10,
-        paddingVertical: 5,
+        alignSelf: 'center',
+        gap: 6,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
         borderRadius: 20,
-        gap: 4,
+        backgroundColor: '#FFEBEE',
+        marginTop: 4,
     },
-    areaBadgeText: {
-        fontSize: 11,
-        color: '#66BB6A',
+    deleteBtnText: {
+        fontSize: 13,
+        color: '#EF5350',
         fontWeight: '600',
     },
 });
 
-export default CropCard;
+export default HuertoCard;

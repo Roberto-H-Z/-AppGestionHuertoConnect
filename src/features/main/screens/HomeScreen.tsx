@@ -1,9 +1,10 @@
 /**
- * HomeScreen - Main screen of the app.
- * Shows greeting header, empty state or list of crop cards,
- * and a FAB to add more crops. Uses local state (no API).
- * Includes WateringModal and WeatherModal.
+ * HomeScreen — Main screen of the app.
+ * Shows greeting header, empty state or list of HuertoCards,
+ * and a FAB to add more huertos.
  * Fetches real-time weather from Open-Meteo API.
+ * Data is loaded from the production API:
+ *   GET /huertos, GET /regiones, GET /cultivos, GET /cultivos/siembras/{id}
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -16,35 +17,43 @@ import {
     TouchableOpacity,
     Platform,
     Alert,
+    RefreshControl,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { Crop, GardenArea, WateringSchedule, CropTask } from '../types/cropTypes';
-import { wateringFrequencyOptions } from '../data/cropData';
-import { apiClient } from '../../../infrastructure/api/apiClient';
-import { EmptyState, CropCard, AddCropModal, WateringModal, WeatherModal, TasksModal, NotificationsModal } from '../components';
+import {
+    Huerto,
+    HuertoCreate,
+    Region,
+    Cultivo,
+    Siembra,
+    SiembraCreate,
+    HuertoConDetalles,
+    SiembraConCultivo,
+    RegionCreate,
+    CultivoCreate,
+} from '../types/cropTypes';
+import { huertoService } from '../services/huertoService';
+import { EmptyState, HuertoCard, AddHuertoModal, WeatherModal, NotificationsModal } from '../components';
 import { WeatherData, fetchWeatherByLocation } from '../services/weatherService';
-import { perfilAgricultorService } from '../../onboarding/services/perfilAgricultorService';
+import { useAuth } from '../../auth/services/AuthContext';
 
 export const HomeScreen: React.FC = () => {
     const navigation = useNavigation<any>();
-    // Crop & area state (local, no API)
-    const [crops, setCrops] = useState<Crop[]>([]);
-    const [gardenAreas, setGardenAreas] = useState<GardenArea[]>([]);
-    const [modalVisible, setModalVisible] = useState(false);
+    const { user } = useAuth();
 
-    // Watering modal state
-    const [wateringModalVisible, setWateringModalVisible] = useState(false);
-    const [selectedCropForWatering, setSelectedCropForWatering] = useState<Crop | null>(null);
+    // ── Data state ──
+    const [huertosConDetalles, setHuertosConDetalles] = useState<HuertoConDetalles[]>([]);
+    const [regiones, setRegiones] = useState<Region[]>([]);
+    const [cultivos, setCultivos] = useState<Cultivo[]>([]);
+    const [modalVisible, setModalVisible] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     // Weather state
     const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
     const [weatherLoading, setWeatherLoading] = useState(false);
     const [weatherModalVisible, setWeatherModalVisible] = useState(false);
-
-    const [tasksModalVisible, setTasksModalVisible] = useState(false);
-    const [selectedCropForTasks, setSelectedCropForTasks] = useState<Crop | null>(null);
 
     // Notifications modal state
     const [notificationsVisible, setNotificationsVisible] = useState(false);
@@ -52,68 +61,66 @@ export const HomeScreen: React.FC = () => {
     // User profile state
     const [userName, setUserName] = useState('Agricultor');
 
-    // Fetch on mount
+    // ── Load data on mount ──
     useEffect(() => {
+        loadAllData();
         loadWeather();
-        loadProfile();
-        loadRegiones();
-        loadCrops();
     }, []);
 
-    const loadCrops = async () => {
-        try {
-            console.log('[HomeScreen] Fetching /huertos-realizados...');
-            const res = await apiClient.get('/huertos-realizados');
-            console.log('[HomeScreen] Crops fetched:', res.data?.length || 0, 'items');
-            
-            // Transform API data to frontend Crop format
-            const apiCrops = (res.data || []).map((h: any) => ({
-                id: h.id,
-                gardenAreaId: h.region_id,
-                name: h.cultivo_nombre || 'Cultivo', // Backend should ideally provide name or we map it
-                imageUri: h.imagen_url || null,
-                currentDay: h.dia_actual,
-                totalDays: h.total_dias,
-                harvestStatus: h.estado_cosecha,
-                nextWatering: h.proximo_riego || 'Sin programar',
-                watering: {
-                    nextDate: h.proximo_riego || '', // Now using ISO string from DB
-                    frequency: 2, // Default or could be stored in DB too
-                    quantity: 2,
-                    lastWatering: 'Sin registro'
-                },
-                tasks: (h.tareas || []).map((t: string, idx: number) => ({
-                    id: String(idx),
-                    title: t,
-                    completed: false
-                })),
-                description: h.descripcion || ''
-            }));
-            setCrops(apiCrops);
-        } catch (error) {
-            console.warn('Crops fetch failed:', error);
+    // Get display name from auth context
+    useEffect(() => {
+        if (user?.nombre) {
+            setUserName(user.nombre);
         }
-    };
+    }, [user]);
 
-    const loadRegiones = async () => {
+    const loadAllData = useCallback(async () => {
         try {
-            const res = await apiClient.get('/regiones');
-            setGardenAreas(res.data || []);
-        } catch (error) {
-            console.warn('Regions fetch failed:', error);
-        }
-    };
+            // Load regiones, cultivos and huertos in parallel
+            const [regionesData, cultivosData, huertosData] = await Promise.all([
+                huertoService.getRegiones().catch(() => []),
+                huertoService.getCultivos().catch(() => []),
+                huertoService.getHuertos().catch(() => []),
+            ]);
 
-    const loadProfile = async () => {
-        try {
-            const data = await perfilAgricultorService.getMyProfile();
-            if (data?.nombre) {
-                setUserName(data.nombre);
-            }
+            setRegiones(regionesData);
+            setCultivos(cultivosData);
+
+            // For each huerto, load its siembras
+            const enriched: HuertoConDetalles[] = await Promise.all(
+                huertosData.map(async (huerto) => {
+                    let siembrasRaw: Siembra[] = [];
+                    try {
+                        siembrasRaw = await huertoService.getSiembras(huerto.id);
+                    } catch {
+                        // Huerto might have no siembras yet
+                    }
+
+                    // Enrich siembras with their cultivo data
+                    const siembras: SiembraConCultivo[] = siembrasRaw.map((s) => ({
+                        ...s,
+                        cultivo: cultivosData.find((c) => c.id === s.cultivo_id),
+                    }));
+
+                    return {
+                        huerto,
+                        region: regionesData.find((r) => r.id === huerto.region_id),
+                        siembras,
+                    };
+                })
+            );
+
+            setHuertosConDetalles(enriched);
         } catch (error) {
-            console.warn('Profile fetch failed:', error);
+            console.warn('[HomeScreen] loadAllData failed:', error);
         }
-    };
+    }, []);
+
+    const handleRefresh = useCallback(async () => {
+        setIsRefreshing(true);
+        await loadAllData();
+        setIsRefreshing(false);
+    }, [loadAllData]);
 
     const loadWeather = async () => {
         try {
@@ -131,142 +138,103 @@ export const HomeScreen: React.FC = () => {
         ? `${weatherData.current.temperature}°C - ${weatherData.current.condition}`
         : '-- °C';
 
-    const handleSaveCrop = useCallback(async (cropData: any, newArea?: GardenArea) => {
+    // ── Create Huerto + optional Siembra ──
+    const handleSaveHuerto = useCallback(async (
+        huertoData: HuertoCreate,
+        siembraData?: { cultivoId: string; fechaSiembra?: string },
+        newRegion?: RegionCreate,
+        newCultivo?: CultivoCreate,
+    ) => {
         try {
-            let imagePayload: { imagen_url?: string; imagen_public_id?: string } = {};
+            // 1. Create new region if needed
+            let regionId = huertoData.region_id;
+            if (newRegion) {
+                const createdRegion = await huertoService.createRegion(newRegion);
+                regionId = createdRegion.id;
+                huertoData.region_id = regionId;
+            }
 
-            if (cropData.imageUri) {
-                const imageName = cropData.imageUri.split('/').pop() || `cultivo-${Date.now()}.jpg`;
-                const imageExtension = imageName.split('.').pop()?.toLowerCase();
-                const imageTypeMap: Record<string, string> = {
-                    jpg: 'image/jpeg',
-                    jpeg: 'image/jpeg',
-                    png: 'image/png',
-                    webp: 'image/webp',
-                    gif: 'image/gif',
-                };
+            // 2. Create the huerto
+            const createdHuerto = await huertoService.createHuerto(huertoData);
 
-                const formData = new FormData();
-                const imageType = imageTypeMap[imageExtension || 'jpg'] || 'image/jpeg';
+            // 3. Create new cultivo if needed, then create siembra
+            if (siembraData) {
+                let cultivoId = siembraData.cultivoId;
 
-                if (Platform.OS === 'web') {
-                    const imageResponse = await fetch(cropData.imageUri);
-                    const imageBlob = await imageResponse.blob();
-                    const imageFile = new File([imageBlob], imageName, { type: imageType });
-                    formData.append('imagen', imageFile);
-                } else {
-                    formData.append('imagen', {
-                        uri: cropData.imageUri,
-                        name: imageName,
-                        type: imageType,
-                    } as any);
+                if (newCultivo) {
+                    const createdCultivo = await huertoService.createCultivo(newCultivo);
+                    cultivoId = createdCultivo.id;
                 }
 
-                const uploadResponse = await apiClient.post('/huertos-realizados/upload-imagen', formData, {
-                    headers: {
-                        'Accept': 'application/json',
-                    },
-                });
-
-                imagePayload = {
-                    imagen_url: uploadResponse.data?.secure_url,
-                    imagen_public_id: uploadResponse.data?.public_id,
+                const siembraPayload: SiembraCreate = {
+                    huerto_id: createdHuerto.id,
+                    cultivo_id: cultivoId,
+                    fecha_siembra: siembraData.fechaSiembra || new Date().toISOString().split('T')[0],
+                    estado: 'Activo',
                 };
+                await huertoService.createSiembra(siembraPayload);
             }
 
-            // Re-map to match Backend HuertoRealizadoCreate
-            const payload = {
-                region_id: cropData.regionId,
-                cultivo_id: cropData.cultivoId,
-                estado_cosecha: cropData.harvestStatus,
-                dia_actual: cropData.currentDay,
-                total_dias: cropData.totalDays,
-                proximo_riego: cropData.nextWateringISO, // Send ISO date
-                tareas: cropData.tasks.map((t: any) => t.title),
-                descripcion: cropData.description,
-                ...imagePayload,
-            };
-
-            console.log('[HomeScreen] Saving crop payload:', JSON.stringify(payload, null, 2));
-
-            const res = await apiClient.post('/huertos-realizados', payload);
-            
-            console.log('[HomeScreen] Save response:', res.status, res.data);
-            
-            if (res.data) {
-                await loadCrops();
-            }
-
-            if (newArea) {
-                setGardenAreas((prev) => [...prev, newArea]);
-            }
-        } catch (error) {
-            console.error('Error saving crop:', error);
-            Alert.alert('Error', 'No se pudo guardar el cultivo. Revisa tu conexión e inténtalo de nuevo.');
+            // 4. Reload all data
+            await loadAllData();
+        } catch (error: any) {
+            console.error('[HomeScreen] Error saving huerto:', error);
+            Alert.alert(
+                'Error',
+                error?.message || 'No se pudo guardar el huerto. Revisa tu conexión e inténtalo de nuevo.'
+            );
             throw error;
         }
-    }, [gardenAreas]);
+    }, [loadAllData]);
 
-    const handleWateringPress = useCallback((crop: Crop) => {
-        setSelectedCropForWatering(crop);
-        setWateringModalVisible(true);
-    }, []);
+    // ── Delete Huerto ──
+    const handleDeleteHuerto = useCallback(async (huertoId: string) => {
+        const performDelete = async () => {
+            try {
+                await huertoService.deleteHuerto(huertoId);
+                await loadAllData();
+            } catch (error: any) {
+                Alert.alert('Error', error?.message || 'No se pudo eliminar el huerto.');
+            }
+        };
 
-    const handleWateringSave = useCallback((cropId: string, watering: WateringSchedule) => {
-        setCrops((prev) =>
-            prev.map((c) => {
-                if (c.id !== cropId) return c;
-
-                const date = new Date(watering.nextDate + 'T12:00:00');
-                const day = date.getDate().toString().padStart(2, '0');
-                const month = (date.getMonth() + 1).toString().padStart(2, '0');
-                const year = date.getFullYear();
-                const freqLabel = wateringFrequencyOptions.find(
-                    (o) => o.days === watering.frequency
-                )?.label || `Cada ${watering.frequency} días`;
-
-                return {
-                    ...c,
-                    watering,
-                    nextWatering: `${day}/${month}/${year} (${freqLabel})`,
-                };
-            })
-        );
-    }, []);
+        if (Platform.OS === 'web') {
+            const confirm = window.confirm('¿Estás seguro de que deseas eliminar este huerto? Esta acción no se puede deshacer.');
+            if (confirm) {
+                await performDelete();
+            }
+        } else {
+            Alert.alert(
+                'Eliminar Huerto',
+                '¿Estás seguro de que deseas eliminar este huerto? Esta acción no se puede deshacer.',
+                [
+                    { text: 'Cancelar', style: 'cancel' },
+                    {
+                        text: 'Eliminar',
+                        style: 'destructive',
+                        onPress: performDelete,
+                    },
+                ]
+            );
+        }
+    }, [loadAllData]);
 
     const handleWeatherPress = useCallback(() => {
         setWeatherModalVisible(true);
-        // Refresh weather data when opening
         if (!weatherLoading) {
             loadWeather();
         }
     }, [weatherLoading]);
 
-    const handleTasksPress = useCallback((crop: Crop) => {
-        setSelectedCropForTasks(crop);
-        setTasksModalVisible(true);
-    }, []);
-
-    const handleSpecsPress = useCallback((crop: Crop) => {
+    const handleSpecsPress = useCallback((cultivoNombre: string) => {
         navigation.navigate('PlantSpecs', {
-            cropName: crop.name,
-            scientificName: crop.description || 'Solanum lycopersicum',
+            cropName: cultivoNombre,
+            scientificName: cultivoNombre,
             cropIcon: 'sprout',
         });
     }, [navigation]);
 
-    const handleTasksSave = useCallback((cropId: string, tasks: CropTask[]) => {
-        setCrops((prev) =>
-            prev.map((c) => (c.id === cropId ? { ...c, tasks } : c))
-        );
-    }, []);
-
-    const getGardenArea = useCallback(
-        (areaId: string) => gardenAreas.find((a) => a.id === areaId),
-        [gardenAreas]
-    );
-
-    const hasCrops = crops.length > 0;
+    const hasHuertos = huertosConDetalles.length > 0;
 
     return (
         <SafeAreaView style={styles.container}>
@@ -288,51 +256,55 @@ export const HomeScreen: React.FC = () => {
             </View>
 
             {/* Content */}
-            {hasCrops ? (
-                <>
-                    <ScrollView
-                        style={styles.scrollView}
-                        contentContainerStyle={styles.scrollContent}
-                        showsVerticalScrollIndicator={false}
-                    >
-                        {/* Section header */}
-                        <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Mis Cultivos</Text>
-                            <TouchableOpacity
-                                style={styles.addMoreButton}
-                                onPress={() => setModalVisible(true)}
-                                activeOpacity={0.7}
-                            >
-                                <MaterialCommunityIcons name="plus" size={18} color="#4CAF50" />
-                                <Text style={styles.addMoreText}>Agregar</Text>
-                            </TouchableOpacity>
-                        </View>
+            {hasHuertos ? (
+                <ScrollView
+                    style={styles.scrollView}
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={isRefreshing}
+                            onRefresh={handleRefresh}
+                            colors={['#4CAF50']}
+                            tintColor="#4CAF50"
+                        />
+                    }
+                >
+                    {/* Section header */}
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Mis Huertos</Text>
+                        <TouchableOpacity
+                            style={styles.addMoreButton}
+                            onPress={() => setModalVisible(true)}
+                            activeOpacity={0.7}
+                        >
+                            <MaterialCommunityIcons name="plus" size={18} color="#4CAF50" />
+                            <Text style={styles.addMoreText}>Agregar</Text>
+                        </TouchableOpacity>
+                    </View>
 
-                        {/* Crop cards */}
-                        {crops.map((crop, index) => (
-                            <CropCard
-                                key={crop.id}
-                                crop={crop}
-                                gardenArea={getGardenArea(crop.gardenAreaId)}
-                                defaultExpanded={crops.length === 1 || index === 0}
-                                onWateringPress={handleWateringPress}
-                                onWeatherPress={handleWeatherPress}
-                                onTasksPress={handleTasksPress}
-                                onSpecsPress={handleSpecsPress}
-                                weatherText={weatherText}
-                            />
-                        ))}
+                    {/* Huerto cards */}
+                    {huertosConDetalles.map((item, index) => (
+                        <HuertoCard
+                            key={item.huerto.id}
+                            data={item}
+                            defaultExpanded={huertosConDetalles.length === 1 || index === 0}
+                            onWeatherPress={handleWeatherPress}
+                            onSpecsPress={handleSpecsPress}
+                            onDeletePress={handleDeleteHuerto}
+                            weatherText={weatherText}
+                        />
+                    ))}
 
-                        {/* Bottom spacer for tab bar */}
-                        <View style={{ height: 100 }} />
-                    </ScrollView>
-                </>
+                    {/* Bottom spacer for tab bar */}
+                    <View style={{ height: 100 }} />
+                </ScrollView>
             ) : (
-                <EmptyState onAddCrop={() => setModalVisible(true)} />
+                <EmptyState onAddHuerto={() => setModalVisible(true)} />
             )}
 
-            {/* FAB - only when crops exist */}
-            {hasCrops && (
+            {/* FAB - only when huertos exist */}
+            {hasHuertos && (
                 <TouchableOpacity
                     style={styles.fab}
                     onPress={() => setModalVisible(true)}
@@ -342,20 +314,13 @@ export const HomeScreen: React.FC = () => {
                 </TouchableOpacity>
             )}
 
-            {/* Add Crop Modal */}
-            <AddCropModal
+            {/* Add Huerto Modal */}
+            <AddHuertoModal
                 visible={modalVisible}
                 onClose={() => setModalVisible(false)}
-                onSave={handleSaveCrop}
-                gardenAreas={gardenAreas}
-            />
-
-            {/* Watering Schedule Modal */}
-            <WateringModal
-                visible={wateringModalVisible}
-                crop={selectedCropForWatering}
-                onClose={() => setWateringModalVisible(false)}
-                onSave={handleWateringSave}
+                onSave={handleSaveHuerto}
+                regiones={regiones}
+                cultivos={cultivos}
             />
 
             {/* Weather Detail Modal */}
@@ -364,14 +329,6 @@ export const HomeScreen: React.FC = () => {
                 onClose={() => setWeatherModalVisible(false)}
                 weather={weatherData}
                 loading={weatherLoading}
-            />
-
-            {/* Tasks Modal */}
-            <TasksModal
-                visible={tasksModalVisible}
-                crop={selectedCropForTasks}
-                onClose={() => setTasksModalVisible(false)}
-                onSave={handleTasksSave}
             />
 
             {/* Notifications Modal */}

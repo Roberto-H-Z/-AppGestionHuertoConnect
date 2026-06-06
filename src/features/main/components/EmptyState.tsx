@@ -1,6 +1,6 @@
 /**
- * EmptyState - Shown on HomeScreen when user has no crops yet.
- * Displays a friendly icon with a call-to-action to add the first crop.
+ * EmptyState - Shown on HomeScreen when user has no huertos yet.
+ * Displays a friendly icon with a call-to-action to add the first huerto.
  */
 
 import React from 'react';
@@ -8,10 +8,10 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface EmptyStateProps {
-    onAddCrop: () => void;
+    onAddHuerto: () => void;
 }
 
-export const EmptyState: React.FC<EmptyStateProps> = ({ onAddCrop }) => {
+export const EmptyState: React.FC<EmptyStateProps> = ({ onAddHuerto }) => {
     return (
         <View style={styles.container}>
             <View style={styles.iconCircle}>
@@ -23,16 +23,16 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onAddCrop }) => {
             </View>
             <Text style={styles.title}>¡Bienvenido a tu huerto!</Text>
             <Text style={styles.subtitle}>
-                Aún no tienes cultivos registrados.{'\n'}
-                Agrega tu primer cultivo para comenzar.
+                Aún no tienes huertos registrados.{'\n'}
+                Agrega tu primer huerto para comenzar.
             </Text>
             <TouchableOpacity
                 style={styles.addButton}
-                onPress={onAddCrop}
+                onPress={onAddHuerto}
                 activeOpacity={0.8}
             >
                 <MaterialCommunityIcons name="plus" size={22} color="#fff" />
-                <Text style={styles.addButtonText}>Agregar mi primer cultivo</Text>
+                <Text style={styles.addButtonText}>Agregar mi primer huerto</Text>
             </TouchableOpacity>
         </View>
     );

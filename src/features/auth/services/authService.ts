@@ -52,6 +52,7 @@ export interface UserResponse {
     email_verificado: boolean;
     profile_picture?: string | null;
     auth_provider: string;
+    created_at?: string | null;
 }
 
 export interface ForgotPasswordResponse {

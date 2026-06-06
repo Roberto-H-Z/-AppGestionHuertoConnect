@@ -16,8 +16,27 @@ import {
     Platform,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Crop, WateringSchedule } from '../types/cropTypes';
-import { wateringFrequencyOptions } from '../data/cropData';
+// NOTE: This modal is currently unused — the API does not support watering schedules yet.
+// Types defined locally to avoid breaking the build.
+interface WateringSchedule {
+    nextDate: string;
+    frequency: number;
+    quantity: number;
+    lastWatering: string;
+}
+interface Crop {
+    id: string;
+    name: string;
+    watering: WateringSchedule;
+}
+
+const wateringFrequencyOptions = [
+    { label: 'Diario', days: 1 },
+    { label: 'Cada 2 días', days: 2 },
+    { label: 'Cada 3 días', days: 3 },
+    { label: 'Semanal', days: 7 },
+    { label: 'Quincenal', days: 15 },
+];
 
 interface WateringModalProps {
     visible: boolean;
