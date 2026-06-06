@@ -34,12 +34,76 @@ import { geocodeMunicipio } from '../services/geocodingService';
 
 const { width } = Dimensions.get('window');
 
+// ── Formatear hora en timezone del dispositivo ────────────────────────
+const formatTime = (date: Date): string => {
+    try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        return new Intl.DateTimeFormat('es-MX', {
+            hour: '2-digit', minute: '2-digit', hour12: true, timeZone: tz,
+        }).format(date);
+    } catch {
+        const h = date.getHours();
+        const m = date.getMinutes().toString().padStart(2, '0');
+        return `${h % 12 || 12}:${m} ${h >= 12 ? 'PM' : 'AM'}`;
+    }
+};
+
+// ── Mapeo de códigos WMO a iconos y colores ───────────────────────────
+const getWeatherInfo = (code: number): { condition: string; icon: string; color: string } => {
+    if (code === 0 || code === 1) return { condition: 'Despejado', icon: 'weather-sunny', color: '#FFB300' };
+    if (code <= 3)  return { condition: 'Nublado', icon: 'weather-partly-cloudy', color: '#78909C' };
+    if (code <= 48) return { condition: 'Niebla', icon: 'weather-fog', color: '#90A4AE' };
+    if (code <= 55) return { condition: 'Llovizna', icon: 'weather-partly-rainy', color: '#42A5F5' };
+    if (code <= 65) return { condition: 'Lluvia', icon: 'weather-rainy', color: '#1E88E5' };
+    if (code <= 82) return { condition: 'Chubascos', icon: 'weather-pouring', color: '#1565C0' };
+    if (code <= 99) return { condition: 'Tormenta', icon: 'weather-lightning', color: '#6A1B9A' };
+    return { condition: 'Nublado', icon: 'weather-cloudy', color: '#78909C' };
+};
+
+// ── Obtener clima actual de Open-Meteo (sin API key) ──────────────────
+const fetchCurrentWeather = async (lat: number, lon: number): Promise<WeatherInfo | null> => {
+    try {
+        const url =
+            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+            `&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,precipitation` +
+            `&timezone=auto&forecast_days=1`;
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        const data = await res.json();
+        const c = data.current;
+        const info = getWeatherInfo(c.weather_code ?? 0);
+        return {
+            temperature: Math.round(c.temperature_2m ?? 0),
+            humidity: Math.round(c.relative_humidity_2m ?? 0),
+            windSpeed: Math.round(c.wind_speed_10m ?? 0),
+            precipitation: c.precipitation ?? 0,
+            weatherCode: c.weather_code ?? 0,
+            condition: info.condition,
+            icon: info.icon,
+            iconColor: info.color,
+        };
+    } catch {
+        return null;
+    }
+};
+
 // ══════════════════════════════════════════════════════
 //  TIPOS
 // ══════════════════════════════════════════════════════
 
 type ChatMode = 'chat' | 'cultivos' | 'plagas';
 type MessageType = 'text' | 'cultivos_result' | 'plagas_result' | 'error' | 'system';
+
+interface WeatherInfo {
+    temperature: number;
+    humidity: number;
+    windSpeed: number;
+    precipitation: number;
+    weatherCode: number;
+    condition: string;
+    icon: string;
+    iconColor: string;
+}
 
 interface Message {
     id: string;
@@ -52,6 +116,7 @@ interface Message {
     imagenUrl?: string;
     municipio?: string;
     region?: string;
+    weatherInfo?: WeatherInfo;
 }
 
 // ══════════════════════════════════════════════════════
@@ -201,8 +266,9 @@ const TypingIndicator: React.FC = () => {
 //  TARJETA CULTIVOS
 // ══════════════════════════════════════════════════════
 
-const CultivosCard: React.FC<{ cultivos: CultivoRecomendado[]; municipio?: string; region?: string }> = ({ cultivos, municipio, region }) => (
+const CultivosCard: React.FC<{ cultivos: CultivoRecomendado[]; municipio?: string; region?: string; weatherInfo?: WeatherInfo }> = ({ cultivos, municipio, region, weatherInfo }) => (
     <View style={styles.resultCard}>
+        {/* Encabezado */}
         <View style={styles.resultCardHeader}>
             <View style={styles.resultCardIconGreen}>
                 <MaterialCommunityIcons name="sprout" size={16} color="#fff" />
@@ -210,11 +276,45 @@ const CultivosCard: React.FC<{ cultivos: CultivoRecomendado[]; municipio?: strin
             <View style={{ flex: 1 }}>
                 <Text style={styles.resultCardTitle}>Cultivos Recomendados</Text>
                 <Text style={styles.resultCardSub}>
-                    {municipio}{region ? `, ${region}` : ''} · Random Forest + Clima
+                    {municipio}{region ? `, ${region}` : ''} · Random Forest
                 </Text>
             </View>
         </View>
 
+        {/* Clima en tiempo real */}
+        {weatherInfo && (
+            <View style={styles.weatherStrip}>
+                <View style={styles.weatherStripLeft}>
+                    <MaterialCommunityIcons
+                        name={weatherInfo.icon as any}
+                        size={28}
+                        color={weatherInfo.iconColor}
+                    />
+                    <View>
+                        <Text style={styles.weatherTemp}>{weatherInfo.temperature}°C</Text>
+                        <Text style={styles.weatherCond}>{weatherInfo.condition}</Text>
+                    </View>
+                </View>
+                <View style={styles.weatherStats}>
+                    <View style={styles.weatherStat}>
+                        <MaterialCommunityIcons name="water-percent" size={13} color="#42A5F5" />
+                        <Text style={styles.weatherStatText}>{weatherInfo.humidity}%</Text>
+                    </View>
+                    <View style={styles.weatherStat}>
+                        <MaterialCommunityIcons name="weather-windy" size={13} color="#78909C" />
+                        <Text style={styles.weatherStatText}>{weatherInfo.windSpeed} km/h</Text>
+                    </View>
+                    {weatherInfo.precipitation > 0 && (
+                        <View style={styles.weatherStat}>
+                            <MaterialCommunityIcons name="umbrella-outline" size={13} color="#1E88E5" />
+                            <Text style={styles.weatherStatText}>{weatherInfo.precipitation} mm</Text>
+                        </View>
+                    )}
+                </View>
+            </View>
+        )}
+
+        {/* Lista de cultivos */}
         {cultivos.length === 0 ? (
             <View style={styles.emptyResult}>
                 <MaterialCommunityIcons name="sprout-outline" size={28} color="#C8E6C9" />
@@ -307,7 +407,7 @@ const MessageBubble: React.FC<{ msg: Message; accentColor: string }> = ({ msg, a
     }, []);
 
     const isUser = msg.sender === 'user';
-    const time = msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const time = formatTime(msg.timestamp);
 
     return (
         <Animated.View style={[
@@ -323,7 +423,7 @@ const MessageBubble: React.FC<{ msg: Message; accentColor: string }> = ({ msg, a
 
             <View style={[styles.msgContentWrapper, isUser && { alignItems: 'flex-end' }]}>
                 {msg.type === 'cultivos_result' && msg.cultivosData && (
-                    <CultivosCard cultivos={msg.cultivosData} municipio={msg.municipio} region={msg.region} />
+                    <CultivosCard cultivos={msg.cultivosData} municipio={msg.municipio} region={msg.region} weatherInfo={msg.weatherInfo} />
                 )}
                 {msg.type === 'plagas_result' && msg.plagasData && (
                     <PlagasCard plagas={msg.plagasData} imagenUrl={msg.imagenUrl} />
@@ -532,11 +632,15 @@ export const AIChatScreen: React.FC = () => {
                     return;
                 }
 
-                const response = await aiModelService.recommendGarden({
-                    lat: geo.lat,
-                    lon: geo.lon,
-                    municipio: geo.name,
-                });
+                // Fetch cultivos + clima EN PARALELO para menor latencia
+                const [response, weatherInfo] = await Promise.all([
+                    aiModelService.recommendGarden({
+                        lat: geo.lat,
+                        lon: geo.lon,
+                        municipio: geo.name,
+                    }),
+                    fetchCurrentWeather(geo.lat, geo.lon),
+                ]);
 
                 const cultivos = extractCultivos(response);
                 const reply = cultivos.length > 0
@@ -546,6 +650,7 @@ export const AIChatScreen: React.FC = () => {
                 addMessage({
                     text: reply, sender: 'ai', type: 'cultivos_result',
                     cultivosData: cultivos, municipio: geo.name, region: geo.region,
+                    weatherInfo: weatherInfo ?? undefined,
                 });
                 await persistMessage(reply, 'assistant', currentId);
 
@@ -853,6 +958,19 @@ const styles = StyleSheet.create({
     cultivoMeta: { fontSize: 10, color: '#9E9E9E', marginTop: 2 },
     confBadge: { backgroundColor: '#E8F5E9', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
     confBadgeText: { fontSize: 11, fontWeight: '700', color: '#4CAF50' },
+
+    // Widget de clima en tiempo real
+    weatherStrip: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        backgroundColor: '#F0F7FF', borderRadius: 10, padding: 10,
+        borderWidth: 1, borderColor: '#BBDEFB',
+    },
+    weatherStripLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    weatherTemp: { fontSize: 18, fontWeight: '700', color: '#1565C0' },
+    weatherCond: { fontSize: 11, color: '#42A5F5', marginTop: 1 },
+    weatherStats: { flexDirection: 'column', gap: 4, alignItems: 'flex-end' },
+    weatherStat: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+    weatherStatText: { fontSize: 11, color: '#546E7A', fontWeight: '500' },
 
     plagaPreview: { width: '100%', height: 130, borderRadius: 10 },
     plagaOk: { alignItems: 'center', gap: 8, paddingVertical: 8 },
