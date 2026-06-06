@@ -1,14 +1,12 @@
 /**
- * AIChatScreen — Premium AI assistant chat interface.
- * Connected to the production chatbot API:
- *   POST /chatbot/conversaciones          — Start a conversation
- *   POST /chatbot/conversaciones/{id}/mensajes  — Store messages
- *   GET  /chatbot/conversaciones          — List past conversations
- *   PATCH /chatbot/conversaciones/{id}/cerrar   — Close a conversation
+ * AIChatScreen — Asistente IA de HuertoConnect
  *
- * Keeps the futuristic design: animated typing indicator,
- * glassmorphism message bubbles, smooth entrance animations,
- * and a conversation history drawer.
+ * Tres modos de operación:
+ *   🤖 Asistente General  → Texto libre, respuestas inteligentes locales + persistencia API
+ *   🌽 Cultivos           → POST /huertos/recomendar (Random Forest + Clima)
+ *   🐛 Plagas             → POST /plagas/detectar    (YOLOv8 Visión Artificial)
+ *
+ * Todos los mensajes se persisten en /chatbot/conversaciones via chatbotService.
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -16,7 +14,6 @@ import {
     View,
     Text,
     StyleSheet,
-    SafeAreaView,
     ScrollView,
     TextInput,
     TouchableOpacity,
@@ -28,1211 +25,1057 @@ import {
     Alert,
     ActivityIndicator,
     Modal,
+    Image,
+    StatusBar as RNStatusBar,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import {
-    chatbotService,
-    ConversacionOut,
-    MensajeOut,
-} from '../services/chatbotService';
+import { chatbotService, ConversacionOut, MensajeOut } from '../services/chatbotService';
+import { aiModelService, CultivoRecomendado, PlagaDetectada } from '../services/aiModelService';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+const STATUSBAR_HEIGHT = RNStatusBar.currentHeight ?? 0;
 
-// ═══════════════════════════════════════════
-// ██  TYPES
-// ═══════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+//  TIPOS
+// ══════════════════════════════════════════════════════════════
+
+type ChatMode = 'chat' | 'cultivos' | 'plagas';
+type MessageType = 'text' | 'cultivos_result' | 'plagas_result' | 'error' | 'system';
 
 interface Message {
     id: string;
     text: string;
     sender: 'user' | 'ai';
+    type: MessageType;
     timestamp: Date;
+    // Datos estructurados de los modelos IA
+    cultivosData?: CultivoRecomendado[];
+    plagasData?: PlagaDetectada[];
+    imagenUrl?: string;
+    municipio?: string;
 }
 
-const getAssistantResponse = (input: string): string => {
-    const normalized = input.toLowerCase();
+// ══════════════════════════════════════════════════════════════
+//  CONFIGURACIÓN DE MODOS
+// ══════════════════════════════════════════════════════════════
 
-    if (
-        normalized.includes('hojas plateadas') ||
-        normalized.includes('puntos negros') ||
-        normalized.includes('trips')
-    ) {
-        return 'Los síntomas coinciden con una posible presencia de trips. Las zonas plateadas aparecen por el daño al tejido y los puntos negros suelen ser sus excrementos. Revisa el envés con una lupa, retira las hojas muy afectadas y coloca trampas adhesivas azules o amarillas. Puedes aplicar jabón potásico o aceite de neem al atardecer, repitiendo según las indicaciones del producto.';
-    }
-
-    if (normalized.includes('riego') || normalized.includes('regar')) {
-        return 'Riega temprano por la mañana y dirige el agua a la base de la planta. Comprueba primero los 2 o 3 cm superiores del suelo: si siguen húmedos, espera. Es mejor un riego profundo y espaciado que muchos riegos superficiales.';
-    }
-
-    if (
-        normalized.includes('plaga') ||
-        normalized.includes('pulgón') ||
-        normalized.includes('mosca blanca')
-    ) {
-        return 'Revisa el envés de las hojas para identificar la plaga. Como manejo inicial, retira las partes muy afectadas, usa trampas adhesivas y aplica jabón potásico al atardecer. Evita mezclar tratamientos sin revisar antes las indicaciones del producto.';
-    }
-
-    if (normalized.includes('tomate') || normalized.includes('jitomate')) {
-        return 'El tomate necesita entre 6 y 8 horas de sol, suelo con buen drenaje y riego profundo sin mojar demasiado las hojas. Mantén una humedad estable para reducir el agrietamiento y elimina hojas enfermas o que toquen el suelo.';
-    }
-
-    if (
-        normalized.includes('abono') ||
-        normalized.includes('fertilizante') ||
-        normalized.includes('compost')
-    ) {
-        return 'Puedes comenzar con compost maduro o humus de lombriz alrededor de la planta, sin pegarlo al tallo. Aplica cantidades moderadas y observa la respuesta del cultivo; demasiado nitrógeno produce muchas hojas y pocos frutos.';
-    }
-
-    if (normalized.includes('clima') || normalized.includes('temperatura')) {
-        return 'La recomendación depende del cultivo y de tu temperatura local. Protege las plantas del sol intenso del mediodía, vigila que el suelo no se seque con viento o calor y evita regar de noche cuando hay mucha humedad.';
-    }
-
-    return 'Puedo ayudarte con riego, plagas, cultivos, fertilización y clima. Cuéntame qué planta tienes, qué síntomas observas, desde cuándo aparecen y cómo la estás regando para darte una recomendación más precisa.';
+const MODE_CONFIG: Record<ChatMode, {
+    label: string;
+    icon: keyof typeof MaterialCommunityIcons.glyphMap;
+    gradient: [string, string];
+    accent: string;
+    inputPlaceholder: string;
+    hint: string;
+}> = {
+    chat: {
+        label: 'Asistente',
+        icon: 'robot-outline',
+        gradient: ['#0d4f3c', '#0a3d2e'],
+        accent: '#4ade80',
+        inputPlaceholder: 'Escribe tu pregunta sobre el huerto...',
+        hint: 'Pregúntame sobre riego, cultivos, clima o fertilización',
+    },
+    cultivos: {
+        label: 'Cultivos',
+        icon: 'sprout-outline',
+        gradient: ['#14532d', '#0f3d21'],
+        accent: '#86efac',
+        inputPlaceholder: 'Escribe tu municipio (ej: Xalapa)...',
+        hint: 'Escribe tu municipio y el modelo IA te recomendará cultivos ideales',
+    },
+    plagas: {
+        label: 'Plagas',
+        icon: 'bug-outline',
+        gradient: ['#1a1a0a', '#2d1a00'],
+        accent: '#fbbf24',
+        inputPlaceholder: 'Pega la URL pública de la foto de tu planta...',
+        hint: 'El modelo YOLOv8 analizará la imagen y detectará posibles plagas',
+    },
 };
 
-// ═══════════════════════════════════════════
-// ██  TYPING INDICATOR — animated dots
-// ═══════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+//  RESPUESTAS DEL ASISTENTE GENERAL
+// ══════════════════════════════════════════════════════════════
 
-const TypingIndicator: React.FC = () => {
-    const dot1 = useRef(new Animated.Value(0)).current;
-    const dot2 = useRef(new Animated.Value(0)).current;
-    const dot3 = useRef(new Animated.Value(0)).current;
+const getAssistantResponse = (input: string): string => {
+    const n = input.toLowerCase();
+    if (n.includes('hojas plateadas') || n.includes('puntos negros') || n.includes('trips'))
+        return '🔍 Los síntomas coinciden con una posible presencia de **trips**. Las zonas plateadas aparecen por el daño al tejido y los puntos negros son sus excrementos.\n\n✅ Acciones recomendadas:\n• Revisa el envés con una lupa\n• Retira las hojas muy afectadas\n• Coloca trampas adhesivas azules o amarillas\n• Aplica jabón potásico o aceite de neem al atardecer';
+    if (n.includes('riego') || n.includes('regar'))
+        return '💧 **Guía de riego inteligente:**\n\n• Riega temprano por la mañana\n• Dirige el agua a la base de la planta\n• Comprueba los 2-3 cm superiores del suelo antes\n• Prefiere riegos profundos y espaciados sobre muchos superficiales';
+    if (n.includes('plaga') || n.includes('pulgón') || n.includes('mosca blanca'))
+        return '🐛 Para identificar la plaga:\n\n• Revisa el envés de las hojas\n• Busca huevos, larvas o excrementos\n\n✅ Manejo inicial:\n• Retira partes muy afectadas\n• Usa trampas adhesivas\n• Aplica jabón potásico al atardecer';
+    if (n.includes('tomate') || n.includes('jitomate'))
+        return '🍅 **Cultivo de tomate:**\n\n• Necesita 6-8 horas de sol directo\n• Suelo con buen drenaje\n• Riego profundo sin mojar las hojas\n• Mantén humedad estable para evitar agrietamiento\n• Elimina hojas que toquen el suelo';
+    if (n.includes('abono') || n.includes('fertilizante') || n.includes('compost'))
+        return '🌱 **Fertilización orgánica:**\n\n• Comienza con compost maduro o humus de lombriz\n• Aplica alrededor de la planta, sin tocar el tallo\n• Cantidades moderadas primero\n• Demasiado nitrógeno = muchas hojas, pocos frutos';
+    if (n.includes('clima') || n.includes('temperatura'))
+        return '🌤️ Para recomendaciones personalizadas según tu clima usa el modo **🌽 Cultivos** — el modelo de IA analizará las condiciones meteorológicas de tu municipio.';
+    return '👋 Soy el asistente IA de HuertoConnect. Puedo ayudarte con:\n\n• 💧 Riego y nutrición\n• 🌱 Selección de cultivos\n• 🐛 Identificación de plagas\n• 🌤️ Clima y temporadas\n\nO usa los modos especializados arriba para análisis con inteligencia artificial real.';
+};
+
+// ══════════════════════════════════════════════════════════════
+//  FORMATEO DE RESULTADOS DE MODELOS IA
+// ══════════════════════════════════════════════════════════════
+
+const extractCultivos = (data: unknown): CultivoRecomendado[] => {
+    const d = data as Record<string, unknown>;
+    const list = d?.recomendaciones || d?.cultivos || d?.predicciones || d?.resultado || d?.data;
+    return Array.isArray(list) ? list.slice(0, 8) :
+        Array.isArray(data) ? (data as CultivoRecomendado[]).slice(0, 8) : [];
+};
+
+const extractPlagas = (data: unknown): PlagaDetectada[] => {
+    const d = data as Record<string, unknown>;
+    const list = d?.detecciones || d?.plagas || d?.results || d?.resultado || d?.data;
+    return Array.isArray(list) ? list.slice(0, 8) :
+        Array.isArray(data) ? (data as PlagaDetectada[]).slice(0, 8) : [];
+};
+
+const formatConfianza = (value: number | string | undefined): string => {
+    if (value === undefined || value === null) return '';
+    const num = parseFloat(String(value));
+    if (isNaN(num)) return String(value);
+    return num > 1 ? `${num.toFixed(1)}%` : `${(num * 100).toFixed(1)}%`;
+};
+
+const getNombreCultivo = (c: CultivoRecomendado, i: number): string =>
+    String(c.nombre || c.cultivo || c.crop || c.name || `Cultivo ${i + 1}`);
+
+const getNombrePlaga = (p: PlagaDetectada, i: number): string =>
+    String(p.plaga || p.clase || p.label || p.name || `Detección ${i + 1}`);
+
+// ══════════════════════════════════════════════════════════════
+//  TYPING INDICATOR
+// ══════════════════════════════════════════════════════════════
+
+const TypingIndicator: React.FC<{ color?: string }> = ({ color = '#4ade80' }) => {
+    const d1 = useRef(new Animated.Value(0)).current;
+    const d2 = useRef(new Animated.Value(0)).current;
+    const d3 = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        const animateDot = (dot: Animated.Value, delay: number) =>
+        const anim = (d: Animated.Value, delay: number) =>
             Animated.loop(
                 Animated.sequence([
                     Animated.delay(delay),
-                    Animated.timing(dot, {
-                        toValue: 1,
-                        duration: 400,
-                        easing: Easing.inOut(Easing.ease),
-                        useNativeDriver: false,
-                    }),
-                    Animated.timing(dot, {
-                        toValue: 0,
-                        duration: 400,
-                        easing: Easing.inOut(Easing.ease),
-                        useNativeDriver: false,
-                    }),
+                    Animated.timing(d, { toValue: 1, duration: 350, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+                    Animated.timing(d, { toValue: 0, duration: 350, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
                 ])
             );
-
-        const a1 = animateDot(dot1, 0);
-        const a2 = animateDot(dot2, 200);
-        const a3 = animateDot(dot3, 400);
+        const a1 = anim(d1, 0); const a2 = anim(d2, 150); const a3 = anim(d3, 300);
         a1.start(); a2.start(); a3.start();
-
         return () => { a1.stop(); a2.stop(); a3.stop(); };
     }, []);
 
-    const renderDot = (anim: Animated.Value) => {
-        const translateY = anim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, -6],
-        });
-        const opacity = anim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0.4, 1],
-        });
-        return (
-            <Animated.View
-                style={[
-                    styles.typingDot,
-                    { transform: [{ translateY }], opacity },
-                ]}
-            />
-        );
-    };
+    const dot = (anim: Animated.Value) => (
+        <Animated.View style={[
+            styles.typingDot,
+            { backgroundColor: color },
+            { transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [0, -7] }) }], opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }
+        ]} />
+    );
 
     return (
-        <View style={styles.typingContainer}>
-            <View style={styles.typingBubble}>
+        <View style={styles.typingRow}>
+            <View style={[styles.typingBubble, { borderColor: color + '33' }]}>
+                <MaterialCommunityIcons name="robot-outline" size={14} color={color} style={{ marginRight: 8 }} />
                 <View style={styles.typingDots}>
-                    {renderDot(dot1)}
-                    {renderDot(dot2)}
-                    {renderDot(dot3)}
+                    {dot(d1)}{dot(d2)}{dot(d3)}
                 </View>
+                <Text style={[styles.typingLabel, { color }]}>Analizando...</Text>
             </View>
         </View>
     );
 };
 
-// ═══════════════════════════════════════════
-// ██  MESSAGE BUBBLE — with entrance animation
-// ═══════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+//  TARJETA DE CULTIVOS (resultado del modelo IA)
+// ══════════════════════════════════════════════════════════════
 
-const MessageBubble: React.FC<{ message: Message; index: number }> = ({ message, index }) => {
+const CultivosCard: React.FC<{ cultivos: CultivoRecomendado[]; municipio?: string }> = ({ cultivos, municipio }) => (
+    <View style={styles.resultCard}>
+        <View style={styles.resultCardHeader}>
+            <LinearGradient colors={['#14532d', '#166534']} style={styles.resultCardIcon}>
+                <MaterialCommunityIcons name="sprout" size={18} color="#86efac" />
+            </LinearGradient>
+            <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={styles.resultCardTitle}>🌽 Cultivos Recomendados</Text>
+                {municipio ? <Text style={styles.resultCardSubtitle}>Para {municipio} · Modelo Random Forest</Text> : null}
+            </View>
+        </View>
+        {cultivos.length === 0 ? (
+            <Text style={styles.resultCardEmpty}>No se encontraron recomendaciones para esta zona.</Text>
+        ) : cultivos.map((c, i) => {
+            const conf = c.probabilidad || c.score || c.confianza;
+            const confStr = conf ? formatConfianza(conf as number | string) : null;
+            return (
+                <View key={i} style={styles.resultItem}>
+                    <View style={styles.resultItemLeft}>
+                        <Text style={styles.resultItemNumber}>{i + 1}</Text>
+                    </View>
+                    <View style={styles.resultItemContent}>
+                        <Text style={styles.resultItemName}>{getNombreCultivo(c, i)}</Text>
+                        {c.descripcion ? <Text style={styles.resultItemDesc}>{String(c.descripcion)}</Text> : null}
+                        {c.temporada ? <Text style={styles.resultItemMeta}>🗓️ {String(c.temporada)}</Text> : null}
+                    </View>
+                    {confStr ? (
+                        <View style={styles.resultItemBadge}>
+                            <Text style={styles.resultItemBadgeText}>{confStr}</Text>
+                        </View>
+                    ) : null}
+                </View>
+            );
+        })}
+    </View>
+);
+
+// ══════════════════════════════════════════════════════════════
+//  TARJETA DE PLAGAS (resultado del modelo YOLOv8)
+// ══════════════════════════════════════════════════════════════
+
+const PlagasCard: React.FC<{ plagas: PlagaDetectada[]; imagenUrl?: string }> = ({ plagas, imagenUrl }) => (
+    <View style={[styles.resultCard, styles.resultCardPlagas]}>
+        <View style={styles.resultCardHeader}>
+            <LinearGradient colors={['#78350f', '#92400e']} style={styles.resultCardIcon}>
+                <MaterialCommunityIcons name="bug" size={18} color="#fbbf24" />
+            </LinearGradient>
+            <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={[styles.resultCardTitle, { color: '#fbbf24' }]}>🐛 Análisis de Plagas</Text>
+                <Text style={styles.resultCardSubtitle}>Modelo YOLOv8 · Visión Artificial</Text>
+            </View>
+        </View>
+
+        {imagenUrl ? (
+            <Image source={{ uri: imagenUrl }} style={styles.plagaImage} resizeMode="cover" />
+        ) : null}
+
+        {plagas.length === 0 ? (
+            <View style={styles.plagasEmptyContainer}>
+                <MaterialCommunityIcons name="shield-check" size={28} color="#4ade80" />
+                <Text style={styles.plagasEmptyText}>No se detectaron plagas en la imagen ✅</Text>
+            </View>
+        ) : plagas.map((p, i) => {
+            const conf = p.confianza || p.confidence || p.score;
+            const confNum = conf ? parseFloat(String(conf)) : null;
+            const confPct = confNum !== null ? (confNum > 1 ? confNum : confNum * 100) : null;
+            return (
+                <View key={i} style={styles.plagaItem}>
+                    <View style={styles.plagaItemHeader}>
+                        <MaterialCommunityIcons name="alert-circle" size={14} color="#fbbf24" />
+                        <Text style={styles.plagaItemName}>{getNombrePlaga(p, i)}</Text>
+                        {confPct !== null ? (
+                            <Text style={styles.plagaConf}>{confPct.toFixed(1)}%</Text>
+                        ) : null}
+                    </View>
+                    {confPct !== null && (
+                        <View style={styles.confBar}>
+                            <View style={[styles.confBarFill, {
+                                width: `${Math.min(confPct, 100)}%` as any,
+                                backgroundColor: confPct > 70 ? '#ef4444' : confPct > 40 ? '#fbbf24' : '#4ade80',
+                            }]} />
+                        </View>
+                    )}
+                    {p.tratamiento ? <Text style={styles.plagaTratamiento}>💊 {String(p.tratamiento)}</Text> : null}
+                </View>
+            );
+        })}
+    </View>
+);
+
+// ══════════════════════════════════════════════════════════════
+//  BURBUJA DE MENSAJE
+// ══════════════════════════════════════════════════════════════
+
+const MessageBubble: React.FC<{ msg: Message; accentColor: string }> = ({ msg, accentColor }) => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
-    const slideAnim = useRef(new Animated.Value(message.sender === 'user' ? 30 : -30)).current;
+    const slideAnim = useRef(new Animated.Value(msg.sender === 'user' ? 20 : -20)).current;
 
     useEffect(() => {
         Animated.parallel([
-            Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 350,
-                easing: Easing.out(Easing.ease),
-                useNativeDriver: true,
-            }),
-            Animated.spring(slideAnim, {
-                toValue: 0,
-                friction: 8,
-                tension: 65,
-                useNativeDriver: true,
-            }),
+            Animated.timing(fadeAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
+            Animated.spring(slideAnim, { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }),
         ]).start();
     }, []);
 
-    const isUser = message.sender === 'user';
-    const timeStr = message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const isUser = msg.sender === 'user';
+    const time = msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     return (
-        <Animated.View
-            style={[
-                styles.messageRow,
-                isUser ? styles.messageRowUser : styles.messageRowAI,
-                {
-                    opacity: fadeAnim,
-                    transform: [{ translateX: slideAnim }],
-                },
-            ]}
-        >
-            {/* AI avatar */}
+        <Animated.View style={[
+            styles.msgRow,
+            isUser ? styles.msgRowUser : styles.msgRowAI,
+            { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }
+        ]}>
             {!isUser && (
-                <View style={styles.aiAvatar}>
-                    <MaterialCommunityIcons name="robot-outline" size={18} color="#fff" />
+                <View style={[styles.aiAvatar, { backgroundColor: accentColor + '22', borderColor: accentColor + '55' }]}>
+                    <MaterialCommunityIcons name="robot-outline" size={16} color={accentColor} />
                 </View>
             )}
 
-            <View style={[
-                styles.messageBubble,
-                isUser ? styles.userBubble : styles.aiBubble,
-            ]}>
-                <Text style={[
-                    styles.messageText,
-                    isUser ? styles.userText : styles.aiText,
-                ]}>
-                    {message.text}
-                </Text>
-                <Text style={[
-                    styles.messageTime,
-                    isUser ? styles.userTime : styles.aiTime,
-                ]}>
-                    {timeStr}
-                </Text>
+            <View style={styles.msgContent}>
+                {/* Tarjetas especiales de IA */}
+                {msg.type === 'cultivos_result' && msg.cultivosData && (
+                    <CultivosCard cultivos={msg.cultivosData} municipio={msg.municipio} />
+                )}
+                {msg.type === 'plagas_result' && msg.plagasData && (
+                    <PlagasCard plagas={msg.plagasData} imagenUrl={msg.imagenUrl} />
+                )}
+                {/* Burbuja de texto estándar */}
+                {(msg.type === 'text' || msg.type === 'error' || msg.type === 'system') && (
+                    <View style={[
+                        styles.msgBubble,
+                        isUser
+                            ? [styles.userBubble, { borderColor: accentColor + '44' }]
+                            : msg.type === 'error'
+                                ? styles.errorBubble
+                                : styles.aiBubble,
+                    ]}>
+                        {isUser && (
+                            <LinearGradient
+                                colors={[accentColor + 'DD', accentColor + 'AA']}
+                                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                style={StyleSheet.absoluteFill}
+                            />
+                        )}
+                        <Text style={[styles.msgText, isUser ? styles.userMsgText : styles.aiMsgText]}>
+                            {msg.text}
+                        </Text>
+                    </View>
+                )}
+                <Text style={[styles.msgTime, isUser ? styles.userMsgTime : styles.aiMsgTime]}>{time}</Text>
             </View>
+
+            {isUser && (
+                <View style={[styles.userAvatar, { backgroundColor: accentColor + '33', borderColor: accentColor + '66' }]}>
+                    <MaterialCommunityIcons name="account" size={16} color={accentColor} />
+                </View>
+            )}
         </Animated.View>
     );
 };
 
-// ═══════════════════════════════════════════
-// ██  SUGGESTION CHIPS
-// ═══════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+//  MODAL DE HISTORIAL
+// ══════════════════════════════════════════════════════════════
 
-const suggestions = [
-    { label: '💧 Riego', query: '¿Cómo debo regar mis cultivos?' },
-    { label: '🐛 Plagas', query: '¿Cómo controlar plagas en mi huerto?' },
-    { label: '🍅 Tomates', query: '¿Cómo cultivar tomates correctamente?' },
-    { label: '🌱 Abono', query: '¿Qué abono debo usar para mi huerto?' },
-    { label: '🌤️ Clima', query: '¿Cómo afecta el clima a mis cultivos?' },
-];
+const HistoryModal: React.FC<{
+    visible: boolean;
+    onClose: () => void;
+    conversations: ConversacionOut[];
+    onSelect: (c: ConversacionOut) => void;
+    loading: boolean;
+    activeId?: string;
+}> = ({ visible, onClose, conversations, onSelect, loading, activeId }) => (
+    <Modal visible={visible} animationType="slide" transparent>
+        <View style={styles.historyOverlay}>
+            <View style={styles.historySheet}>
+                <View style={styles.historyHandle} />
+                <View style={styles.historyHeader}>
+                    <Text style={styles.historyTitle}>Historial de conversaciones</Text>
+                    <TouchableOpacity onPress={onClose} style={styles.historyClose}>
+                        <MaterialCommunityIcons name="close" size={22} color="#9ca3af" />
+                    </TouchableOpacity>
+                </View>
 
-// ═══════════════════════════════════════════
-// ██  HEADER with subtle glow
-// ═══════════════════════════════════════════
+                {loading ? (
+                    <View style={styles.historyCentered}>
+                        <ActivityIndicator color="#4ade80" size="large" />
+                        <Text style={styles.historyLoadingText}>Cargando...</Text>
+                    </View>
+                ) : conversations.length === 0 ? (
+                    <View style={styles.historyCentered}>
+                        <MaterialCommunityIcons name="chat-outline" size={44} color="#374151" />
+                        <Text style={styles.historyEmptyText}>Sin conversaciones anteriores</Text>
+                    </View>
+                ) : (
+                    <ScrollView showsVerticalScrollIndicator={false}>
+                        {conversations.map(c => (
+                            <TouchableOpacity
+                                key={c.id}
+                                style={[styles.historyItem, c.id === activeId && styles.historyItemActive]}
+                                onPress={() => onSelect(c)}
+                                activeOpacity={0.7}
+                            >
+                                <MaterialCommunityIcons
+                                    name={c.estado === 'activa' ? 'chat-processing-outline' : 'chat-outline'}
+                                    size={20}
+                                    color={c.id === activeId ? '#4ade80' : '#6b7280'}
+                                />
+                                <View style={{ flex: 1, marginLeft: 12 }}>
+                                    <Text style={styles.historyItemTitle} numberOfLines={2}>{c.tema}</Text>
+                                    {c.fecha && (
+                                        <Text style={styles.historyItemDate}>
+                                            {new Date(c.fecha).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                        </Text>
+                                    )}
+                                </View>
+                                {c.estado !== 'activa' && (
+                                    <View style={styles.historyClosedBadge}>
+                                        <Text style={styles.historyClosedText}>Cerrada</Text>
+                                    </View>
+                                )}
+                                <MaterialCommunityIcons name="chevron-right" size={18} color="#374151" />
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                )}
+            </View>
+        </View>
+    </Modal>
+);
 
-const ChatHeader: React.FC<{
-    onNewChat: () => void;
-    onShowHistory: () => void;
-    hasActiveConversation: boolean;
-}> = ({ onNewChat, onShowHistory, hasActiveConversation }) => {
-    const glowAnim = useRef(new Animated.Value(0)).current;
+// ══════════════════════════════════════════════════════════════
+//  PANTALLA PRINCIPAL
+// ══════════════════════════════════════════════════════════════
 
+export const AIChatScreen: React.FC = () => {
+    const [mode, setMode] = useState<ChatMode>('chat');
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [inputText, setInputText] = useState('');
+    const [isTyping, setIsTyping] = useState(false);
+    const [convId, setConvId] = useState<string | null>(null);
+    const [conversations, setConversations] = useState<ConversacionOut[]>([]);
+    const [historyVisible, setHistoryVisible] = useState(false);
+    const [historyLoading, setHistoryLoading] = useState(false);
+
+    const scrollRef = useRef<ScrollView>(null);
+    const tabAnim = useRef(new Animated.Value(0)).current;
+    const headerGlow = useRef(new Animated.Value(0)).current;
+
+    const modeConfig = MODE_CONFIG[mode];
+
+    // Mensaje de bienvenida al cambiar modo
+    useEffect(() => {
+        const welcomeMessages: Record<ChatMode, string> = {
+            chat: '👋 ¡Hola! Soy tu asistente de horticultura. Pregúntame lo que necesites sobre tu huerto.',
+            cultivos: '🌽 Modo **Recomendación de Cultivos** activado.\n\nEscribe el nombre de tu municipio y el modelo de IA (Random Forest + datos climáticos) te recomendará los mejores cultivos para tu zona.',
+            plagas: '🐛 Modo **Detección de Plagas** activado.\n\nPega la URL pública de una foto de tu planta y el modelo YOLOv8 de visión artificial analizará la imagen para detectar posibles plagas.',
+        };
+        const welcome: Message = {
+            id: `welcome-${mode}-${Date.now()}`,
+            text: welcomeMessages[mode],
+            sender: 'ai',
+            type: 'system',
+            timestamp: new Date(),
+        };
+        setMessages([welcome]);
+        setConvId(null);
+        setInputText('');
+    }, [mode]);
+
+    // Animación continua del glow del header
     useEffect(() => {
         Animated.loop(
             Animated.sequence([
-                Animated.timing(glowAnim, {
-                    toValue: 1,
-                    duration: 2000,
-                    easing: Easing.inOut(Easing.ease),
-                    useNativeDriver: false,
-                }),
-                Animated.timing(glowAnim, {
-                    toValue: 0,
-                    duration: 2000,
-                    easing: Easing.inOut(Easing.ease),
-                    useNativeDriver: false,
-                }),
+                Animated.timing(headerGlow, { toValue: 1, duration: 2000, useNativeDriver: true }),
+                Animated.timing(headerGlow, { toValue: 0, duration: 2000, useNativeDriver: true }),
             ])
         ).start();
     }, []);
 
-    const glowOpacity = glowAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0.3, 0.8],
-    });
-
-    return (
-        <View style={styles.header}>
-            <View style={styles.headerLeft}>
-                <View style={styles.headerIconContainer}>
-                    <View style={styles.headerIcon}>
-                        <MaterialCommunityIcons name="robot-outline" size={22} color="#fff" />
-                    </View>
-                    <Animated.View style={[styles.headerIconGlow, { opacity: glowOpacity }]} />
-                </View>
-                <View style={styles.headerTextContainer}>
-                    <Text style={styles.headerTitle}>HuertoConnect IA</Text>
-                    <View style={styles.statusRow}>
-                        <View style={styles.statusDot} />
-                        <Text style={styles.statusText}>En línea</Text>
-                    </View>
-                </View>
-            </View>
-            <View style={styles.headerActions}>
-                {hasActiveConversation && (
-                    <TouchableOpacity style={styles.headerAction} onPress={onNewChat}>
-                        <MaterialCommunityIcons name="chat-plus-outline" size={22} color="#66BB6A" />
-                    </TouchableOpacity>
-                )}
-                <TouchableOpacity style={styles.headerAction} onPress={onShowHistory}>
-                    <MaterialCommunityIcons name="history" size={22} color="#66BB6A" />
-                </TouchableOpacity>
-            </View>
-        </View>
-    );
-};
-
-// ═══════════════════════════════════════════
-// ██  EMPTY STATE — welcome message
-// ═══════════════════════════════════════════
-
-const WelcomeState: React.FC<{ onSuggestionPress: (q: string) => void }> = ({ onSuggestionPress }) => {
-    const scaleAnim = useRef(new Animated.Value(0.8)).current;
-    const fadeAnim = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-        Animated.parallel([
-            Animated.spring(scaleAnim, {
-                toValue: 1,
-                friction: 6,
-                tension: 50,
-                useNativeDriver: true,
-            }),
-            Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 600,
-                useNativeDriver: true,
-            }),
-        ]).start();
-    }, []);
-
-    return (
-        <Animated.View style={[
-            styles.welcomeContainer,
-            { opacity: fadeAnim, transform: [{ scale: scaleAnim }] },
-        ]}>
-            <View style={styles.welcomeIconOuter}>
-                <View style={styles.welcomeIcon}>
-                    <MaterialCommunityIcons name="robot-happy-outline" size={44} color="#fff" />
-                </View>
-            </View>
-            <Text style={styles.welcomeTitle}>¡Hola! 👋</Text>
-            <Text style={styles.welcomeSubtitle}>
-                Soy tu asistente inteligente de HuertoConnect.{'\n'}
-                Pregúntame sobre el cuidado de tu huerto.
-            </Text>
-            <Text style={styles.welcomeHint}>Prueba con alguna de estas opciones:</Text>
-            <View style={styles.suggestionsGrid}>
-                {suggestions.map((s, i) => (
-                    <TouchableOpacity
-                        key={i}
-                        style={styles.suggestionChip}
-                        onPress={() => onSuggestionPress(s.query)}
-                        activeOpacity={0.7}
-                    >
-                        <Text style={styles.suggestionText}>{s.label}</Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-        </Animated.View>
-    );
-};
-
-// ═══════════════════════════════════════════
-// ██  CONVERSATION HISTORY MODAL
-// ═══════════════════════════════════════════
-
-const ConversationHistoryModal: React.FC<{
-    visible: boolean;
-    onClose: () => void;
-    conversations: ConversacionOut[];
-    onSelect: (conv: ConversacionOut) => void;
-    isLoading: boolean;
-    activeConvId?: string;
-}> = ({ visible, onClose, conversations, onSelect, isLoading, activeConvId }) => {
-    return (
-        <Modal visible={visible} animationType="slide" transparent>
-            <View style={styles.historyOverlay}>
-                <View style={styles.historyContainer}>
-                    {/* Header */}
-                    <View style={styles.historyHeader}>
-                        <Text style={styles.historyTitle}>Conversaciones</Text>
-                        <TouchableOpacity onPress={onClose} style={styles.historyCloseBtn}>
-                            <MaterialCommunityIcons name="close" size={22} color="#666" />
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Content */}
-                    {isLoading ? (
-                        <View style={styles.historyLoading}>
-                            <ActivityIndicator size="large" color="#4CAF50" />
-                            <Text style={styles.historyLoadingText}>Cargando conversaciones...</Text>
-                        </View>
-                    ) : conversations.length === 0 ? (
-                        <View style={styles.historyEmpty}>
-                            <MaterialCommunityIcons name="chat-outline" size={48} color="#C8E6C9" />
-                            <Text style={styles.historyEmptyText}>No hay conversaciones previas</Text>
-                        </View>
-                    ) : (
-                        <ScrollView style={styles.historyList} showsVerticalScrollIndicator={false}>
-                            {conversations.map((conv) => (
-                                <TouchableOpacity
-                                    key={conv.id}
-                                    style={[
-                                        styles.historyItem,
-                                        conv.id === activeConvId && styles.historyItemActive,
-                                    ]}
-                                    onPress={() => onSelect(conv)}
-                                    activeOpacity={0.7}
-                                >
-                                    <View style={styles.historyItemIcon}>
-                                        <MaterialCommunityIcons
-                                            name={isConvActive(conv.estado) ? 'chat-processing-outline' : 'chat-outline'}
-                                            size={22}
-                                            color={isConvActive(conv.estado) ? '#4CAF50' : '#9E9E9E'}
-                                        />
-                                    </View>
-                                    <View style={styles.historyItemContent}>
-                                        <Text style={styles.historyItemTema} numberOfLines={2}>
-                                            {conv.tema}
-                                        </Text>
-                                        <View style={styles.historyItemMeta}>
-                                            <Text style={styles.historyItemDate}>
-                                                {conv.fecha
-                                                    ? new Date(conv.fecha).toLocaleDateString('es-MX', {
-                                                        day: '2-digit',
-                                                        month: 'short',
-                                                        hour: '2-digit',
-                                                        minute: '2-digit',
-                                                    })
-                                                    : 'Reciente'}
-                                            </Text>
-                                            {!isConvActive(conv.estado) && (
-                                                <View style={styles.historyClosedBadge}>
-                                                    <Text style={styles.historyClosedText}>Cerrada</Text>
-                                                </View>
-                                            )}
-                                        </View>
-                                    </View>
-                                    <MaterialCommunityIcons name="chevron-right" size={20} color="#C8E6C9" />
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-                    )}
-                </View>
-            </View>
-        </Modal>
-    );
-};
-
-// ═══════════════════════════════════════════
-// ██  HELPER: Convert API messages to UI messages
-// ═══════════════════════════════════════════
-
-const apiMessageToUI = (msg: MensajeOut): Message => ({
-    id: msg.id,
-    text: msg.contenido,
-    sender: msg.rol === 'user' ? 'user' : 'ai',
-    timestamp: msg.fecha ? new Date(msg.fecha) : new Date(),
-});
-
-/** Helper to check if a conversation status represents an active chat */
-const isConvActive = (estado?: string): boolean => {
-    if (!estado) return false;
-    const norm = estado.toLowerCase().trim();
-    return norm === 'activa' || norm === 'activo' || norm === 'abierta' || norm === 'abierto';
-};
-
-// ═══════════════════════════════════════════
-// ██  MAIN SCREEN
-// ═══════════════════════════════════════════
-
-export const AIChatScreen: React.FC = () => {
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [inputText, setInputText] = useState('');
-    const [isTyping, setIsTyping] = useState(false);
-    const [conversationId, setConversationId] = useState<string | null>(null);
-    const [conversationActive, setConversationActive] = useState(true);
-    const [conversations, setConversations] = useState<ConversacionOut[]>([]);
-    const [historyVisible, setHistoryVisible] = useState(false);
-    const [historyLoading, setHistoryLoading] = useState(false);
-    const scrollRef = useRef<ScrollView>(null);
-    const inputRef = useRef<TextInput>(null);
+    // Animación de cambio de tab
+    const handleModeChange = (newMode: ChatMode) => {
+        if (newMode === mode) return;
+        Animated.spring(tabAnim, { toValue: ['chat', 'cultivos', 'plagas'].indexOf(newMode), useNativeDriver: false, friction: 7, tension: 50 }).start();
+        setMode(newMode);
+    };
 
     const scrollToBottom = useCallback(() => {
-        setTimeout(() => {
-            scrollRef.current?.scrollToEnd({ animated: true });
-        }, 100);
+        setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
     }, []);
 
-    // ── Load conversation history when modal opens ──
-    const loadConversations = useCallback(async () => {
+    const addMessage = useCallback((msg: Omit<Message, 'id' | 'timestamp'>) => {
+        setMessages(prev => [...prev, { ...msg, id: `${Date.now()}-${Math.random()}`, timestamp: new Date() }]);
+        scrollToBottom();
+    }, [scrollToBottom]);
+
+    // ── Cargar historial ──
+    const loadHistory = useCallback(async () => {
         setHistoryLoading(true);
         try {
-            const convs = await chatbotService.listConversaciones(0, 50);
-            setConversations(convs);
-        } catch (error) {
-            console.warn('[AIChatScreen] Error loading conversations:', error);
+            const data = await chatbotService.listConversaciones(0, 30);
+            setConversations(data);
+        } catch (e) {
+            console.warn('[Chat] Error cargando historial:', e);
         } finally {
             setHistoryLoading(false);
         }
     }, []);
 
-    // ── Load messages from a specific conversation ──
+    // ── Cargar conversación del historial ──
     const loadConversation = useCallback(async (conv: ConversacionOut) => {
         try {
             const msgs = await chatbotService.listMensajes(conv.id);
-            setMessages(msgs.map(apiMessageToUI));
-            setConversationId(conv.id);
-            setConversationActive(isConvActive(conv.estado));
+            const uiMsgs: Message[] = msgs.map((m: MensajeOut) => ({
+                id: m.id,
+                text: m.contenido,
+                sender: m.rol === 'user' ? 'user' : 'ai',
+                type: 'text',
+                timestamp: m.fecha ? new Date(m.fecha) : new Date(),
+            }));
+            setMessages(uiMsgs);
+            setConvId(conv.id);
             setHistoryVisible(false);
             scrollToBottom();
-        } catch (error: any) {
-            Alert.alert('Error', error?.message || 'No se pudieron cargar los mensajes.');
+        } catch (e: any) {
+            Alert.alert('Error', e?.message || 'No se pudieron cargar los mensajes.');
         }
     }, [scrollToBottom]);
 
-    // ── Start a new conversation ──
+    // ── Nuevo chat ──
     const startNewChat = useCallback(() => {
         setMessages([]);
-        setConversationId(null);
-        setConversationActive(true);
+        setConvId(null);
         setInputText('');
+        handleModeChange('chat');
     }, []);
 
-    // ── Send message ──
-    const sendMessage = useCallback(async (text: string) => {
-        if (!text.trim() || isTyping) return;
+    // ── Persistir mensaje en la API ──
+    const persistMessage = useCallback(async (texto: string, rol: 'user' | 'assistant', currentConvId: string | null): Promise<string | null> => {
+        try {
+            let id = currentConvId;
+            if (!id) {
+                const tema = texto.length > 60 ? texto.substring(0, 60) + '...' : texto;
+                const conv = await chatbotService.createConversacion({ tema });
+                id = conv.id;
+                setConvId(id);
+            }
+            await chatbotService.createMensaje(id, { contenido: texto, rol });
+            return id;
+        } catch (e) {
+            console.warn('[Chat] Error persistiendo mensaje:', e);
+            return currentConvId;
+        }
+    }, []);
 
-        const userText = text.trim();
+    // ══════════════════════════════════════════════════
+    //  ENVÍO DE MENSAJE — lógica según modo
+    // ══════════════════════════════════════════════════
 
-        // Show user message immediately
-        const userMsg: Message = {
-            id: 'temp-' + Date.now(),
-            text: userText,
-            sender: 'user',
-            timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, userMsg]);
+    const handleSend = useCallback(async () => {
+        const text = inputText.trim();
+        if (!text || isTyping) return;
+
         setInputText('');
         setIsTyping(true);
-        scrollToBottom();
+
+        // Mostrar mensaje del usuario
+        addMessage({ text, sender: 'user', type: 'text' });
+
+        let currentConvId = convId;
 
         try {
-            let convId = conversationId;
+            // ── Modo Cultivos: llama al modelo Random Forest ──
+            if (mode === 'cultivos') {
+                currentConvId = await persistMessage(text, 'user', currentConvId) ?? currentConvId;
 
-            // 1. If no active conversation, create one with the first message as the topic
-            if (!convId) {
-                const tema = userText.length > 60 ? userText.substring(0, 60) + '...' : userText;
-                const newConv = await chatbotService.createConversacion({ tema });
-                convId = newConv.id;
-                setConversationId(convId);
-                setConversationActive(isConvActive(newConv.estado));
+                const municipio = text;
+                // Coordenadas por defecto de Xalapa (el frontend puede mejorar esto con geolocalización)
+                const response = await aiModelService.recommendGarden({
+                    lat: 19.5312,
+                    lon: -96.9276,
+                    municipio,
+                });
+                const cultivos = extractCultivos(response);
+                const aiText = cultivos.length > 0
+                    ? `✅ Encontré ${cultivos.length} cultivos recomendados para ${municipio}`
+                    : `No encontré recomendaciones específicas para "${municipio}". Intenta con otro municipio.`;
+
+                addMessage({ text: aiText, sender: 'ai', type: 'cultivos_result', cultivosData: cultivos, municipio });
+                currentConvId = await persistMessage(aiText, 'assistant', currentConvId) ?? currentConvId;
             }
 
-            // The API stores messages but does not generate assistant replies.
-            await chatbotService.createMensaje(convId, {
-                contenido: userText,
-                rol: 'user',
-            });
+            // ── Modo Plagas: llama al modelo YOLOv8 ──
+            else if (mode === 'plagas') {
+                if (!text.startsWith('http')) {
+                    addMessage({ text: '⚠️ Por favor pega una URL válida de imagen (debe comenzar con https://...)', sender: 'ai', type: 'error' });
+                    return;
+                }
+                currentConvId = await persistMessage(`Analizar imagen: ${text}`, 'user', currentConvId) ?? currentConvId;
 
-            const assistantText = getAssistantResponse(userText);
-            await chatbotService.createMensaje(convId, {
-                contenido: assistantText,
-                rol: 'assistant',
-            });
+                const response = await aiModelService.detectPest({ imagen_url: text });
+                const plagas = extractPlagas(response);
+                const aiText = plagas.length > 0
+                    ? `🐛 Se detectaron ${plagas.length} posibles plagas en la imagen`
+                    : '✅ No se detectaron plagas en la imagen analizada';
 
-            const updatedMessages = await chatbotService.listMensajes(convId);
-            setMessages(updatedMessages.map(apiMessageToUI));
+                addMessage({ text: aiText, sender: 'ai', type: 'plagas_result', plagasData: plagas, imagenUrl: text });
+                currentConvId = await persistMessage(aiText, 'assistant', currentConvId) ?? currentConvId;
+            }
+
+            // ── Modo Chat: asistente general ──
+            else {
+                currentConvId = await persistMessage(text, 'user', currentConvId) ?? currentConvId;
+                const reply = getAssistantResponse(text);
+                addMessage({ text: reply, sender: 'ai', type: 'text' });
+                currentConvId = await persistMessage(reply, 'assistant', currentConvId) ?? currentConvId;
+            }
+
         } catch (error: any) {
-            console.error('[AIChatScreen] Error sending message:', error);
-
-            // Show error as an AI message so the user sees feedback
-            const errorMsg: Message = {
-                id: 'error-' + Date.now(),
-                text: '❌ No se pudo enviar el mensaje. Verifica tu conexión e inténtalo de nuevo.',
-                sender: 'ai',
-                timestamp: new Date(),
-            };
-            setMessages(prev => [...prev, errorMsg]);
+            console.error('[Chat] Error:', error);
+            const errMsg = error?.response?.data?.detail || error?.message || 'Error al conectar con el servidor. Verifica tu conexión.';
+            addMessage({ text: `❌ ${errMsg}`, sender: 'ai', type: 'error' });
         } finally {
             setIsTyping(false);
             scrollToBottom();
         }
-    }, [conversationId, isTyping, scrollToBottom]);
+    }, [inputText, isTyping, mode, convId, addMessage, persistMessage, scrollToBottom]);
 
-    const handleSend = useCallback(() => {
-        sendMessage(inputText);
-    }, [inputText, sendMessage]);
+    // ══════════════════════════════════════════════════
+    //  RENDER
+    // ══════════════════════════════════════════════════
 
-    const handleSuggestion = useCallback((query: string) => {
-        sendMessage(query);
-    }, [sendMessage]);
-
-    const handleShowHistory = useCallback(() => {
-        setHistoryVisible(true);
-        loadConversations();
-    }, [loadConversations]);
-
-    const handleSelectConversation = useCallback((conv: ConversacionOut) => {
-        loadConversation(conv);
-    }, [loadConversation]);
+    const accentColor = modeConfig.accent;
+    const tabWidth = (width - 48) / 3;
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar style="dark" />
+        <View style={styles.root}>
+            <StatusBar style="light" />
+            <LinearGradient colors={['#030d07', '#061408', '#040c07']} style={StyleSheet.absoluteFill} />
 
-            {/* Header */}
-            <ChatHeader
-                onNewChat={startNewChat}
-                onShowHistory={handleShowHistory}
-                hasActiveConversation={conversationId !== null}
-            />
+            {/* HEADER */}
+            <View style={[styles.header, { paddingTop: STATUSBAR_HEIGHT + 12 }]}>
+                <Animated.View style={[styles.headerGlow, { opacity: headerGlow.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.8] }), backgroundColor: accentColor }]} />
+                <View style={styles.headerContent}>
+                    <View style={styles.headerLeft}>
+                        <LinearGradient colors={[accentColor + '44', accentColor + '22']} style={styles.headerIconBg}>
+                            <MaterialCommunityIcons name="robot-outline" size={20} color={accentColor} />
+                        </LinearGradient>
+                        <View>
+                            <Text style={styles.headerTitle}>HuertoConnect IA</Text>
+                            <View style={styles.statusRow}>
+                                <View style={[styles.statusDot, { backgroundColor: '#4ade80' }]} />
+                                <Text style={styles.statusText}>Modelos activos</Text>
+                            </View>
+                        </View>
+                    </View>
+                    <View style={styles.headerActions}>
+                        <TouchableOpacity style={styles.headerBtn} onPress={startNewChat}>
+                            <MaterialCommunityIcons name="chat-plus-outline" size={20} color={accentColor} />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.headerBtn} onPress={() => { loadHistory(); setHistoryVisible(true); }}>
+                            <MaterialCommunityIcons name="history" size={20} color="#9ca3af" />
+                        </TouchableOpacity>
+                    </View>
+                </View>
 
-            {/* Chat area */}
+                {/* SELECTOR DE MODO */}
+                <View style={styles.tabContainer}>
+                    <Animated.View style={[
+                        styles.tabIndicator,
+                        { width: tabWidth - 8, backgroundColor: accentColor + '33', borderColor: accentColor + '88' },
+                        { transform: [{ translateX: tabAnim.interpolate({ inputRange: [0, 1, 2], outputRange: [4, tabWidth + 4, tabWidth * 2 + 4] }) }] }
+                    ]} />
+                    {(['chat', 'cultivos', 'plagas'] as ChatMode[]).map(m => {
+                        const cfg = MODE_CONFIG[m];
+                        const isActive = mode === m;
+                        return (
+                            <TouchableOpacity
+                                key={m}
+                                style={[styles.tab, { width: tabWidth }]}
+                                onPress={() => handleModeChange(m)}
+                                activeOpacity={0.7}
+                            >
+                                <MaterialCommunityIcons
+                                    name={cfg.icon}
+                                    size={16}
+                                    color={isActive ? accentColor : '#6b7280'}
+                                />
+                                <Text style={[styles.tabLabel, { color: isActive ? accentColor : '#6b7280' }]}>
+                                    {cfg.label}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+            </View>
+
+            {/* HINT CONTEXTUAL */}
+            <View style={[styles.hintBar, { borderColor: accentColor + '22' }]}>
+                <MaterialCommunityIcons name="information-outline" size={13} color={accentColor + 'AA'} />
+                <Text style={[styles.hintText, { color: accentColor + 'AA' }]}>{modeConfig.hint}</Text>
+            </View>
+
+            {/* MENSAJES */}
             <KeyboardAvoidingView
-                style={styles.chatArea}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
             >
                 <ScrollView
                     ref={scrollRef}
-                    style={styles.messagesScroll}
-                    contentContainerStyle={styles.messagesContent}
+                    style={styles.messageList}
+                    contentContainerStyle={styles.messageListContent}
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
                 >
-                    {messages.length === 0 ? (
-                        <WelcomeState onSuggestionPress={handleSuggestion} />
-                    ) : (
-                        <>
-                            {messages.map((msg, i) => (
-                                <MessageBubble key={msg.id} message={msg} index={i} />
-                            ))}
-                            {isTyping && <TypingIndicator />}
-                        </>
-                    )}
+                    {messages.map(msg => (
+                        <MessageBubble key={msg.id} msg={msg} accentColor={accentColor} />
+                    ))}
+                    {isTyping && <TypingIndicator color={accentColor} />}
                 </ScrollView>
 
-                {/* Quick suggestions when chat is active */}
-                {messages.length > 0 && !isTyping && conversationActive && (
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        style={styles.quickSuggestions}
-                        contentContainerStyle={styles.quickSuggestionsContent}
-                    >
-                        {suggestions.map((s, i) => (
-                            <TouchableOpacity
-                                key={i}
-                                style={styles.quickChip}
-                                onPress={() => handleSuggestion(s.query)}
-                                activeOpacity={0.7}
-                            >
-                                <Text style={styles.quickChipText}>{s.label}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                )}
-
-                {/* Conversation closed banner */}
-                {!conversationActive && conversationId && (
-                    <View style={styles.closedBanner}>
-                        <MaterialCommunityIcons name="lock-outline" size={16} color="#FF9800" />
-                        <Text style={styles.closedBannerText}>Esta conversación está cerrada.</Text>
-                        <TouchableOpacity onPress={startNewChat}>
-                            <Text style={styles.closedBannerLink}>Nueva conversación</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-
-                {/* Input bar */}
-                <View style={styles.inputBar}>
-                    <View style={styles.inputContainer}>
+                {/* INPUT */}
+                <View style={[styles.inputContainer, { borderTopColor: accentColor + '22' }]}>
+                    <View style={[styles.inputWrapper, { borderColor: accentColor + '44' }]}>
+                        <MaterialCommunityIcons
+                            name={mode === 'cultivos' ? 'map-marker-outline' : mode === 'plagas' ? 'link-variant' : 'message-text-outline'}
+                            size={18}
+                            color={accentColor + 'AA'}
+                            style={styles.inputIcon}
+                        />
                         <TextInput
-                            ref={inputRef}
-                            style={styles.textInput}
-                            placeholder="Escribe tu consulta..."
-                            placeholderTextColor="#9E9E9E"
+                            style={[styles.input, { color: '#f0fdf4' }]}
+                            placeholder={modeConfig.inputPlaceholder}
+                            placeholderTextColor="#4b5563"
                             value={inputText}
                             onChangeText={setInputText}
                             multiline
                             maxLength={500}
-                            returnKeyType="default"
-                            editable={conversationActive}
+                            onSubmitEditing={handleSend}
+                            blurOnSubmit={false}
                         />
+                        <TouchableOpacity
+                            style={[styles.sendBtn, { backgroundColor: accentColor, opacity: (!inputText.trim() || isTyping) ? 0.4 : 1 }]}
+                            onPress={handleSend}
+                            disabled={!inputText.trim() || isTyping}
+                        >
+                            {isTyping
+                                ? <ActivityIndicator size="small" color="#000" />
+                                : <MaterialCommunityIcons name="send" size={18} color="#000" />
+                            }
+                        </TouchableOpacity>
                     </View>
-                    <TouchableOpacity
-                        style={[
-                            styles.sendButton,
-                            (!inputText.trim() || !conversationActive) && styles.sendButtonDisabled,
-                        ]}
-                        onPress={handleSend}
-                        disabled={!inputText.trim() || isTyping || !conversationActive}
-                        activeOpacity={0.7}
-                    >
-                        {isTyping ? (
-                            <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                            <MaterialCommunityIcons
-                                name="send"
-                                size={20}
-                                color={inputText.trim() && conversationActive ? '#fff' : '#A5D6A7'}
-                            />
-                        )}
-                    </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
 
-            {/* Conversation History Modal */}
-            <ConversationHistoryModal
+            {/* MODAL HISTORIAL */}
+            <HistoryModal
                 visible={historyVisible}
                 onClose={() => setHistoryVisible(false)}
                 conversations={conversations}
-                onSelect={handleSelectConversation}
-                isLoading={historyLoading}
-                activeConvId={conversationId || undefined}
+                onSelect={loadConversation}
+                loading={historyLoading}
+                activeId={convId ?? undefined}
             />
-        </SafeAreaView>
+        </View>
     );
 };
 
-// ═══════════════════════════════════════════
-// ██  STYLES
-// ═══════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+//  ESTILOS
+// ══════════════════════════════════════════════════════════════
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F1F8E9',
-    },
+    root: { flex: 1, backgroundColor: '#030d07' },
 
-    // ── Header ──
+    // Header
     header: {
+        backgroundColor: 'rgba(6, 20, 8, 0.97)',
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(74, 222, 128, 0.1)',
+        paddingHorizontal: 16,
+        paddingBottom: 0,
+        overflow: 'hidden',
+    },
+    headerGlow: {
+        position: 'absolute',
+        top: 0, left: '20%', right: '20%',
+        height: 1,
+        borderRadius: 2,
+    },
+    headerContent: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(76, 175, 80, 0.1)',
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.05,
-                shadowRadius: 8,
-            },
-            android: { elevation: 3 },
-        }),
+        paddingBottom: 12,
     },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    headerIconBg: {
+        width: 40, height: 40, borderRadius: 20,
+        alignItems: 'center', justifyContent: 'center',
+        borderWidth: 1, borderColor: 'rgba(74,222,128,0.2)',
     },
-    headerIconContainer: {
-        position: 'relative',
-        marginRight: 12,
-    },
-    headerIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#4CAF50',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    headerIconGlow: {
-        position: 'absolute',
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: 'transparent',
-        borderWidth: 2,
-        borderColor: '#66BB6A',
-        top: -4,
-        left: -4,
-    },
-    headerTextContainer: {
-        justifyContent: 'center',
-    },
-    headerTitle: {
-        fontSize: 17,
-        fontWeight: '700',
-        color: '#1B5E20',
-        letterSpacing: 0.3,
-    },
-    statusRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 2,
-    },
-    statusDot: {
-        width: 7,
-        height: 7,
-        borderRadius: 3.5,
-        backgroundColor: '#4CAF50',
-        marginRight: 5,
-    },
-    statusText: {
-        fontSize: 12,
-        color: '#66BB6A',
-        fontWeight: '500',
-    },
-    headerActions: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    headerAction: {
-        padding: 6,
+    headerTitle: { fontSize: 16, fontWeight: '700', color: '#f0fdf4' },
+    statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+    statusDot: { width: 6, height: 6, borderRadius: 3 },
+    statusText: { fontSize: 11, color: '#6b7280' },
+    headerActions: { flexDirection: 'row', gap: 4 },
+    headerBtn: {
+        width: 36, height: 36, borderRadius: 18,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        alignItems: 'center', justifyContent: 'center',
     },
 
-    // ── Chat area ──
-    chatArea: {
-        flex: 1,
-    },
-    messagesScroll: {
-        flex: 1,
-    },
-    messagesContent: {
-        paddingHorizontal: 12,
-        paddingTop: 16,
-        paddingBottom: 8,
-    },
-
-    // ── Welcome state ──
-    welcomeContainer: {
-        alignItems: 'center',
-        paddingTop: 40,
-        paddingHorizontal: 20,
-    },
-    welcomeIconOuter: {
-        marginBottom: 20,
-    },
-    welcomeIcon: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: '#4CAF50',
-        justifyContent: 'center',
-        alignItems: 'center',
-        ...Platform.select({
-            ios: {
-                shadowColor: '#4CAF50',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.35,
-                shadowRadius: 12,
-            },
-            android: { elevation: 8 },
-        }),
-    },
-    welcomeTitle: {
-        fontSize: 26,
-        fontWeight: '800',
-        color: '#1B5E20',
-        marginBottom: 8,
-    },
-    welcomeSubtitle: {
-        fontSize: 15,
-        color: '#558B2F',
-        textAlign: 'center',
-        lineHeight: 22,
-        marginBottom: 28,
-    },
-    welcomeHint: {
-        fontSize: 13,
-        color: '#9E9E9E',
-        fontWeight: '600',
-        letterSpacing: 0.5,
-        textTransform: 'uppercase',
-        marginBottom: 14,
-    },
-    suggestionsGrid: {
+    // Tabs de modo
+    tabContainer: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-        gap: 10,
-    },
-    suggestionChip: {
-        paddingHorizontal: 18,
-        paddingVertical: 11,
-        borderRadius: 22,
-        backgroundColor: '#fff',
-        borderWidth: 1.5,
-        borderColor: '#C8E6C9',
-        ...Platform.select({
-            ios: {
-                shadowColor: '#4CAF50',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 6,
-            },
-            android: { elevation: 2 },
-        }),
-    },
-    suggestionText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#2E7D32',
-    },
-
-    // ── Messages ──
-    messageRow: {
-        flexDirection: 'row',
+        height: 44,
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        borderRadius: 12,
         marginBottom: 12,
-        alignItems: 'flex-end',
+        padding: 4,
+        position: 'relative',
     },
-    messageRowUser: {
-        justifyContent: 'flex-end',
+    tabIndicator: {
+        position: 'absolute',
+        top: 4, bottom: 4,
+        borderRadius: 9,
+        borderWidth: 1,
     },
-    messageRowAI: {
-        justifyContent: 'flex-start',
-    },
-    aiAvatar: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        backgroundColor: '#4CAF50',
-        justifyContent: 'center',
+    tab: {
+        flexDirection: 'row',
         alignItems: 'center',
-        marginRight: 8,
-        marginBottom: 2,
+        justifyContent: 'center',
+        gap: 5,
+        zIndex: 1,
     },
-    messageBubble: {
-        maxWidth: width * 0.72,
-        borderRadius: 20,
+    tabLabel: { fontSize: 12, fontWeight: '600' },
+
+    // Hint bar
+    hintBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
         paddingHorizontal: 16,
-        paddingVertical: 11,
+        paddingVertical: 7,
+        borderBottomWidth: 1,
+        backgroundColor: 'rgba(0,0,0,0.2)',
+    },
+    hintText: { fontSize: 11, flex: 1 },
+
+    // Mensajes
+    messageList: { flex: 1 },
+    messageListContent: { paddingHorizontal: 14, paddingVertical: 16, gap: 10 },
+
+    msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, maxWidth: '100%' },
+    msgRowUser: { alignSelf: 'flex-end', flexDirection: 'row-reverse' },
+    msgRowAI: { alignSelf: 'flex-start' },
+
+    aiAvatar: {
+        width: 30, height: 30, borderRadius: 15,
+        alignItems: 'center', justifyContent: 'center',
+        borderWidth: 1, flexShrink: 0,
+    },
+    userAvatar: {
+        width: 30, height: 30, borderRadius: 15,
+        alignItems: 'center', justifyContent: 'center',
+        borderWidth: 1, flexShrink: 0,
+    },
+    msgContent: { maxWidth: width * 0.72, gap: 4 },
+
+    msgBubble: {
+        borderRadius: 18,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        overflow: 'hidden',
+        position: 'relative',
     },
     userBubble: {
-        backgroundColor: '#4CAF50',
-        borderBottomRightRadius: 6,
-        ...Platform.select({
-            ios: {
-                shadowColor: '#388E3C',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.2,
-                shadowRadius: 6,
-            },
-            android: { elevation: 3 },
-        }),
+        borderBottomRightRadius: 4,
+        borderWidth: 1,
     },
     aiBubble: {
-        backgroundColor: '#fff',
-        borderBottomLeftRadius: 6,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        borderBottomLeftRadius: 4,
         borderWidth: 1,
-        borderColor: 'rgba(76, 175, 80, 0.12)',
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.06,
-                shadowRadius: 6,
-            },
-            android: { elevation: 2 },
-        }),
+        borderColor: 'rgba(255,255,255,0.08)',
     },
-    messageText: {
-        fontSize: 15,
-        lineHeight: 21,
+    errorBubble: {
+        backgroundColor: 'rgba(239,68,68,0.12)',
+        borderBottomLeftRadius: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(239,68,68,0.3)',
     },
-    userText: {
-        color: '#fff',
-    },
-    aiText: {
-        color: '#1B5E20',
-    },
-    messageTime: {
-        fontSize: 10,
-        marginTop: 5,
-    },
-    userTime: {
-        color: 'rgba(255,255,255,0.7)',
-        textAlign: 'right',
-    },
-    aiTime: {
-        color: '#9E9E9E',
-    },
+    msgText: { fontSize: 14, lineHeight: 20 },
+    userMsgText: { color: '#000', fontWeight: '500' },
+    aiMsgText: { color: '#e2f5e9' },
+    msgTime: { fontSize: 10 },
+    userMsgTime: { color: 'rgba(255,255,255,0.35)', textAlign: 'right' },
+    aiMsgTime: { color: '#4b5563', textAlign: 'left' },
 
-    // ── Typing indicator ──
-    typingContainer: {
-        flexDirection: 'row',
-        alignItems: 'flex-end',
-        marginBottom: 12,
-    },
+    // Typing
+    typingRow: { alignSelf: 'flex-start', paddingLeft: 38 },
     typingBubble: {
-        backgroundColor: '#fff',
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.04)',
         borderRadius: 20,
-        borderBottomLeftRadius: 6,
-        paddingHorizontal: 18,
-        paddingVertical: 14,
-        marginLeft: 38,
-        borderWidth: 1,
-        borderColor: 'rgba(76, 175, 80, 0.12)',
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.05,
-                shadowRadius: 4,
-            },
-            android: { elevation: 1 },
-        }),
-    },
-    typingDots: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-    },
-    typingDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#66BB6A',
-    },
-
-    // ── Quick suggestions ──
-    quickSuggestions: {
-        maxHeight: 46,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(76, 175, 80, 0.08)',
-        backgroundColor: '#F1F8E9',
-    },
-    quickSuggestionsContent: {
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        gap: 8,
-    },
-    quickChip: {
         paddingHorizontal: 14,
-        paddingVertical: 6,
-        borderRadius: 16,
-        backgroundColor: '#fff',
+        paddingVertical: 10,
         borderWidth: 1,
-        borderColor: '#C8E6C9',
+        gap: 4,
     },
-    quickChipText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#2E7D32',
-    },
+    typingDots: { flexDirection: 'row', gap: 4, alignItems: 'center' },
+    typingDot: { width: 6, height: 6, borderRadius: 3 },
+    typingLabel: { fontSize: 12, marginLeft: 4 },
 
-    // ── Closed conversation banner ──
-    closedBanner: {
+    // Tarjeta resultado IA
+    resultCard: {
+        backgroundColor: 'rgba(20, 83, 45, 0.25)',
+        borderRadius: 16,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(74, 222, 128, 0.2)',
+        maxWidth: width * 0.78,
+        gap: 10,
+    },
+    resultCardPlagas: {
+        backgroundColor: 'rgba(120, 53, 15, 0.25)',
+        borderColor: 'rgba(251, 191, 36, 0.2)',
+    },
+    resultCardHeader: { flexDirection: 'row', alignItems: 'center' },
+    resultCardIcon: {
+        width: 36, height: 36, borderRadius: 10,
+        alignItems: 'center', justifyContent: 'center',
+    },
+    resultCardTitle: { fontSize: 13, fontWeight: '700', color: '#86efac' },
+    resultCardSubtitle: { fontSize: 10, color: '#6b7280', marginTop: 1 },
+    resultCardEmpty: { fontSize: 13, color: '#6b7280', textAlign: 'center', paddingVertical: 8 },
+
+    resultItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        backgroundColor: '#FFF8E1',
-        borderTopWidth: 1,
-        borderTopColor: '#FFE082',
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        borderRadius: 10,
+        padding: 10,
+        gap: 10,
+    },
+    resultItemLeft: {
+        width: 24, height: 24, borderRadius: 12,
+        backgroundColor: 'rgba(74, 222, 128, 0.15)',
+        alignItems: 'center', justifyContent: 'center',
+    },
+    resultItemNumber: { fontSize: 11, fontWeight: '700', color: '#4ade80' },
+    resultItemContent: { flex: 1 },
+    resultItemName: { fontSize: 13, fontWeight: '600', color: '#d1fae5' },
+    resultItemDesc: { fontSize: 11, color: '#6b7280', marginTop: 2 },
+    resultItemMeta: { fontSize: 10, color: '#4b5563', marginTop: 2 },
+    resultItemBadge: {
+        backgroundColor: 'rgba(74, 222, 128, 0.15)',
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+    },
+    resultItemBadgeText: { fontSize: 11, color: '#4ade80', fontWeight: '600' },
+
+    // Plagas
+    plagaImage: { width: '100%', height: 140, borderRadius: 10, marginVertical: 4 },
+    plagasEmptyContainer: { alignItems: 'center', gap: 8, paddingVertical: 8 },
+    plagasEmptyText: { fontSize: 13, color: '#4ade80', textAlign: 'center' },
+    plagaItem: {
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        borderRadius: 10,
+        padding: 10,
         gap: 8,
     },
-    closedBannerText: {
-        fontSize: 13,
-        color: '#F57F17',
-        fontWeight: '500',
+    plagaItemHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    plagaItemName: { flex: 1, fontSize: 13, fontWeight: '600', color: '#fde68a' },
+    plagaConf: { fontSize: 12, color: '#fbbf24', fontWeight: '700' },
+    confBar: {
+        height: 4, backgroundColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 2, overflow: 'hidden',
     },
-    closedBannerLink: {
-        fontSize: 13,
-        color: '#4CAF50',
-        fontWeight: '700',
-        textDecorationLine: 'underline',
-    },
+    confBarFill: { height: 4, borderRadius: 2 },
+    plagaTratamiento: { fontSize: 11, color: '#9ca3af' },
 
-    // ── Input bar ──
-    inputBar: {
+    // Input
+    inputContainer: {
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        backgroundColor: 'rgba(3, 13, 7, 0.98)',
+        borderTopWidth: 1,
+    },
+    inputWrapper: {
         flexDirection: 'row',
         alignItems: 'flex-end',
-        paddingHorizontal: 12,
-        paddingTop: 10,
-        paddingBottom: 85,
-        backgroundColor: '#fff',
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(76, 175, 80, 0.1)',
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: -2 },
-                shadowOpacity: 0.04,
-                shadowRadius: 6,
-            },
-            android: { elevation: 4 },
-        }),
-    },
-    inputContainer: {
-        flex: 1,
-        backgroundColor: '#F1F8E9',
+        backgroundColor: 'rgba(255,255,255,0.05)',
         borderRadius: 24,
         borderWidth: 1,
-        borderColor: '#C8E6C9',
-        paddingHorizontal: 16,
-        paddingVertical: Platform.OS === 'ios' ? 10 : 6,
-        marginRight: 10,
-        maxHeight: 100,
+        paddingLeft: 12,
+        paddingRight: 6,
+        paddingVertical: 6,
+        gap: 8,
     },
-    textInput: {
-        fontSize: 15,
-        color: '#1B5E20',
-        maxHeight: 80,
+    inputIcon: { paddingBottom: 4 },
+    input: {
+        flex: 1,
+        fontSize: 14,
+        maxHeight: 100,
+        paddingVertical: 4,
         lineHeight: 20,
     },
-    sendButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: '#4CAF50',
-        justifyContent: 'center',
-        alignItems: 'center',
-        ...Platform.select({
-            ios: {
-                shadowColor: '#388E3C',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.3,
-                shadowRadius: 6,
-            },
-            android: { elevation: 4 },
-        }),
-    },
-    sendButtonDisabled: {
-        backgroundColor: '#E8F5E9',
-        ...Platform.select({
-            ios: { shadowOpacity: 0 },
-            android: { elevation: 0 },
-        }),
+    sendBtn: {
+        width: 36, height: 36, borderRadius: 18,
+        alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0,
     },
 
-    // ── Conversation History Modal ──
+    // Historial modal
     historyOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.4)',
+        backgroundColor: 'rgba(0,0,0,0.75)',
         justifyContent: 'flex-end',
     },
-    historyContainer: {
-        backgroundColor: '#fff',
+    historySheet: {
+        backgroundColor: '#0d1f12',
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
-        maxHeight: '75%',
+        paddingHorizontal: 20,
         paddingBottom: 30,
+        maxHeight: height * 0.75,
+        borderTopWidth: 1,
+        borderColor: 'rgba(74, 222, 128, 0.15)',
+    },
+    historyHandle: {
+        width: 40, height: 4, borderRadius: 2,
+        backgroundColor: '#374151',
+        alignSelf: 'center',
+        marginTop: 12, marginBottom: 16,
     },
     historyHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 18,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E8F5E9',
+        marginBottom: 16,
     },
-    historyTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1B5E20',
+    historyTitle: { fontSize: 16, fontWeight: '700', color: '#f0fdf4' },
+    historyClose: {
+        width: 32, height: 32, borderRadius: 16,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        alignItems: 'center', justifyContent: 'center',
     },
-    historyCloseBtn: {
-        padding: 4,
-    },
-    historyLoading: {
-        alignItems: 'center',
-        paddingVertical: 40,
-    },
-    historyLoadingText: {
-        marginTop: 12,
-        fontSize: 14,
-        color: '#9E9E9E',
-    },
-    historyEmpty: {
-        alignItems: 'center',
-        paddingVertical: 40,
-    },
-    historyEmptyText: {
-        marginTop: 12,
-        fontSize: 14,
-        color: '#9E9E9E',
-    },
-    historyList: {
-        paddingHorizontal: 16,
-        paddingTop: 8,
-    },
+    historyCentered: { alignItems: 'center', paddingVertical: 40, gap: 12 },
+    historyLoadingText: { fontSize: 13, color: '#6b7280' },
+    historyEmptyText: { fontSize: 14, color: '#4b5563', textAlign: 'center' },
     historyItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 12,
-        borderRadius: 14,
-        marginBottom: 6,
-        backgroundColor: '#FAFFF5',
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.06)',
+        gap: 0,
     },
     historyItemActive: {
-        backgroundColor: '#E8F5E9',
-        borderWidth: 1.5,
-        borderColor: '#4CAF50',
+        borderColor: 'rgba(74, 222, 128, 0.35)',
+        backgroundColor: 'rgba(74, 222, 128, 0.06)',
     },
-    historyItemIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#E8F5E9',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    historyItemContent: {
-        flex: 1,
-    },
-    historyItemTema: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#1B5E20',
-        marginBottom: 4,
-    },
-    historyItemMeta: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    historyItemDate: {
-        fontSize: 12,
-        color: '#9E9E9E',
-    },
+    historyItemTitle: { fontSize: 13, color: '#d1fae5', fontWeight: '500' },
+    historyItemDate: { fontSize: 11, color: '#6b7280', marginTop: 3 },
     historyClosedBadge: {
-        paddingHorizontal: 8,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 6,
+        paddingHorizontal: 6,
         paddingVertical: 2,
-        borderRadius: 8,
-        backgroundColor: '#FFF3E0',
+        marginRight: 6,
     },
-    historyClosedText: {
-        fontSize: 10,
-        fontWeight: '600',
-        color: '#FF9800',
-    },
+    historyClosedText: { fontSize: 10, color: '#6b7280' },
 });
 
 export default AIChatScreen;
