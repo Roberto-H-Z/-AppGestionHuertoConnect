@@ -127,24 +127,24 @@ const MODE_CONFIG = {
     chat: {
         label: 'Asistente',
         icon: 'robot-outline' as const,
-        color: '#4CAF50',
-        lightBg: '#E8F5E9',
+        color: '#059669',
+        lightBg: '#ECFDF5',
         placeholder: 'Escribe tu pregunta sobre el huerto...',
         hint: 'Pregúntame sobre riego, plagas, cultivos o fertilización',
     },
     cultivos: {
         label: 'Cultivos IA',
         icon: 'sprout-outline' as const,
-        color: '#2E7D32',
-        lightBg: '#F1F8E9',
+        color: '#047857',
+        lightBg: '#F0FDF4',
         placeholder: 'Escribe tu municipio (ej: Xalapa, Monterrey)...',
         hint: 'IA: Random Forest + datos climáticos reales de tu zona',
     },
     plagas: {
         label: 'Detectar Plaga',
         icon: 'bug-outline' as const,
-        color: '#E65100',
-        lightBg: '#FFF3E0',
+        color: '#DC2626',
+        lightBg: '#FEF2F2',
         placeholder: 'Pega la URL pública de la foto de tu planta...',
         hint: 'IA: YOLOv8 detectará plagas en la imagen',
     },
@@ -705,7 +705,7 @@ export const AIChatScreen: React.FC = () => {
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
                     <View style={styles.headerIconBg}>
-                        <MaterialCommunityIcons name="robot-outline" size={22} color="#4CAF50" />
+                        <MaterialCommunityIcons name="leaf" size={20} color="#059669" />
                     </View>
                     <View>
                         <Text style={styles.headerTitle}>HuertoConnect IA</Text>
@@ -717,31 +717,33 @@ export const AIChatScreen: React.FC = () => {
                 </View>
                 <View style={styles.headerActions}>
                     <TouchableOpacity style={styles.headerBtn} onPress={() => { setMessages([]); setConvId(null); setMode('chat'); }}>
-                        <MaterialCommunityIcons name="chat-plus-outline" size={20} color="#4CAF50" />
+                        <MaterialCommunityIcons name="plus" size={20} color="#059669" />
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.headerBtn} onPress={() => { loadHistory(); setHistoryVisible(true); }}>
-                        <MaterialCommunityIcons name="history" size={20} color="#757575" />
+                        <MaterialCommunityIcons name="history" size={20} color="#6B7280" />
                     </TouchableOpacity>
                 </View>
             </View>
 
             {/* ── SELECTOR DE MODO ── */}
             <View style={styles.modeBar}>
+                <View style={styles.modeTabsRow}>
                 {(['chat', 'cultivos', 'plagas'] as ChatMode[]).map(m => {
                     const cfg = MODE_CONFIG[m];
                     const active = mode === m;
                     return (
                         <TouchableOpacity
                             key={m}
-                            style={[styles.modeTab, active && { backgroundColor: cfg.color, borderColor: cfg.color }]}
+                            style={[styles.modeTab, active && { backgroundColor: cfg.color }]}
                             onPress={() => setMode(m)}
-                            activeOpacity={0.8}
+                            activeOpacity={0.75}
                         >
-                            <MaterialCommunityIcons name={cfg.icon} size={14} color={active ? '#fff' : '#9E9E9E'} />
-                            <Text style={[styles.modeTabLabel, { color: active ? '#fff' : '#9E9E9E' }]}>{cfg.label}</Text>
+                            <MaterialCommunityIcons name={cfg.icon} size={13} color={active ? '#fff' : '#9CA3AF'} />
+                            <Text style={[styles.modeTabLabel, { color: active ? '#fff' : '#6B7280' }]}>{cfg.label}</Text>
                         </TouchableOpacity>
                     );
                 })}
+                </View>
             </View>
 
             {/* ── HINT ── */}
@@ -836,175 +838,206 @@ export const AIChatScreen: React.FC = () => {
 // ══════════════════════════════════════════════════════
 
 const styles = StyleSheet.create({
-    root: { flex: 1, backgroundColor: '#F1F8E9' },
+    // ── Base ────────────────────────────────────────────────────────────
+    root: { flex: 1, backgroundColor: '#FAFAFA' },
 
+    // ── Header ──────────────────────────────────────────────────────────
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 12,
-        borderBottomWidth: 1, borderBottomColor: '#E8F5E9',
-        elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4,
+        backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingVertical: 13,
+        borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
+        elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.07, shadowRadius: 6,
     },
-    headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 11 },
     headerIconBg: {
-        width: 42, height: 42, borderRadius: 21, backgroundColor: '#E8F5E9',
-        alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#C8E6C9',
+        width: 40, height: 40, borderRadius: 20,
+        backgroundColor: '#ECFDF5',
+        alignItems: 'center', justifyContent: 'center',
     },
-    headerTitle: { fontSize: 16, fontWeight: '700', color: '#1B5E20' },
-    headerStatus: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 },
-    statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#4CAF50' },
-    statusLabel: { fontSize: 11, color: '#66BB6A' },
-    headerActions: { flexDirection: 'row', gap: 6 },
-    headerBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center' },
+    headerTitle: { fontSize: 16, fontWeight: '700', color: '#111827', letterSpacing: -0.3 },
+    headerStatus: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+    statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#10B981' },
+    statusLabel: { fontSize: 11, color: '#6EE7B7', fontWeight: '500' },
+    headerActions: { flexDirection: 'row', gap: 8 },
+    headerBtn: {
+        width: 36, height: 36, borderRadius: 18,
+        backgroundColor: '#F3F4F6',
+        alignItems: 'center', justifyContent: 'center',
+    },
 
+    // ── Mode selector ────────────────────────────────────────────────────
     modeBar: {
-        flexDirection: 'row', backgroundColor: '#fff',
-        paddingHorizontal: 12, paddingVertical: 10, gap: 8,
-        borderBottomWidth: 1, borderBottomColor: '#E8F5E9',
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 14, paddingVertical: 10,
+        borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
+    },
+    modeTabsRow: {
+        flexDirection: 'row',
+        backgroundColor: '#F3F4F6',
+        borderRadius: 12, padding: 3, gap: 2,
     },
     modeTab: {
         flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        gap: 4, paddingVertical: 8, borderRadius: 10,
-        backgroundColor: '#F5F5F5', borderWidth: 1, borderColor: '#E0E0E0',
+        gap: 5, paddingVertical: 8, borderRadius: 10,
     },
-    modeTabLabel: { fontSize: 11, fontWeight: '700' },
+    modeTabLabel: { fontSize: 11, fontWeight: '600', letterSpacing: -0.1 },
 
-    hintBar: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8 },
-    hintText: { fontSize: 11, flex: 1, fontWeight: '500' },
+    // ── Hint bar ─────────────────────────────────────────────────────────
+    hintBar: {
+        flexDirection: 'row', alignItems: 'center', gap: 7,
+        paddingHorizontal: 14, paddingVertical: 8,
+        borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
+    },
+    hintText: { fontSize: 11.5, flex: 1, fontWeight: '500', letterSpacing: -0.1 },
 
-    msgList: { flex: 1, backgroundColor: '#F8FDF8' },
-    msgListContent: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 8, gap: 8 },
+    // ── Messages list ────────────────────────────────────────────────────
+    msgList: { flex: 1, backgroundColor: '#FAFAFA' },
+    msgListContent: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10, gap: 10 },
 
-    msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
+    msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 7 },
     msgRowUser: { justifyContent: 'flex-end' },
     msgRowAI: { justifyContent: 'flex-start' },
 
     aiAvatarSmall: {
-        width: 28, height: 28, borderRadius: 14, backgroundColor: '#E8F5E9',
-        alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#C8E6C9', flexShrink: 0,
+        width: 30, height: 30, borderRadius: 15,
+        backgroundColor: '#ECFDF5',
+        alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0,
     },
-    msgContentWrapper: { flex: 1, maxWidth: width * 0.72, gap: 3 },
+    msgContentWrapper: { flex: 1, maxWidth: width * 0.74, gap: 4 },
 
-    msgBubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
-    userBubble: { borderBottomRightRadius: 4 },
+    msgBubble: { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
+    userBubble: { borderBottomRightRadius: 5 },
     aiBubble: {
-        backgroundColor: '#fff', borderBottomLeftRadius: 4,
-        borderWidth: 1, borderColor: '#E0E0E0', elevation: 1,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2,
+        backgroundColor: '#FFFFFF', borderBottomLeftRadius: 5,
+        borderWidth: 1, borderColor: '#EDEDED',
+        elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3,
     },
-    errorBubble: { backgroundColor: '#FFF3E0', borderWidth: 1, borderColor: '#FFB74D', borderBottomLeftRadius: 4 },
-    msgText: { fontSize: 14, lineHeight: 21 },
-    userMsgText: { color: '#fff' },
-    aiMsgText: { color: '#212121' },
-    msgTime: { fontSize: 10, color: '#BDBDBD', marginTop: 1 },
+    errorBubble: {
+        backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderBottomLeftRadius: 5,
+    },
+    msgText: { fontSize: 14, lineHeight: 22, letterSpacing: -0.1 },
+    userMsgText: { color: '#FFFFFF', fontWeight: '500' },
+    aiMsgText: { color: '#1F2937' },
+    msgTime: { fontSize: 10, color: '#D1D5DB', marginTop: 2, letterSpacing: 0.2 },
 
-    typingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    // ── Typing indicator ─────────────────────────────────────────────────
+    typingRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
     typingBubble: {
         flexDirection: 'row', gap: 5, alignItems: 'center',
-        backgroundColor: '#fff', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12,
-        borderWidth: 1, borderColor: '#E0E0E0', elevation: 1,
+        backgroundColor: '#FFFFFF', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 13,
+        borderWidth: 1, borderColor: '#EDEDED',
+        elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3,
     },
-    typingDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4CAF50' },
-    typingLabel: { fontSize: 11, color: '#9E9E9E', marginLeft: 4 },
+    typingDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#059669' },
+    typingLabel: { fontSize: 11, color: '#9CA3AF', marginLeft: 4, fontWeight: '500' },
 
-    // Chips de acciones rápidas
-    chipsContainer: { paddingTop: 4, paddingBottom: 8, gap: 8 },
-    chipsLabel: { fontSize: 11, color: '#9E9E9E', fontWeight: '500', marginLeft: 2 },
+    // ── Quick chips ──────────────────────────────────────────────────────
+    chipsContainer: { paddingTop: 6, paddingBottom: 10, gap: 10 },
+    chipsLabel: { fontSize: 11, color: '#9CA3AF', fontWeight: '600', marginLeft: 2, letterSpacing: 0.5 },
     chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     chip: {
-        paddingHorizontal: 12, paddingVertical: 8,
+        paddingHorizontal: 13, paddingVertical: 8,
         borderRadius: 20, borderWidth: 1.5,
-        backgroundColor: '#fff',
-        elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2,
+        backgroundColor: '#FFFFFF',
+        elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 3,
     },
     chipText: { fontSize: 12, fontWeight: '600' },
 
+    // ── Input bar ────────────────────────────────────────────────────────
     inputBar: {
-        backgroundColor: '#fff', paddingHorizontal: 12, paddingTop: 10,
-        paddingBottom: 90, borderTopWidth: 1, borderTopColor: '#E8F5E9',
-        elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.06, shadowRadius: 6,
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 12, paddingTop: 10, paddingBottom: 90,
+        borderTopWidth: 1, borderTopColor: '#F0F0F0',
+        elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.06, shadowRadius: 8,
     },
     inputWrapper: {
         flexDirection: 'row', alignItems: 'flex-end',
-        backgroundColor: '#F5F5F5', borderRadius: 24, borderWidth: 1.5,
-        paddingLeft: 12, paddingRight: 6, paddingVertical: 6, gap: 8,
+        backgroundColor: '#F9FAFB', borderRadius: 24, borderWidth: 1.5,
+        paddingLeft: 13, paddingRight: 5, paddingVertical: 5, gap: 8,
     },
-    inputPrefixIcon: { paddingBottom: 3, flexShrink: 0 },
-    input: { flex: 1, fontSize: 14, color: '#212121', maxHeight: 100, paddingVertical: 4, lineHeight: 20 },
-    sendBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-    sendBtnDisabled: { opacity: 0.4 },
+    inputPrefixIcon: { paddingBottom: 4, flexShrink: 0 },
+    input: { flex: 1, fontSize: 14, color: '#1F2937', maxHeight: 100, paddingVertical: 5, lineHeight: 20 },
+    sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    sendBtnDisabled: { opacity: 0.35 },
 
-    // Tarjetas resultado IA
+    // ── Result cards ─────────────────────────────────────────────────────
     resultCard: {
-        backgroundColor: '#fff', borderRadius: 14, padding: 14,
-        borderWidth: 1, borderColor: '#C8E6C9', gap: 10,
-        elevation: 2, shadowColor: '#4CAF50', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6,
-        maxWidth: width * 0.78,
+        backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14,
+        borderWidth: 1, borderColor: '#D1FAE5', gap: 10,
+        elevation: 2, shadowColor: '#059669', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8,
+        maxWidth: width * 0.8,
     },
-    resultCardPlagas: { borderColor: '#FFCC80', shadowColor: '#FF9800' },
+    resultCardPlagas: { borderColor: '#FECACA', shadowColor: '#DC2626' },
     resultCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    resultCardIconGreen: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#4CAF50', alignItems: 'center', justifyContent: 'center' },
-    resultCardIconOrange: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#FF9800', alignItems: 'center', justifyContent: 'center' },
-    resultCardTitle: { fontSize: 13, fontWeight: '700', color: '#1B5E20' },
-    resultCardSub: { fontSize: 10, color: '#9E9E9E', marginTop: 1 },
+    resultCardIconGreen: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#059669', alignItems: 'center', justifyContent: 'center' },
+    resultCardIconOrange: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#DC2626', alignItems: 'center', justifyContent: 'center' },
+    resultCardTitle: { fontSize: 13, fontWeight: '700', color: '#065F46', letterSpacing: -0.2 },
+    resultCardSub: { fontSize: 10, color: '#9CA3AF', marginTop: 2, letterSpacing: 0.1 },
 
-    emptyResult: { alignItems: 'center', gap: 8, paddingVertical: 12 },
-    emptyResultText: { fontSize: 12, color: '#9E9E9E', textAlign: 'center' },
+    emptyResult: { alignItems: 'center', gap: 8, paddingVertical: 14 },
+    emptyResultText: { fontSize: 12, color: '#9CA3AF', textAlign: 'center', lineHeight: 18 },
 
-    cultivoItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1F8E9', borderRadius: 10, padding: 10, gap: 10 },
-    cultivoNumber: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#C8E6C9', alignItems: 'center', justifyContent: 'center' },
-    cultivoNumberText: { fontSize: 11, fontWeight: '700', color: '#2E7D32' },
-    cultivoName: { fontSize: 13, fontWeight: '600', color: '#1B5E20' },
-    cultivoDesc: { fontSize: 11, color: '#757575', marginTop: 2 },
-    cultivoMeta: { fontSize: 10, color: '#9E9E9E', marginTop: 2 },
-    confBadge: { backgroundColor: '#E8F5E9', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-    confBadgeText: { fontSize: 11, fontWeight: '700', color: '#4CAF50' },
+    cultivoItem: {
+        flexDirection: 'row', alignItems: 'center',
+        backgroundColor: '#F0FDF4', borderRadius: 12, padding: 11, gap: 10,
+        borderWidth: 1, borderColor: '#D1FAE5',
+    },
+    cultivoNumber: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#A7F3D0', alignItems: 'center', justifyContent: 'center' },
+    cultivoNumberText: { fontSize: 11, fontWeight: '800', color: '#065F46' },
+    cultivoName: { fontSize: 13, fontWeight: '600', color: '#065F46', letterSpacing: -0.2 },
+    cultivoDesc: { fontSize: 11, color: '#6B7280', marginTop: 2, lineHeight: 16 },
+    cultivoMeta: { fontSize: 10, color: '#9CA3AF', marginTop: 2 },
+    confBadge: { backgroundColor: '#ECFDF5', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+    confBadgeText: { fontSize: 11, fontWeight: '700', color: '#059669' },
 
-    // Widget de clima en tiempo real
+    // ── Weather strip ────────────────────────────────────────────────────
     weatherStrip: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        backgroundColor: '#F0F7FF', borderRadius: 10, padding: 10,
-        borderWidth: 1, borderColor: '#BBDEFB',
+        backgroundColor: '#EFF6FF', borderRadius: 12, padding: 11,
+        borderWidth: 1, borderColor: '#BFDBFE',
     },
-    weatherStripLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    weatherTemp: { fontSize: 18, fontWeight: '700', color: '#1565C0' },
-    weatherCond: { fontSize: 11, color: '#42A5F5', marginTop: 1 },
-    weatherStats: { flexDirection: 'column', gap: 4, alignItems: 'flex-end' },
-    weatherStat: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-    weatherStatText: { fontSize: 11, color: '#546E7A', fontWeight: '500' },
+    weatherStripLeft: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+    weatherTemp: { fontSize: 20, fontWeight: '700', color: '#1D4ED8', letterSpacing: -0.5 },
+    weatherCond: { fontSize: 11, color: '#60A5FA', marginTop: 1, fontWeight: '500' },
+    weatherStats: { flexDirection: 'column', gap: 5, alignItems: 'flex-end' },
+    weatherStat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    weatherStatText: { fontSize: 11, color: '#475569', fontWeight: '500' },
 
-    plagaPreview: { width: '100%', height: 130, borderRadius: 10 },
-    plagaOk: { alignItems: 'center', gap: 8, paddingVertical: 8 },
-    plagaOkText: { fontSize: 13, color: '#4CAF50', fontWeight: '500', textAlign: 'center' },
-    plagaItem: { backgroundColor: '#FFF8E1', borderRadius: 10, padding: 10, gap: 6 },
+    // ── Plagas card ──────────────────────────────────────────────────────
+    plagaPreview: { width: '100%', height: 140, borderRadius: 12 },
+    plagaOk: { alignItems: 'center', gap: 8, paddingVertical: 10 },
+    plagaOkText: { fontSize: 13, color: '#059669', fontWeight: '600', textAlign: 'center' },
+    plagaItem: { backgroundColor: '#FEF2F2', borderRadius: 12, padding: 11, gap: 6, borderWidth: 1, borderColor: '#FECACA' },
     plagaItemHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    plagaName: { flex: 1, fontSize: 13, fontWeight: '600', color: '#E65100' },
-    plagaConf: { fontSize: 12, color: '#FF9800', fontWeight: '700' },
-    confBar: { height: 4, backgroundColor: '#E0E0E0', borderRadius: 2, overflow: 'hidden' },
+    plagaName: { flex: 1, fontSize: 13, fontWeight: '600', color: '#DC2626' },
+    plagaConf: { fontSize: 12, color: '#DC2626', fontWeight: '700' },
+    confBar: { height: 4, backgroundColor: '#FEE2E2', borderRadius: 2, overflow: 'hidden' },
     confBarFill: { height: 4, borderRadius: 2 },
-    plagaTratamiento: { fontSize: 11, color: '#757575' },
+    plagaTratamiento: { fontSize: 11, color: '#6B7280', lineHeight: 16 },
 
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+    // ── History modal ────────────────────────────────────────────────────
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
     modalSheet: {
-        backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+        backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24,
         paddingHorizontal: 20, paddingBottom: 30, maxHeight: '75%',
-        borderTopWidth: 1, borderColor: '#E8F5E9',
     },
-    modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E0E0E0', alignSelf: 'center', marginTop: 12, marginBottom: 16 },
+    modalHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', alignSelf: 'center', marginTop: 12, marginBottom: 16 },
     modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-    modalTitle: { fontSize: 16, fontWeight: '700', color: '#1B5E20' },
-    modalClose: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center' },
+    modalTitle: { fontSize: 16, fontWeight: '700', color: '#111827', letterSpacing: -0.3 },
+    modalClose: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
     modalCenter: { alignItems: 'center', paddingVertical: 40, gap: 10 },
-    modalCenterText: { fontSize: 14, color: '#9E9E9E' },
+    modalCenterText: { fontSize: 14, color: '#9CA3AF' },
 
     historyItem: {
-        flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9F9F9',
-        borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: '#EEEEEE',
+        flexDirection: 'row', alignItems: 'center', backgroundColor: '#FAFAFA',
+        borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: '#F3F4F6',
     },
-    historyItemActive: { borderColor: '#A5D6A7', backgroundColor: '#F1F8E9' },
-    historyItemTitle: { fontSize: 13, color: '#212121', fontWeight: '500' },
-    historyItemDate: { fontSize: 11, color: '#9E9E9E', marginTop: 3 },
-    closedBadge: { backgroundColor: '#F5F5F5', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginRight: 6 },
-    closedBadgeText: { fontSize: 10, color: '#9E9E9E' },
+    historyItemActive: { borderColor: '#6EE7B7', backgroundColor: '#F0FDF4' },
+    historyItemTitle: { fontSize: 13, color: '#1F2937', fontWeight: '500', lineHeight: 19 },
+    historyItemDate: { fontSize: 11, color: '#9CA3AF', marginTop: 3 },
+    closedBadge: { backgroundColor: '#F3F4F6', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginRight: 6 },
+    closedBadgeText: { fontSize: 10, color: '#9CA3AF' },
 });
 
 export default AIChatScreen;
