@@ -242,16 +242,21 @@ export const HomeScreen: React.FC = () => {
 
             {/* Header */}
             <View style={styles.header}>
-                <View>
-                    <Text style={styles.greeting}>Hola,</Text>
-                    <Text style={styles.userName}>{userName}</Text>
+                <View style={styles.headerLeft}>
+                    <View style={styles.headerIconBg}>
+                        <MaterialCommunityIcons name="leaf" size={20} color="#059669" />
+                    </View>
+                    <View>
+                        <Text style={styles.greeting}>Hola, bienvenido 👋</Text>
+                        <Text style={styles.userName}>{userName}</Text>
+                    </View>
                 </View>
                 <TouchableOpacity
                     style={styles.notificationButton}
                     activeOpacity={0.7}
                     onPress={() => setNotificationsVisible(true)}
                 >
-                    <MaterialCommunityIcons name="bell-outline" size={24} color="#1B5E20" />
+                    <MaterialCommunityIcons name="bell-outline" size={22} color="#374151" />
                 </TouchableOpacity>
             </View>
 
@@ -265,8 +270,8 @@ export const HomeScreen: React.FC = () => {
                         <RefreshControl
                             refreshing={isRefreshing}
                             onRefresh={handleRefresh}
-                            colors={['#4CAF50']}
-                            tintColor="#4CAF50"
+                            colors={['#059669']}
+                            tintColor="#059669"
                         />
                     }
                 >
@@ -278,7 +283,7 @@ export const HomeScreen: React.FC = () => {
                             onPress={() => setModalVisible(true)}
                             activeOpacity={0.7}
                         >
-                            <MaterialCommunityIcons name="plus" size={18} color="#4CAF50" />
+                            <MaterialCommunityIcons name="plus" size={16} color="#059669" />
                             <Text style={styles.addMoreText}>Agregar</Text>
                         </TouchableOpacity>
                     </View>
@@ -308,9 +313,9 @@ export const HomeScreen: React.FC = () => {
                 <TouchableOpacity
                     style={styles.fab}
                     onPress={() => setModalVisible(true)}
-                    activeOpacity={0.8}
+                    activeOpacity={0.85}
                 >
-                    <MaterialCommunityIcons name="plus" size={28} color="#fff" />
+                    <MaterialCommunityIcons name="plus" size={26} color="#fff" />
                 </TouchableOpacity>
             )}
 
@@ -343,71 +348,95 @@ export const HomeScreen: React.FC = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F1F8E9',
+        backgroundColor: '#FAFAFA',
     },
+    // ── Header ──────────────────────────────────────────────────────────
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 20,
+        paddingHorizontal: 16,
         paddingTop: Platform.OS === 'web' ? 20 : 10,
-        paddingBottom: 16,
+        paddingBottom: 14,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F0F0F0',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.07,
+        shadowRadius: 6,
+    },
+    headerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 11,
+    },
+    headerIconBg: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#ECFDF5',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     greeting: {
-        fontSize: 16,
-        color: '#66BB6A',
+        fontSize: 12,
+        color: '#6B7280',
         fontWeight: '500',
     },
     userName: {
-        fontSize: 22,
+        fontSize: 18,
         fontWeight: '700',
-        color: '#1B5E20',
+        color: '#111827',
+        letterSpacing: -0.4,
     },
     notificationButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: '#fff',
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#F3F4F6',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.06,
-        shadowRadius: 4,
-        elevation: 2,
     },
+    // ── Content ──────────────────────────────────────────────────────────
     scrollView: {
         flex: 1,
     },
     scrollContent: {
-        paddingTop: 4,
+        paddingTop: 8,
     },
     sectionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 20,
-        marginBottom: 14,
+        paddingHorizontal: 16,
+        marginBottom: 12,
+        marginTop: 8,
     },
     sectionTitle: {
-        fontSize: 18,
+        fontSize: 17,
         fontWeight: '700',
-        color: '#1B5E20',
+        color: '#111827',
+        letterSpacing: -0.3,
     },
     addMoreButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#E8F5E9',
+        backgroundColor: '#ECFDF5',
         paddingHorizontal: 12,
-        paddingVertical: 6,
+        paddingVertical: 7,
         borderRadius: 20,
         gap: 4,
+        borderWidth: 1,
+        borderColor: '#D1FAE5',
     },
     addMoreText: {
         fontSize: 13,
-        color: '#4CAF50',
+        color: '#059669',
         fontWeight: '600',
     },
+    // ── FAB ──────────────────────────────────────────────────────────────
     fab: {
         position: 'absolute',
         bottom: 100,
@@ -415,13 +444,13 @@ const styles = StyleSheet.create({
         width: 52,
         height: 52,
         borderRadius: 26,
-        backgroundColor: '#4CAF50',
+        backgroundColor: '#059669',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#4CAF50',
+        shadowColor: '#059669',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
         elevation: 8,
     },
 });
