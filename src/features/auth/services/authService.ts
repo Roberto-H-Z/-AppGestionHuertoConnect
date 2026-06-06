@@ -31,6 +31,7 @@ export interface ChallengeResponse {
     message: string;
     maskedEmail?: string;
     expiresAt?: string;
+    devOtpCode?: string | null;
 }
 
 export interface VerifyOtpResponse {
@@ -43,11 +44,22 @@ export interface VerifyOtpResponse {
 
 export interface UserResponse {
     id: string;
-    email: string;
     nombre: string;
     apellidos: string;
-    rol: string;
-    activo: boolean;
+    email: string;
+    role: string;
+    estado: string;
+    email_verificado: boolean;
+    profile_picture?: string | null;
+    auth_provider: string;
+    created_at?: string | null;
+}
+
+export interface ForgotPasswordResponse {
+    message: string;
+    challengeId?: string;
+    expiresAt?: string;
+    maskedEmail?: string;
 }
 
 /**
@@ -92,8 +104,8 @@ export const authService = {
     /**
      * Solicita recuperar la contraseña. Devuelve un challenge OTP.
      */
-    forgotPassword: async (email: string): Promise<ChallengeResponse> => {
-        const response = await apiClient.post<ChallengeResponse>(`${environment.services.auth}/forgot-password`, { email });
+    forgotPassword: async (email: string): Promise<ForgotPasswordResponse> => {
+        const response = await apiClient.post<ForgotPasswordResponse>(`${environment.services.auth}/forgot-password`, { email });
         return response.data;
     },
 

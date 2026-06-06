@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+// Platform import removed — single production URL used for all platforms
 
 /**
  * Environment Configuration
@@ -6,9 +6,8 @@ import { Platform } from 'react-native';
  * Similar a environment.ts de Angular.
  */
 
-const WEB_API_BASE_URL = 'http://localhost:8000/api';
-const MOBILE_API_BASE_URL = 'http://3.17.60.253:8000/api';
-const API_BASE_URL = Platform.OS === 'web' ? WEB_API_BASE_URL : MOBILE_API_BASE_URL;
+const PRODUCTION_API_BASE_URL = 'http://3.17.60.253:8000/api';
+const API_BASE_URL = PRODUCTION_API_BASE_URL;
 
 export const environment = {
     production: false,

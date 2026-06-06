@@ -1,15 +1,15 @@
 /**
- * AddCropModal - Form modal to add a new crop.
+ * AddHuertoModal — Form modal to create a new Huerto.
  * Features:
- * - Image picker for crop photo
- * - Garden area selector with "add new area" option
- * - Harvest status chip selector
- * - Calendar date picker + frequency for watering schedule
- * - Default task checklist + custom task addition
- * - Description field
+ * - Huerto name & municipio text inputs
+ * - Region selector (chips from API) + inline "create new" option
+ * - Estado selector (Optimo / Atencion / Critico)
+ * - Salud slider (0–100)
+ * - Optional: associate a Cultivo (siembra) with fecha_siembra
+ * - Cultivo selector (chips from API) + inline "create new" option
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     Animated,
     Easing,
@@ -22,29 +22,45 @@ import {
     ScrollView,
     KeyboardAvoidingView,
     Platform,
-    Image,
     Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import { apiClient } from '../../../infrastructure/api/apiClient';
-import { Crop, GardenArea, HarvestStatus } from '../types/cropTypes';
+import * as Location from 'expo-location';
+import type {
+    Region,
+    Cultivo,
+    HuertoCreate,
+    RegionCreate,
+    CultivoCreate,
+    Huerto,
+    RecomendacionCultivo,
+    RecomendarCultivosResponse,
+} from '../types/cropTypes';
 import {
-    harvestStatusOptions,
-    harvestDaysMap,
-    defaultCropTasks,
-    wateringFrequencyOptions,
-    generateId,
-} from '../data/cropData';
+    ESTADO_HUERTO_OPTIONS,
+    ESTADO_COLORS,
+    ACTIVIDAD_REGION_OPTIONS,
+    DIFICULTAD_CULTIVO_OPTIONS,
+} from '../types/cropTypes';
+import { huertoService } from '../services/huertoService';
 
-interface AddCropModalProps {
+// ── Props ──
+
+interface AddHuertoModalProps {
     visible: boolean;
     onClose: () => void;
-    onSave: (cropData: any, gardenArea?: GardenArea) => Promise<void>;
-    gardenAreas: GardenArea[];
+    onSave: (
+        huertoData: HuertoCreate,
+        siembraData?: { cultivoId: string; fechaSiembra?: string },
+        newRegion?: RegionCreate,
+        newCultivo?: CultivoCreate,
+    ) => Promise<void>;
+    regiones: Region[];
+    cultivos: Cultivo[];
 }
 
-// ---- Reusable Sub-Components ----
+// ── Sub-components ──
 
 const FieldLabel: React.FC<{ text: string }> = ({ text }) => (
     <Text style={styles.fieldLabel}>{text}</Text>
@@ -53,15 +69,14 @@ const FieldLabel: React.FC<{ text: string }> = ({ text }) => (
 const SelectableChip: React.FC<{
     label: string;
     selected: boolean;
-    recommended?: boolean;
+    color?: string;
     onPress: () => void;
-}> = ({ label, selected, recommended = false, onPress }) => (
+}> = ({ label, selected, color, onPress }) => (
     <TouchableOpacity
         style={[
             styles.chip,
-            recommended && styles.chipRecommended,
             selected && styles.chipSelected,
-            selected && recommended && styles.chipRecommendedSelected,
+            selected && color ? { backgroundColor: color, borderColor: color } : undefined,
         ]}
         onPress={onPress}
         activeOpacity={0.7}
@@ -69,406 +84,280 @@ const SelectableChip: React.FC<{
         <Text
             style={[
                 styles.chipText,
-                recommended && styles.chipTextRecommended,
                 selected && styles.chipTextSelected,
             ]}
         >
             {label}
         </Text>
-        {recommended && (
-            <MaterialCommunityIcons
-                name="leaf"
-                size={14}
-                color={selected ? '#1B5E20' : '#2E7D32'}
-                style={styles.chipIcon}
-            />
-        )}
     </TouchableOpacity>
 );
 
-/** Task checkbox item */
-const TaskCheckItem: React.FC<{
-    label: string;
-    checked: boolean;
-    onToggle: () => void;
-    onRemove?: () => void;
-    isCustom?: boolean;
-}> = ({ label, checked, onToggle, onRemove, isCustom }) => (
-    <TouchableOpacity
-        style={styles.taskItem}
-        onPress={onToggle}
-        activeOpacity={0.7}
-    >
-        <MaterialCommunityIcons
-            name={checked ? 'checkbox-marked' : 'checkbox-blank-outline'}
-            size={22}
-            color={checked ? '#4CAF50' : '#BDBDBD'}
-        />
-        <Text style={[styles.taskItemText, checked && styles.taskItemTextChecked]}>
-            {label}
-        </Text>
-        {isCustom && onRemove && (
-            <TouchableOpacity onPress={onRemove} style={styles.taskRemoveBtn}>
-                <MaterialCommunityIcons name="close-circle" size={18} color="#EF5350" />
-            </TouchableOpacity>
-        )}
-    </TouchableOpacity>
-);
+// ── Saving Loader ──
 
-const GrowingCropLoader: React.FC = () => {
-    const rotateAnim = useRef(new Animated.Value(0)).current;
+const SavingLoader: React.FC = () => {
     const pulseAnim = useRef(new Animated.Value(0.92)).current;
-    const swayAnim = useRef(new Animated.Value(0)).current;
+    const rotateAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        const rotation = Animated.loop(
-            Animated.timing(rotateAnim, {
-                toValue: 1,
-                duration: 2600,
-                easing: Easing.linear,
-                useNativeDriver: true,
-            })
-        );
-
         const pulse = Animated.loop(
             Animated.sequence([
-                Animated.timing(pulseAnim, {
-                    toValue: 1.04,
-                    duration: 850,
-                    easing: Easing.inOut(Easing.ease),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(pulseAnim, {
-                    toValue: 0.92,
-                    duration: 850,
-                    easing: Easing.inOut(Easing.ease),
-                    useNativeDriver: true,
-                }),
+                Animated.timing(pulseAnim, { toValue: 1.05, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+                Animated.timing(pulseAnim, { toValue: 0.92, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
             ])
         );
-
-        const sway = Animated.loop(
-            Animated.sequence([
-                Animated.timing(swayAnim, {
-                    toValue: 1,
-                    duration: 700,
-                    easing: Easing.inOut(Easing.ease),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(swayAnim, {
-                    toValue: 0,
-                    duration: 700,
-                    easing: Easing.inOut(Easing.ease),
-                    useNativeDriver: true,
-                }),
-            ])
+        const rotation = Animated.loop(
+            Animated.timing(rotateAnim, { toValue: 1, duration: 2400, easing: Easing.linear, useNativeDriver: true })
         );
-
-        rotation.start();
         pulse.start();
-        sway.start();
+        rotation.start();
+        return () => { pulse.stop(); rotation.stop(); };
+    }, [pulseAnim, rotateAnim]);
 
-        return () => {
-            rotation.stop();
-            pulse.stop();
-            sway.stop();
-        };
-    }, [pulseAnim, rotateAnim, swayAnim]);
-
-    const spin = rotateAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['0deg', '360deg'],
-    });
-
-    const leftLeafRotate = swayAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['-6deg', '5deg'],
-    });
-
-    const rightLeafRotate = swayAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['6deg', '-5deg'],
-    });
+    const spin = rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
     return (
-        <View style={styles.loaderCard}>
-            <View style={styles.loaderStage}>
+        <View style={styles.loaderOverlay}>
+            <View style={styles.loaderCard}>
                 <Animated.View style={[styles.loaderOrbit, { transform: [{ rotate: spin }] }]} />
                 <Animated.View style={[styles.loaderCore, { transform: [{ scale: pulseAnim }] }]}>
-                    <View style={styles.loaderSoil} />
-                    <View style={styles.loaderStem} />
-                    <Animated.View style={[styles.loaderLeafLeft, { transform: [{ rotate: leftLeafRotate }] }]} />
-                    <Animated.View style={[styles.loaderLeafRight, { transform: [{ rotate: rightLeafRotate }] }]} />
-                    <View style={styles.loaderCenter}>
-                        <MaterialCommunityIcons name="sprout" size={34} color="#2E7D32" />
-                    </View>
+                    <MaterialCommunityIcons name="sprout" size={38} color="#2E7D32" />
                 </Animated.View>
+                <Text style={styles.loaderTitle}>Creando tu huerto</Text>
+                <Text style={styles.loaderSubtitle}>Preparando todo, espera un momento.</Text>
             </View>
-            <Text style={styles.loaderTitle}>Sembrando tu cultivo</Text>
-            <Text style={styles.loaderSubtitle}>
-                Estamos preparando tu huerto, espera un momento.
-            </Text>
         </View>
     );
 };
 
-// ---- Main Component ----
+// ── Main Component ──
 
-export const AddCropModal: React.FC<AddCropModalProps> = ({
+export const AddHuertoModal: React.FC<AddHuertoModalProps> = ({
     visible,
     onClose,
     onSave,
-    gardenAreas,
+    regiones,
+    cultivos,
 }) => {
-    // Form state
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [imageUri, setImageUri] = useState<string | null>(null);
-    const [name, setName] = useState('');
-    const [selectedAreaId, setSelectedAreaId] = useState<string>(
-        gardenAreas[0]?.id || ''
+
+    // Huerto fields
+    const [nombre, setNombre] = useState('');
+    const [municipio, setMunicipio] = useState('');
+    const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
+    const [estado, setEstado] = useState<Huerto['estado']>('Optimo');
+    const [salud, setSalud] = useState('100');
+
+    // New region inline form
+    const [showNewRegion, setShowNewRegion] = useState(false);
+    const [newRegionNombre, setNewRegionNombre] = useState('');
+    const [newRegionActividad, setNewRegionActividad] = useState<Region['actividad']>('Media');
+
+    // Siembra (optional cultivo association)
+    const [addSiembra, setAddSiembra] = useState(false);
+    const [selectedCultivoId, setSelectedCultivoId] = useState<string | null>(null);
+    const [fechaSiembra, setFechaSiembra] = useState(
+        new Date().toISOString().split('T')[0]
     );
-    const [harvestStatus, setHarvestStatus] = useState<HarvestStatus>('Germinación');
-    const [currentDay, setCurrentDay] = useState('1');
-    const [totalDays, setTotalDays] = useState(
-        harvestDaysMap['Germinación'].toString()
-    );
-    // ── Database combos ──
-    const [regiones, setRegiones] = useState<any[]>([]);
-    const [cultivos, setCultivos] = useState<any[]>([]);
-    const [selectedRegion, setSelectedRegion] = useState<any>(null);
-    const [selectedCultivo, setSelectedCultivo] = useState<any>(null);
 
-    useEffect(() => {
-        if (visible) {
-            apiClient.get('/regiones')
-                .then((res: any) => setRegiones(res.data || []))
-                .catch((e: any) => console.log('Error regiones:', e));
-        }
-    }, [visible]);
-
-    useEffect(() => {
-        if (!visible) return;
-
-        const endpoint = selectedRegion?.id
-            ? `/cultivos?region_id=${selectedRegion.id}`
-            : '/cultivos';
-
-        apiClient.get(endpoint)
-            .then((res: any) => setCultivos(res.data || []))
-            .catch((e: any) => console.log('Error cultivos:', e));
-    }, [visible, selectedRegion?.id]);
-
-    useEffect(() => {
-        if (!selectedCultivo) return;
-
-        const cultivoActualizado = cultivos.find((cultivo: any) => cultivo.id === selectedCultivo.id);
-        if (cultivoActualizado) {
-            setSelectedCultivo(cultivoActualizado);
-        }
-    }, [cultivos, selectedCultivo]);
-
-    const [description, setDescription] = useState('');
-
-    // Watering schedule state
-    const [wateringDate, setWateringDate] = useState(new Date());
-    const [wateringFrequency, setWateringFrequency] = useState(2); // every 2 days default
-    const [showDatePicker, setShowDatePicker] = useState(false);
-
-    // Tasks state
-    const [selectedTasks, setSelectedTasks] = useState<Set<string>>(
-        new Set(['Riego', 'Fertilizar'])
-    );
-    const [customTasks, setCustomTasks] = useState<string[]>([]);
-    const [newTaskText, setNewTaskText] = useState('');
-
-    // New garden area state
-    const [showNewArea, setShowNewArea] = useState(false);
-    const [newAreaName, setNewAreaName] = useState('');
-    const [newAreaLength, setNewAreaLength] = useState('');
-    const [newAreaWidth, setNewAreaWidth] = useState('');
+    // New cultivo inline form
+    const [showNewCultivo, setShowNewCultivo] = useState(false);
+    const [newCultivoNombre, setNewCultivoNombre] = useState('');
+    const [newCultivoDificultad, setNewCultivoDificultad] = useState<Cultivo['dificultad']>('Media');
+    const [newCultivoTemporada, setNewCultivoTemporada] = useState('');
+    const [newCultivoRiego, setNewCultivoRiego] = useState('');
+    const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
+    const [recommendationResult, setRecommendationResult] =
+        useState<RecomendarCultivosResponse | null>(null);
+    const [selectedRecommendation, setSelectedRecommendation] = useState<string | null>(null);
 
     const resetForm = () => {
-        setImageUri(null);
-        setName('');
-        setSelectedAreaId(gardenAreas[0]?.id || '');
-        setHarvestStatus('Germinación');
-        setCurrentDay('1');
-        setTotalDays(harvestDaysMap['Germinación'].toString());
-        setDescription('');
-        setSelectedRegion(null);
-        setSelectedCultivo(null);
-        setWateringDate(new Date());
-        setWateringFrequency(2);
-        setShowDatePicker(false);
-        setSelectedTasks(new Set(['Riego', 'Fertilizar']));
-        setCustomTasks([]);
-        setNewTaskText('');
-        setShowNewArea(false);
-        setNewAreaName('');
-        setNewAreaLength('');
-        setNewAreaWidth('');
+        setNombre('');
+        setMunicipio('');
+        setSelectedRegionId(null);
+        setEstado('Optimo');
+        setSalud('100');
+        setShowNewRegion(false);
+        setNewRegionNombre('');
+        setNewRegionActividad('Media');
+        setAddSiembra(false);
+        setSelectedCultivoId(null);
+        setFechaSiembra(new Date().toISOString().split('T')[0]);
+        setShowNewCultivo(false);
+        setNewCultivoNombre('');
+        setNewCultivoDificultad('Media');
+        setNewCultivoTemporada('');
+        setNewCultivoRiego('');
+        setIsLoadingRecommendations(false);
+        setRecommendationResult(null);
+        setSelectedRecommendation(null);
     };
 
-    // ---- Image Picker ----
-    const pickImage = async () => {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-            Alert.alert('Permiso requerido', 'Necesitamos acceso a tu galería para seleccionar una imagen.');
-            return;
-        }
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ['images'],
-            allowsEditing: true,
-            aspect: [16, 9],
-            quality: 0.8,
-        });
-        if (!result.canceled && result.assets[0]) {
-            setImageUri(result.assets[0].uri);
-        }
-    };
-
-    const takePhoto = async () => {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-            Alert.alert('Permiso requerido', 'Necesitamos acceso a tu cámara para tomar una foto.');
-            return;
-        }
-        const result = await ImagePicker.launchCameraAsync({
-            allowsEditing: true,
-            aspect: [16, 9],
-            quality: 0.8,
-        });
-        if (!result.canceled && result.assets[0]) {
-            setImageUri(result.assets[0].uri);
-        }
-    };
-
-    // ---- Tasks ----
-    const toggleDefaultTask = (task: string) => {
-        setSelectedTasks((prev) => {
-            const next = new Set(prev);
-            if (next.has(task)) next.delete(task);
-            else next.add(task);
-            return next;
-        });
-    };
-
-    const addCustomTask = () => {
-        const trimmed = newTaskText.trim();
-        if (trimmed && !customTasks.includes(trimmed)) {
-            setCustomTasks((prev) => [...prev, trimmed]);
-            setSelectedTasks((prev) => new Set(prev).add(trimmed));
-            setNewTaskText('');
-        }
-    };
-
-    const removeCustomTask = (task: string) => {
-        setCustomTasks((prev) => prev.filter((t) => t !== task));
-        setSelectedTasks((prev) => {
-            const next = new Set(prev);
-            next.delete(task);
-            return next;
-        });
-    };
-
-    // ---- Date helpers ----
-    const formatDate = (date: Date) => {
-        const day = date.getDate().toString().padStart(2, '0');
-        const month = (date.getMonth() + 1).toString().padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}/${month}/${year}`;
-    };
-
-    const getFrequencyLabel = () => {
-        const opt = wateringFrequencyOptions.find(o => o.days === wateringFrequency);
-        return opt?.label || `Cada ${wateringFrequency} días`;
-    };
-
-    // ---- Date picker (simple day selector for web compatibility) ----
-    const adjustDate = (daysToAdd: number) => {
-        const newDate = new Date(wateringDate);
-        newDate.setDate(newDate.getDate() + daysToAdd);
-        // Don't go before today
-        if (newDate >= new Date(new Date().setHours(0, 0, 0, 0))) {
-            setWateringDate(newDate);
-        }
-    };
-
-    // ---- Handlers ----
-    const handleHarvestStatusChange = (status: HarvestStatus) => {
-        setHarvestStatus(status);
-        setTotalDays(harvestDaysMap[status].toString());
+    const isValid = () => {
+        if (!nombre.trim()) return false;
+        if (showNewRegion && !newRegionNombre.trim()) return false;
+        if (addSiembra && !selectedCultivoId && !showNewCultivo) return false;
+        if (addSiembra && showNewCultivo && !newCultivoNombre.trim()) return false;
+        return true;
     };
 
     const handleSave = async () => {
-        if (!selectedCultivo) return;
+        if (!isValid() || isSubmitting) return;
 
-        let areaId = selectedRegion?.id || 'sin-region';
-        let newArea: GardenArea | undefined;
-
-        if (showNewArea && newAreaName.trim()) {
-            newArea = {
-                id: generateId(),
-                name: newAreaName.trim(),
-                length: parseFloat(newAreaLength) || 5,
-                width: parseFloat(newAreaWidth) || 5,
-            };
-            areaId = newArea.id;
-        }
-
-        // Build task list from selected defaults + customs
-        const allTasks = [...selectedTasks].map((title) => ({
-            id: generateId(),
-            title,
-            completed: false,
-        }));
-
-        const isoDate = (d: Date) => {
-            const y = d.getFullYear();
-            const m = (d.getMonth() + 1).toString().padStart(2, '0');
-            const day = d.getDate().toString().padStart(2, '0');
-            return `${y}-${m}-${day}`;
-        };
-
-        const cropData = {
-            regionId: selectedRegion?.id,
-            cultivoId: selectedCultivo?.id,
-            name: selectedCultivo?.nombre || 'Cultivo Nuevo',
-            imageUri,
-            currentDay: parseInt(currentDay) || 1,
-            totalDays: parseInt(totalDays) || 90,
-            harvestStatus,
-            nextWatering: `${formatDate(wateringDate)} (${getFrequencyLabel()})`,
-            nextWateringISO: isoDate(wateringDate),
-            wateringFrequency,
-            tasks: allTasks,
-            description: description.trim(),
-        };
-
+        setIsSubmitting(true);
         try {
-            setIsSubmitting(true);
-            await onSave(cropData, newArea);
+            const huertoData: HuertoCreate = {
+                nombre: nombre.trim(),
+                municipio: municipio.trim(),
+                region_id: showNewRegion ? null : selectedRegionId,
+                estado,
+                salud: Math.min(100, Math.max(0, parseInt(salud) || 100)),
+            };
+
+            const newRegion: RegionCreate | undefined = showNewRegion
+                ? { nombre: newRegionNombre.trim(), actividad: newRegionActividad }
+                : undefined;
+
+            let siembraPayload: { cultivoId: string; fechaSiembra?: string } | undefined;
+            let newCultivo: CultivoCreate | undefined;
+
+            if (addSiembra) {
+                if (showNewCultivo) {
+                    newCultivo = {
+                        nombre: newCultivoNombre.trim(),
+                        dificultad: newCultivoDificultad,
+                        temporada: newCultivoTemporada.trim(),
+                        riego: newCultivoRiego.trim(),
+                    };
+                    siembraPayload = { cultivoId: '__new__', fechaSiembra };
+                } else if (selectedCultivoId) {
+                    siembraPayload = { cultivoId: selectedCultivoId, fechaSiembra };
+                }
+            }
+
+            await onSave(huertoData, siembraPayload, newRegion, newCultivo);
             resetForm();
             onClose();
+        } catch {
+            // Error handled by parent
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    const isValid = selectedCultivo !== null && selectedRegion !== null && !isSubmitting;
-    const recommendedCount = useMemo(
-        () => cultivos.filter((cultivo: any) => cultivo.es_recomendado).length,
-        [cultivos]
-    );
+    // ── Date adjustment ──
+    const adjustDate = (days: number) => {
+        const d = new Date(fechaSiembra + 'T12:00:00');
+        d.setDate(d.getDate() + days);
+        setFechaSiembra(d.toISOString().split('T')[0]);
+    };
+
+    const formatDisplayDate = (iso: string) => {
+        const [y, m, d] = iso.split('-');
+        return `${d}/${m}/${y}`;
+    };
+
+    const normalizeCultivoName = (value: string) =>
+        value
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .trim()
+            .toLowerCase();
+
+    const handleSelectRecommendation = (recommendation: RecomendacionCultivo) => {
+        const existingCultivo = cultivos.find(
+            (cultivo) =>
+                normalizeCultivoName(cultivo.nombre) ===
+                normalizeCultivoName(recommendation.cultivo)
+        );
+
+        setSelectedRecommendation(recommendation.cultivo);
+
+        if (existingCultivo) {
+            setShowNewCultivo(false);
+            setSelectedCultivoId(existingCultivo.id);
+            return;
+        }
+
+        setSelectedCultivoId(null);
+        setShowNewCultivo(true);
+        setNewCultivoNombre(recommendation.cultivo);
+        setNewCultivoDificultad('Media');
+        setNewCultivoTemporada(recommendation.temporada_ideal);
+        setNewCultivoRiego(recommendation.tecnica_riego);
+    };
+
+    const handleGetRecommendations = async () => {
+        if (isLoadingRecommendations) return;
+
+        setIsLoadingRecommendations(true);
+        try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert(
+                    'Permiso de ubicación',
+                    'Necesitamos tu ubicación para recomendar cultivos adecuados para el clima de tu zona.'
+                );
+                return;
+            }
+
+            const location = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.Balanced,
+            });
+            const { latitude, longitude } = location.coords;
+
+            let detectedMunicipio = municipio.trim();
+            try {
+                const [address] = await Location.reverseGeocodeAsync({
+                    latitude,
+                    longitude,
+                });
+                detectedMunicipio =
+                    address?.city ||
+                    address?.district ||
+                    address?.subregion ||
+                    address?.region ||
+                    detectedMunicipio;
+            } catch {
+                // Coordinates are enough for the recommendation endpoint.
+            }
+
+            if (detectedMunicipio && !municipio.trim()) {
+                setMunicipio(detectedMunicipio);
+            }
+
+            const result = await huertoService.recomendarCultivos({
+                lat: latitude,
+                lon: longitude,
+                municipio: detectedMunicipio || null,
+                huerto_id: null,
+            });
+
+            setRecommendationResult(result);
+            setSelectedRecommendation(null);
+
+            if (!result.recomendaciones.length) {
+                Alert.alert(
+                    'Sin recomendaciones',
+                    'No se encontraron cultivos recomendados para esta ubicación.'
+                );
+            }
+        } catch (error: any) {
+            console.error('[AddHuertoModal] Error recommending crops:', error);
+            Alert.alert(
+                'No se pudo recomendar',
+                error?.message || 'No fue posible obtener recomendaciones para tu ubicación.'
+            );
+        } finally {
+            setIsLoadingRecommendations(false);
+        }
+    };
 
     return (
         <Modal
             visible={visible}
             animationType="slide"
             presentationStyle="pageSheet"
-            onRequestClose={() => {
-                if (!isSubmitting) onClose();
-            }}
+            onRequestClose={() => { if (!isSubmitting) onClose(); }}
         >
             <KeyboardAvoidingView
                 style={styles.modalContainer}
@@ -483,13 +372,13 @@ export const AddCropModal: React.FC<AddCropModalProps> = ({
                     >
                         <MaterialCommunityIcons name="close" size={24} color="#9E9E9E" />
                     </TouchableOpacity>
-                    <Text style={styles.modalTitle}>Nuevo Cultivo</Text>
+                    <Text style={styles.modalTitle}>Nuevo Huerto</Text>
                     <TouchableOpacity
                         onPress={handleSave}
-                        disabled={!isValid}
+                        disabled={!isValid() || isSubmitting}
                         activeOpacity={0.7}
                     >
-                        <Text style={[styles.saveButton, !isValid && styles.saveButtonDisabled]}>
+                        <Text style={[styles.saveButton, (!isValid() || isSubmitting) && styles.saveButtonDisabled]}>
                             {isSubmitting ? 'Guardando...' : 'Guardar'}
                         </Text>
                     </TouchableOpacity>
@@ -500,236 +389,377 @@ export const AddCropModal: React.FC<AddCropModalProps> = ({
                     contentContainerStyle={styles.formContent}
                     showsVerticalScrollIndicator={false}
                 >
-                    {/* ---- Image Picker ---- */}
-                    <FieldLabel text="Imagen del cultivo" />
-                    <TouchableOpacity
-                        style={styles.imagePickerContainer}
-                        onPress={pickImage}
-                        activeOpacity={0.8}
-                    >
-                        {imageUri ? (
-                            <Image source={{ uri: imageUri }} style={styles.imagePreview} />
-                        ) : (
-                            <View style={styles.imagePlaceholder}>
-                                <MaterialCommunityIcons name="image-plus" size={40} color="#A5D6A7" />
-                                <Text style={styles.imagePlaceholderText}>Toca para agregar imagen</Text>
-                            </View>
-                        )}
-                    </TouchableOpacity>
-                    <View style={styles.imageButtonsRow}>
-                        <TouchableOpacity style={styles.imageOptionBtn} onPress={pickImage} activeOpacity={0.7}>
-                            <MaterialCommunityIcons name="image-outline" size={18} color="#4CAF50" />
-                            <Text style={styles.imageOptionText}>Galería</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.imageOptionBtn} onPress={takePhoto} activeOpacity={0.7}>
-                            <MaterialCommunityIcons name="camera-outline" size={18} color="#4CAF50" />
-                            <Text style={styles.imageOptionText}>Cámara</Text>
-                        </TouchableOpacity>
-                        {imageUri && (
-                            <TouchableOpacity
-                                style={[styles.imageOptionBtn, { borderColor: '#EF5350' }]}
-                                onPress={() => setImageUri(null)}
-                                activeOpacity={0.7}
-                            >
-                                <MaterialCommunityIcons name="delete-outline" size={18} color="#EF5350" />
-                                <Text style={[styles.imageOptionText, { color: '#EF5350' }]}>Quitar</Text>
-                            </TouchableOpacity>
-                        )}
-                    </View>
+                    {/* ── Nombre del Huerto ── */}
+                    <FieldLabel text="Nombre del huerto *" />
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Ej. Huerto La Esperanza"
+                        placeholderTextColor="#BDBDBD"
+                        value={nombre}
+                        onChangeText={setNombre}
+                    />
 
-                    {/* ---- Región Selector ---- */}
+                    {/* ── Municipio ── */}
+                    <FieldLabel text="Municipio" />
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Ej. Irapuato"
+                        placeholderTextColor="#BDBDBD"
+                        value={municipio}
+                        onChangeText={setMunicipio}
+                    />
+
+                    {/* ── Región ── */}
                     <FieldLabel text="Región" />
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        style={styles.chipsScroll}
-                    >
-                        {regiones.map((reg) => (
-                            <SelectableChip
-                                key={reg.id}
-                                label={reg.nombre}
-                                selected={selectedRegion?.id === reg.id}
-                                onPress={() => { setSelectedRegion(reg); }}
+                    {!showNewRegion ? (
+                        <>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll}>
+                                {regiones.map((r) => (
+                                    <SelectableChip
+                                        key={r.id}
+                                        label={r.nombre}
+                                        selected={selectedRegionId === r.id}
+                                        onPress={() => setSelectedRegionId(r.id)}
+                                    />
+                                ))}
+                                <TouchableOpacity
+                                    style={styles.chipAdd}
+                                    onPress={() => { setShowNewRegion(true); setSelectedRegionId(null); }}
+                                    activeOpacity={0.7}
+                                >
+                                    <MaterialCommunityIcons name="plus" size={16} color="#4CAF50" />
+                                    <Text style={styles.chipAddText}>Nueva</Text>
+                                </TouchableOpacity>
+                            </ScrollView>
+                        </>
+                    ) : (
+                        <View style={styles.inlineForm}>
+                            <View style={styles.inlineFormHeader}>
+                                <Text style={styles.inlineFormTitle}>Crear nueva región</Text>
+                                <TouchableOpacity onPress={() => setShowNewRegion(false)}>
+                                    <MaterialCommunityIcons name="close-circle" size={20} color="#EF5350" />
+                                </TouchableOpacity>
+                            </View>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Nombre de la región"
+                                placeholderTextColor="#BDBDBD"
+                                value={newRegionNombre}
+                                onChangeText={setNewRegionNombre}
                             />
-                        ))}
-                    </ScrollView>
-
-                    {/* ---- Cultivo Name (from API) ---- */}
-                    <FieldLabel text="Cultivo *" />
-                    {selectedRegion && recommendedCount > 0 && (
-                        <View style={styles.recommendationLegend}>
-                            <MaterialCommunityIcons name="leaf" size={16} color="#2E7D32" />
-                            <Text style={styles.recommendationLegendText}>
-                                Los cultivos en verde están recomendados para {selectedRegion.nombre}
-                            </Text>
+                            <Text style={styles.inlineLabel}>Actividad</Text>
+                            <View style={styles.chipsRow}>
+                                {ACTIVIDAD_REGION_OPTIONS.map((a) => (
+                                    <SelectableChip
+                                        key={a}
+                                        label={a}
+                                        selected={newRegionActividad === a}
+                                        onPress={() => setNewRegionActividad(a)}
+                                    />
+                                ))}
+                            </View>
                         </View>
                     )}
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        style={styles.chipsScroll}
-                    >
-                        {cultivos.map((cul) => (
+
+                    {/* ── Estado del Huerto ── */}
+                    <FieldLabel text="Estado del huerto" />
+                    <View style={styles.chipsRow}>
+                        {ESTADO_HUERTO_OPTIONS.map((e) => (
                             <SelectableChip
-                                key={cul.id}
-                                label={cul.nombre}
-                                selected={selectedCultivo?.id === cul.id}
-                                recommended={Boolean(cul.es_recomendado)}
-                                onPress={() => { setSelectedCultivo(cul); }}
+                                key={e}
+                                label={e}
+                                selected={estado === e}
+                                color={ESTADO_COLORS[e].bg}
+                                onPress={() => setEstado(e)}
                             />
                         ))}
-                    </ScrollView>
-
-                    {/* ---- Harvest Status ---- */}
-                    <FieldLabel text="Estado de cosecha" />
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        style={styles.chipsScroll}
-                    >
-                        {harvestStatusOptions.map((status) => (
-                            <SelectableChip
-                                key={status}
-                                label={status}
-                                selected={harvestStatus === status}
-                                onPress={() => handleHarvestStatusChange(status)}
-                            />
-                        ))}
-                    </ScrollView>
-
-                    {/* ---- Days ---- */}
-                    <View style={styles.dimensionRow}>
-                        <View style={styles.dimensionField}>
-                            <FieldLabel text="Día actual" />
-                            <TextInput
-                                style={styles.inputSmall}
-                                placeholder="1"
-                                placeholderTextColor="#BDBDBD"
-                                keyboardType="numeric"
-                                value={currentDay}
-                                onChangeText={setCurrentDay}
-                            />
-                        </View>
-                        <View style={styles.dimensionField}>
-                            <FieldLabel text="Total de días" />
-                            <TextInput
-                                style={styles.inputSmall}
-                                placeholder="90"
-                                placeholderTextColor="#BDBDBD"
-                                keyboardType="numeric"
-                                value={totalDays}
-                                onChangeText={setTotalDays}
-                            />
-                        </View>
                     </View>
 
-                    {/* ---- Watering Schedule ---- */}
-                    <FieldLabel text="Programar riego" />
-                    <View style={styles.wateringContainer}>
-                        {/* Date selector */}
-                        <View style={styles.wateringDateRow}>
-                            <MaterialCommunityIcons name="calendar" size={20} color="#4CAF50" />
-                            <Text style={styles.wateringDateLabel}>Próximo riego:</Text>
-                            <View style={styles.dateAdjuster}>
-                                <TouchableOpacity onPress={() => adjustDate(-1)} style={styles.dateArrow}>
-                                    <MaterialCommunityIcons name="chevron-left" size={22} color="#4CAF50" />
-                                </TouchableOpacity>
-                                <Text style={styles.dateText}>{formatDate(wateringDate)}</Text>
-                                <TouchableOpacity onPress={() => adjustDate(1)} style={styles.dateArrow}>
-                                    <MaterialCommunityIcons name="chevron-right" size={22} color="#4CAF50" />
+                    {/* ── Salud ── */}
+                    <FieldLabel text={`Salud del huerto: ${salud}%`} />
+                    <View style={styles.saludRow}>
+                        <TouchableOpacity
+                            style={styles.saludBtn}
+                            onPress={() => setSalud(String(Math.max(0, (parseInt(salud) || 0) - 5)))}
+                        >
+                            <MaterialCommunityIcons name="minus" size={20} color="#4CAF50" />
+                        </TouchableOpacity>
+                        <View style={styles.saludBarBg}>
+                            <View
+                                style={[
+                                    styles.saludBarFill,
+                                    {
+                                        width: `${Math.min(100, Math.max(0, parseInt(salud) || 0))}%`,
+                                        backgroundColor: ESTADO_COLORS[estado].bar,
+                                    },
+                                ]}
+                            />
+                        </View>
+                        <TouchableOpacity
+                            style={styles.saludBtn}
+                            onPress={() => setSalud(String(Math.min(100, (parseInt(salud) || 0) + 5)))}
+                        >
+                            <MaterialCommunityIcons name="plus" size={20} color="#4CAF50" />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* ── Separator ── */}
+                    <View style={styles.separator} />
+
+                    {/* ── Toggle: Add Siembra ── */}
+                    <TouchableOpacity
+                        style={styles.toggleRow}
+                        onPress={() => setAddSiembra(!addSiembra)}
+                        activeOpacity={0.7}
+                    >
+                        <MaterialCommunityIcons
+                            name={addSiembra ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                            size={24}
+                            color={addSiembra ? '#4CAF50' : '#BDBDBD'}
+                        />
+                        <Text style={styles.toggleText}>Asociar un cultivo (siembra)</Text>
+                    </TouchableOpacity>
+
+                    {addSiembra && (
+                        <View style={styles.siembraSection}>
+                            <View style={styles.recommendationPrompt}>
+                                <View style={styles.recommendationPromptText}>
+                                    <Text style={styles.recommendationTitle}>
+                                        ¿No sabes qué sembrar?
+                                    </Text>
+                                    <Text style={styles.recommendationSubtitle}>
+                                        Usa tu ubicación y el clima actual para recibir recomendaciones.
+                                    </Text>
+                                </View>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.recommendationButton,
+                                        isLoadingRecommendations && styles.recommendationButtonDisabled,
+                                    ]}
+                                    onPress={handleGetRecommendations}
+                                    disabled={isLoadingRecommendations}
+                                    activeOpacity={0.7}
+                                >
+                                    {isLoadingRecommendations ? (
+                                        <ActivityIndicator size="small" color="#fff" />
+                                    ) : (
+                                        <MaterialCommunityIcons
+                                            name="map-marker-radius"
+                                            size={18}
+                                            color="#fff"
+                                        />
+                                    )}
+                                    <Text style={styles.recommendationButtonText}>
+                                        {isLoadingRecommendations ? 'Analizando...' : 'Recomendar'}
+                                    </Text>
                                 </TouchableOpacity>
                             </View>
+
+                            {recommendationResult && (
+                                <View style={styles.recommendationsContainer}>
+                                    <View style={styles.climateSummary}>
+                                        <MaterialCommunityIcons
+                                            name="weather-partly-cloudy"
+                                            size={20}
+                                            color="#1976D2"
+                                        />
+                                        <View style={styles.climateSummaryText}>
+                                            <Text style={styles.climateCity}>
+                                                {recommendationResult.clima.ciudad}
+                                            </Text>
+                                            <Text style={styles.climateDetails}>
+                                                {Math.round(recommendationResult.clima.temp_actual)} °C ·{' '}
+                                                {recommendationResult.clima.humedad}% humedad ·{' '}
+                                                {recommendationResult.clima.descripcion}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    <Text style={styles.recommendationsHint}>
+                                        Selecciona una recomendación:
+                                    </Text>
+
+                                    {recommendationResult.recomendaciones.map((recommendation) => {
+                                        const isSelected =
+                                            selectedRecommendation === recommendation.cultivo;
+                                        const confidence = Math.round(
+                                            recommendation.confianza <= 1
+                                                ? recommendation.confianza * 100
+                                                : recommendation.confianza
+                                        );
+
+                                        return (
+                                            <TouchableOpacity
+                                                key={recommendation.cultivo}
+                                                style={[
+                                                    styles.recommendationCard,
+                                                    isSelected && styles.recommendationCardSelected,
+                                                ]}
+                                                onPress={() =>
+                                                    handleSelectRecommendation(recommendation)
+                                                }
+                                                activeOpacity={0.75}
+                                            >
+                                                <View style={styles.recommendationCardHeader}>
+                                                    <View style={styles.recommendationNameRow}>
+                                                        <MaterialCommunityIcons
+                                                            name="sprout"
+                                                            size={19}
+                                                            color="#2E7D32"
+                                                        />
+                                                        <Text style={styles.recommendationName}>
+                                                            {recommendation.cultivo}
+                                                        </Text>
+                                                    </View>
+                                                    <Text style={styles.confidenceBadge}>
+                                                        {confidence}%
+                                                    </Text>
+                                                </View>
+                                                <Text style={styles.recommendationReason}>
+                                                    {recommendation.justificacion}
+                                                </Text>
+                                                <Text style={styles.recommendationMeta}>
+                                                    {recommendation.temporada_ideal} ·{' '}
+                                                    {recommendation.rango_temperatura}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+                            )}
+
+                            {/* Cultivo selector */}
+                            <FieldLabel text="Seleccionar cultivo *" />
+                            {!showNewCultivo ? (
+                                <>
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll}>
+                                        {cultivos.map((c) => (
+                                            <SelectableChip
+                                                key={c.id}
+                                                label={c.nombre}
+                                                selected={selectedCultivoId === c.id}
+                                                onPress={() => {
+                                                    setSelectedCultivoId(c.id);
+                                                    setSelectedRecommendation(null);
+                                                }}
+                                            />
+                                        ))}
+                                        <TouchableOpacity
+                                            style={styles.chipAdd}
+                                            onPress={() => {
+                                                setShowNewCultivo(true);
+                                                setSelectedCultivoId(null);
+                                                setSelectedRecommendation(null);
+                                            }}
+                                            activeOpacity={0.7}
+                                        >
+                                            <MaterialCommunityIcons name="plus" size={16} color="#4CAF50" />
+                                            <Text style={styles.chipAddText}>Nuevo</Text>
+                                        </TouchableOpacity>
+                                    </ScrollView>
+
+                                    {/* Show selected cultivo details */}
+                                    {selectedCultivoId && (() => {
+                                        const c = cultivos.find(x => x.id === selectedCultivoId);
+                                        if (!c) return null;
+                                        return (
+                                            <View style={styles.cultivoDetails}>
+                                                <View style={styles.cultivoDetailRow}>
+                                                    <MaterialCommunityIcons name="water-outline" size={16} color="#4CAF50" />
+                                                    <Text style={styles.cultivoDetailText}>Riego: {c.riego || 'Sin especificar'}</Text>
+                                                </View>
+                                                <View style={styles.cultivoDetailRow}>
+                                                    <MaterialCommunityIcons name="speedometer" size={16} color="#FF9800" />
+                                                    <Text style={styles.cultivoDetailText}>Dificultad: {c.dificultad}</Text>
+                                                </View>
+                                                {c.temporada ? (
+                                                    <View style={styles.cultivoDetailRow}>
+                                                        <MaterialCommunityIcons name="calendar-range" size={16} color="#2196F3" />
+                                                        <Text style={styles.cultivoDetailText}>Temporada: {c.temporada}</Text>
+                                                    </View>
+                                                ) : null}
+                                            </View>
+                                        );
+                                    })()}
+                                </>
+                            ) : (
+                                <View style={styles.inlineForm}>
+                                    <View style={styles.inlineFormHeader}>
+                                        <Text style={styles.inlineFormTitle}>Crear nuevo cultivo</Text>
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                setShowNewCultivo(false);
+                                                setSelectedRecommendation(null);
+                                            }}
+                                        >
+                                            <MaterialCommunityIcons name="close-circle" size={20} color="#EF5350" />
+                                        </TouchableOpacity>
+                                    </View>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Nombre del cultivo"
+                                        placeholderTextColor="#BDBDBD"
+                                        value={newCultivoNombre}
+                                        onChangeText={setNewCultivoNombre}
+                                    />
+                                    <Text style={styles.inlineLabel}>Dificultad</Text>
+                                    <View style={styles.chipsRow}>
+                                        {DIFICULTAD_CULTIVO_OPTIONS.map((d) => (
+                                            <SelectableChip
+                                                key={d}
+                                                label={d}
+                                                selected={newCultivoDificultad === d}
+                                                onPress={() => setNewCultivoDificultad(d)}
+                                            />
+                                        ))}
+                                    </View>
+                                    <TextInput
+                                        style={[styles.input, { marginTop: 10 }]}
+                                        placeholder="Temporada (ej. Primavera-Verano)"
+                                        placeholderTextColor="#BDBDBD"
+                                        value={newCultivoTemporada}
+                                        onChangeText={setNewCultivoTemporada}
+                                    />
+                                    <TextInput
+                                        style={[styles.input, { marginTop: 10 }]}
+                                        placeholder="Riego (ej. Cada 2 días por goteo)"
+                                        placeholderTextColor="#BDBDBD"
+                                        value={newCultivoRiego}
+                                        onChangeText={setNewCultivoRiego}
+                                    />
+                                </View>
+                            )}
+
+                            {/* Fecha de siembra */}
+                            <FieldLabel text="Fecha de siembra" />
+                            <View style={styles.dateRow}>
+                                <MaterialCommunityIcons name="calendar" size={20} color="#4CAF50" />
+                                <View style={styles.dateAdjuster}>
+                                    <TouchableOpacity onPress={() => adjustDate(-1)} style={styles.dateArrow}>
+                                        <MaterialCommunityIcons name="chevron-left" size={22} color="#4CAF50" />
+                                    </TouchableOpacity>
+                                    <Text style={styles.dateText}>{formatDisplayDate(fechaSiembra)}</Text>
+                                    <TouchableOpacity onPress={() => adjustDate(1)} style={styles.dateArrow}>
+                                        <MaterialCommunityIcons name="chevron-right" size={22} color="#4CAF50" />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
                         </View>
-
-                    </View>
-
-                    {/* ---- Tasks ---- */}
-                    <FieldLabel text="Tareas del cultivo" />
-                    <View style={styles.tasksContainer}>
-                        {/* Default tasks */}
-                        {defaultCropTasks.map((task) => (
-                            <TaskCheckItem
-                                key={task}
-                                label={task}
-                                checked={selectedTasks.has(task)}
-                                onToggle={() => toggleDefaultTask(task)}
-                            />
-                        ))}
-
-                        {/* Custom tasks */}
-                        {customTasks.map((task) => (
-                            <TaskCheckItem
-                                key={task}
-                                label={task}
-                                checked={selectedTasks.has(task)}
-                                onToggle={() => toggleDefaultTask(task)}
-                                onRemove={() => removeCustomTask(task)}
-                                isCustom
-                            />
-                        ))}
-
-                        {/* Add custom task input */}
-                        <View style={styles.addTaskRow}>
-                            <TextInput
-                                style={styles.addTaskInput}
-                                placeholder="Agregar tarea personalizada..."
-                                placeholderTextColor="#BDBDBD"
-                                value={newTaskText}
-                                onChangeText={setNewTaskText}
-                                onSubmitEditing={addCustomTask}
-                                returnKeyType="done"
-                            />
-                            <TouchableOpacity
-                                onPress={addCustomTask}
-                                style={[
-                                    styles.addTaskBtn,
-                                    !newTaskText.trim() && styles.addTaskBtnDisabled,
-                                ]}
-                                disabled={!newTaskText.trim()}
-                                activeOpacity={0.7}
-                            >
-                                <MaterialCommunityIcons
-                                    name="plus"
-                                    size={20}
-                                    color={newTaskText.trim() ? '#fff' : '#C8E6C9'}
-                                />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-
-                    {/* ---- Description ---- */}
-                    <FieldLabel text="Descripción (opcional)" />
-                    <TextInput
-                        style={[styles.input, styles.textArea]}
-                        placeholder="Notas o especificaciones del cultivo..."
-                        placeholderTextColor="#BDBDBD"
-                        value={description}
-                        onChangeText={setDescription}
-                        multiline
-                        numberOfLines={3}
-                        textAlignVertical="top"
-                    />
+                    )}
 
                     <View style={{ height: 50 }} />
                 </ScrollView>
 
-                {isSubmitting && (
-                    <View style={styles.loaderOverlay}>
-                        <GrowingCropLoader />
-                    </View>
-                )}
+                {isSubmitting && <SavingLoader />}
             </KeyboardAvoidingView>
         </Modal>
     );
 };
 
-// ---- Styles ----
+// ── Styles ──
 
 const styles = StyleSheet.create({
-    modalContainer: {
-        flex: 1,
-        backgroundColor: '#fff',
-    },
+    modalContainer: { flex: 1, backgroundColor: '#fff' },
     loaderOverlay: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(241, 248, 233, 0.94)',
@@ -737,6 +767,28 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingHorizontal: 24,
     },
+    loaderCard: { alignItems: 'center', gap: 12 },
+    loaderOrbit: {
+        position: 'absolute',
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        borderWidth: 3,
+        borderColor: '#C8E6C9',
+        borderTopColor: '#4CAF50',
+    },
+    loaderCore: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#E8F5E9',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    loaderTitle: { fontSize: 18, fontWeight: '700', color: '#1B5E20' },
+    loaderSubtitle: { fontSize: 14, color: '#66BB6A', textAlign: 'center' },
+
     modalHeader: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -746,25 +798,13 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: '#F0F0F0',
     },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1B5E20',
-    },
-    saveButton: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#4CAF50',
-    },
-    saveButtonDisabled: {
-        color: '#C8E6C9',
-    },
-    formScroll: {
-        flex: 1,
-    },
-    formContent: {
-        padding: 20,
-    },
+    modalTitle: { fontSize: 18, fontWeight: '700', color: '#1B5E20' },
+    saveButton: { fontSize: 16, fontWeight: '700', color: '#4CAF50' },
+    saveButtonDisabled: { color: '#C8E6C9' },
+
+    formScroll: { flex: 1 },
+    formContent: { padding: 20 },
+
     fieldLabel: {
         fontSize: 13,
         fontWeight: '600',
@@ -782,372 +822,267 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#E0E0E0',
     },
-    inputSmall: {
-        backgroundColor: '#F5F5F5',
-        borderRadius: 12,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        fontSize: 15,
-        color: '#212121',
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-    },
-    textArea: {
-        minHeight: 80,
-        paddingTop: 14,
-    },
-
-    // Image picker
-    imagePickerContainer: {
-        borderRadius: 14,
-        overflow: 'hidden',
-        borderWidth: 2,
-        borderColor: '#E0E0E0',
-        borderStyle: 'dashed',
-    },
-    imagePreview: {
-        width: '100%',
-        height: 180,
-        resizeMode: 'cover',
-    },
-    imagePlaceholder: {
-        width: '100%',
-        height: 140,
-        backgroundColor: '#FAFAFA',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    imagePlaceholderText: {
-        fontSize: 13,
-        color: '#BDBDBD',
-        marginTop: 8,
-    },
-    imageButtonsRow: {
-        flexDirection: 'row',
-        gap: 10,
-        marginTop: 10,
-    },
-    imageOptionBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: '#C8E6C9',
-        backgroundColor: '#F1F8E9',
-    },
-    imageOptionText: {
-        fontSize: 13,
-        color: '#4CAF50',
-        fontWeight: '600',
-    },
-
-    // Loader
-    loaderCard: {
-        width: '100%',
-        maxWidth: 320,
-        backgroundColor: '#FFFFFF',
-        borderRadius: 24,
-        paddingVertical: 28,
-        paddingHorizontal: 24,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#DCECCF',
-        shadowColor: '#1B5E20',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.12,
-        shadowRadius: 18,
-        elevation: 8,
-    },
-    loaderStage: {
-        width: 136,
-        height: 136,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 14,
-        position: 'relative',
-    },
-    loaderOrbit: {
-        position: 'absolute',
-        width: 118,
-        height: 118,
-        borderRadius: 59,
-        borderWidth: 3,
-        borderColor: '#C8E6C9',
-        borderTopColor: '#4CAF50',
-        opacity: 0.9,
-    },
-    loaderCore: {
-        width: 118,
-        height: 118,
-        borderRadius: 59,
-        backgroundColor: '#F1F8E9',
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-    },
-    loaderCenter: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 3,
-    },
-    loaderSoil: {
-        position: 'absolute',
-        bottom: 24,
-        width: 58,
-        height: 12,
-        borderRadius: 8,
-        backgroundColor: '#8D6E63',
-    },
-    loaderStem: {
-        position: 'absolute',
-        bottom: 41,
-        width: 6,
-        height: 20,
-        borderRadius: 999,
-        backgroundColor: '#43A047',
-        zIndex: 1,
-    },
-    loaderLeafLeft: {
-        position: 'absolute',
-        bottom: 53,
-        left: 39,
-        width: 16,
-        height: 11,
-        borderTopLeftRadius: 16,
-        borderTopRightRadius: 3,
-        borderBottomLeftRadius: 3,
-        borderBottomRightRadius: 16,
-        backgroundColor: '#66BB6A',
-        zIndex: 2,
-    },
-    loaderLeafRight: {
-        position: 'absolute',
-        bottom: 53,
-        right: 39,
-        width: 16,
-        height: 11,
-        borderTopLeftRadius: 3,
-        borderTopRightRadius: 16,
-        borderBottomLeftRadius: 16,
-        borderBottomRightRadius: 3,
-        backgroundColor: '#81C784',
-        zIndex: 2,
-    },
-    loaderTitle: {
-        fontSize: 20,
-        fontWeight: '800',
-        color: '#1B5E20',
-        textAlign: 'center',
-    },
-    loaderSubtitle: {
-        marginTop: 8,
-        fontSize: 14,
-        lineHeight: 20,
-        color: '#4E5D52',
-        textAlign: 'center',
-    },
-
-    // Chips
-    chipsScroll: {
-        flexGrow: 0,
-        marginBottom: 4,
-    },
+    chipsScroll: { marginBottom: 4 },
+    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     chip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 9,
         borderRadius: 20,
         backgroundColor: '#F5F5F5',
-        marginRight: 8,
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: '#E0E0E0',
-    },
-    chipRecommended: {
-        backgroundColor: '#F1F8E9',
-        borderColor: '#A5D6A7',
+        marginRight: 8,
+        marginBottom: 6,
     },
     chipSelected: {
         backgroundColor: '#E8F5E9',
         borderColor: '#4CAF50',
     },
-    chipRecommendedSelected: {
-        backgroundColor: '#DCEDC8',
-        borderColor: '#2E7D32',
-    },
-    chipText: {
-        fontSize: 13,
-        color: '#757575',
-        fontWeight: '500',
-    },
-    chipTextRecommended: {
-        color: '#2E7D32',
-        fontWeight: '600',
-    },
-    chipTextSelected: {
-        color: '#4CAF50',
-        fontWeight: '600',
-    },
-    chipIcon: {
-        marginLeft: 6,
-    },
-    recommendationLegend: {
+    chipText: { fontSize: 13, color: '#616161', fontWeight: '600' },
+    chipTextSelected: { color: '#1B5E20' },
+    chipAdd: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        backgroundColor: '#F1F8E9',
-        borderRadius: 12,
         paddingHorizontal: 12,
-        paddingVertical: 10,
-        marginBottom: 10,
-        borderWidth: 1,
-        borderColor: '#C8E6C9',
+        paddingVertical: 9,
+        borderRadius: 20,
+        backgroundColor: '#F1F8E9',
+        borderWidth: 1.5,
+        borderColor: '#A5D6A7',
+        borderStyle: 'dashed',
+        gap: 4,
+        marginBottom: 6,
     },
-    recommendationLegendText: {
-        flex: 1,
-        fontSize: 12,
-        color: '#2E7D32',
-        fontWeight: '600',
-    },
+    chipAddText: { fontSize: 13, color: '#4CAF50', fontWeight: '600' },
 
-    // New area
-    newAreaContainer: {
-        backgroundColor: '#FAFAFA',
+    // Inline create forms
+    inlineForm: {
+        backgroundColor: '#F8FFF8',
         borderRadius: 12,
         padding: 14,
-        marginTop: 8,
-    },
-    dimensionRow: {
-        flexDirection: 'row',
-        gap: 12,
-        marginTop: 8,
-    },
-    dimensionField: {
-        flex: 1,
-    },
-    dimensionLabel: {
-        fontSize: 12,
-        color: '#9E9E9E',
-        marginBottom: 6,
-        fontWeight: '500',
-    },
-
-    // Watering schedule
-    wateringContainer: {
-        backgroundColor: '#F1F8E9',
-        borderRadius: 14,
-        padding: 16,
         borderWidth: 1,
         borderColor: '#C8E6C9',
     },
-    wateringDateRow: {
+    inlineFormHeader: {
         flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        gap: 8,
-        marginBottom: 14,
-    },
-    wateringDateLabel: {
-        fontSize: 14,
-        color: '#424242',
-        fontWeight: '600',
-    },
-    dateAdjuster: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginLeft: 'auto',
-        backgroundColor: '#fff',
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: '#C8E6C9',
-    },
-    dateArrow: {
-        paddingHorizontal: 6,
-        paddingVertical: 6,
-    },
-    dateText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#1B5E20',
-        paddingHorizontal: 6,
-    },
-    frequencySection: {
-        borderTopWidth: 1,
-        borderTopColor: '#C8E6C9',
-        paddingTop: 12,
-    },
-    frequencyHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
         marginBottom: 10,
     },
-    frequencyLabel: {
-        fontSize: 13,
-        color: '#424242',
-        fontWeight: '600',
-    },
+    inlineFormTitle: { fontSize: 14, fontWeight: '700', color: '#2E7D32' },
+    inlineLabel: { fontSize: 12, fontWeight: '600', color: '#616161', marginTop: 10, marginBottom: 6 },
 
-    // Tasks
-    tasksContainer: {
-        backgroundColor: '#FAFAFA',
-        borderRadius: 14,
-        padding: 12,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-    },
-    taskItem: {
+    // Estado / Salud
+    saludRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 8,
-        paddingHorizontal: 4,
-        gap: 10,
+        gap: 12,
     },
-    taskItemText: {
-        fontSize: 14,
-        color: '#424242',
-        flex: 1,
-    },
-    taskItemTextChecked: {
-        color: '#4CAF50',
-        fontWeight: '500',
-    },
-    taskRemoveBtn: {
-        padding: 2,
-    },
-    addTaskRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 8,
-        borderTopWidth: 1,
-        borderTopColor: '#EEEEEE',
-        paddingTop: 10,
-        gap: 8,
-    },
-    addTaskInput: {
-        flex: 1,
-        backgroundColor: '#fff',
-        borderRadius: 10,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        fontSize: 14,
-        color: '#212121',
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-    },
-    addTaskBtn: {
+    saludBtn: {
         width: 36,
         height: 36,
         borderRadius: 18,
-        backgroundColor: '#4CAF50',
+        backgroundColor: '#E8F5E9',
         alignItems: 'center',
         justifyContent: 'center',
     },
-    addTaskBtnDisabled: {
+    saludBarBg: {
+        flex: 1,
+        height: 10,
+        backgroundColor: '#E0E0E0',
+        borderRadius: 5,
+        overflow: 'hidden',
+    },
+    saludBarFill: {
+        height: '100%',
+        borderRadius: 5,
+    },
+
+    separator: {
+        height: 1,
+        backgroundColor: '#E0E0E0',
+        marginVertical: 20,
+    },
+
+    // Toggle row
+    toggleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingVertical: 4,
+    },
+    toggleText: { fontSize: 15, fontWeight: '600', color: '#424242' },
+
+    siembraSection: {
+        marginTop: 8,
+        paddingLeft: 4,
+    },
+
+    // Crop recommendations
+    recommendationPrompt: {
+        backgroundColor: '#F1F8E9',
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#C8E6C9',
+        padding: 14,
+        marginTop: 8,
+        marginBottom: 4,
+        gap: 12,
+    },
+    recommendationPromptText: {
+        gap: 3,
+    },
+    recommendationTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#1B5E20',
+    },
+    recommendationSubtitle: {
+        fontSize: 12,
+        lineHeight: 17,
+        color: '#558B2F',
+    },
+    recommendationButton: {
+        minHeight: 42,
+        borderRadius: 12,
+        backgroundColor: '#4CAF50',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingHorizontal: 14,
+    },
+    recommendationButtonDisabled: {
+        opacity: 0.7,
+    },
+    recommendationButtonText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    recommendationsContainer: {
+        marginTop: 12,
+        gap: 9,
+    },
+    climateSummary: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        padding: 12,
+        borderRadius: 12,
+        backgroundColor: '#E3F2FD',
+        borderWidth: 1,
+        borderColor: '#BBDEFB',
+    },
+    climateSummaryText: {
+        flex: 1,
+    },
+    climateCity: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#0D47A1',
+    },
+    climateDetails: {
+        marginTop: 2,
+        fontSize: 12,
+        color: '#1565C0',
+    },
+    recommendationsHint: {
+        marginTop: 4,
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#616161',
+    },
+    recommendationCard: {
+        padding: 12,
+        borderRadius: 12,
+        backgroundColor: '#FAFAFA',
+        borderWidth: 1.5,
+        borderColor: '#E0E0E0',
+    },
+    recommendationCardSelected: {
         backgroundColor: '#E8F5E9',
+        borderColor: '#4CAF50',
+    },
+    recommendationCardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+    },
+    recommendationNameRow: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 7,
+    },
+    recommendationName: {
+        flex: 1,
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#1B5E20',
+    },
+    confidenceBadge: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#2E7D32',
+        backgroundColor: '#DCEDC8',
+        borderRadius: 10,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+    },
+    recommendationReason: {
+        marginTop: 7,
+        fontSize: 12,
+        lineHeight: 17,
+        color: '#424242',
+    },
+    recommendationMeta: {
+        marginTop: 6,
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#558B2F',
+    },
+
+    // Cultivo details card
+    cultivoDetails: {
+        backgroundColor: '#F1F8E9',
+        borderRadius: 10,
+        padding: 12,
+        marginTop: 8,
+        gap: 6,
+    },
+    cultivoDetailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    cultivoDetailText: { fontSize: 13, color: '#424242' },
+
+    // Date selector
+    dateRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    dateAdjuster: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F5F5F5',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+        paddingVertical: 6,
+    },
+    dateArrow: { paddingHorizontal: 10, paddingVertical: 4 },
+    dateText: {
+        flex: 1,
+        textAlign: 'center',
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#1B5E20',
     },
 });
 
-export default AddCropModal;
+export default AddHuertoModal;

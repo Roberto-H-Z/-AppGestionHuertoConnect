@@ -18,7 +18,9 @@ import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../auth/services/AuthContext';
-import { perfilAgricultorService } from '../../onboarding/services/perfilAgricultorService';
+import { tokenStorage } from '../../../infrastructure/storage/tokenStorage';
+import { huertoService } from '../services/huertoService';
+
 
 // ═══════════════════════════════════════════
 // ██  TYPES
@@ -183,9 +185,11 @@ const MenuItem: React.FC<MenuItemProps> = ({ icon, label, subtitle, onPress, del
 
 export const ProfileScreen: React.FC = () => {
     const navigation = useNavigation<any>();
-    const { signOut } = useAuth();
+    const { signOut, user } = useAuth();
     const [focusKey, setFocusKey] = useState(0);
-    const [userData, setUserData] = useState<any>(null);
+    const [farmerPerfil, setFarmerPerfil] = useState('Cultivador');
+    const [accesoAgua, setAccesoAgua] = useState('Por definir');
+    const [huertosCount, setHuertosCount] = useState(0);
 
     // ── Animations ──
     const headerFade = useRef(new Animated.Value(0)).current;
@@ -193,6 +197,18 @@ export const ProfileScreen: React.FC = () => {
     const cardFade = useRef(new Animated.Value(0)).current;
     const cardSlide = useRef(new Animated.Value(40)).current;
     const logoutFade = useRef(new Animated.Value(0)).current;
+
+    // Helper to calculate active days from user registration date
+    const getActiveDays = useCallback(() => {
+        if (!user?.created_at) return 1;
+        try {
+            const diffTime = Math.abs(new Date().getTime() - new Date(user.created_at).getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays || 1;
+        } catch (err) {
+            return 1;
+        }
+    }, [user?.created_at]);
 
     // Replay all animations every time this tab gains focus
     useFocusEffect(
@@ -204,10 +220,16 @@ export const ProfileScreen: React.FC = () => {
             cardSlide.setValue(40);
             logoutFade.setValue(0);
 
-            // Fetch data
-            perfilAgricultorService.getMyProfile()
-                .then(setUserData)
-                .catch(e => console.log('Error fetching profile:', e));
+            // Fetch local preferences (perfil & agua) & get Huertos count dynamically
+            Promise.all([
+                tokenStorage.getItem('huertoconnect_farmer_perfil'),
+                tokenStorage.getItem('huertoconnect_farmer_acceso_agua'),
+                huertoService.getHuertos().catch(() => [])
+            ]).then(([perfil, agua, huertos]) => {
+                if (perfil) setFarmerPerfil(perfil);
+                if (agua) setAccesoAgua(agua);
+                setHuertosCount(huertos.length);
+            }).catch(e => console.log('Error loading local profile settings:', e));
 
             // Increment key so children (StatItem, MenuItem) also replay
             setFocusKey((k) => k + 1);
@@ -251,7 +273,7 @@ export const ProfileScreen: React.FC = () => {
                 delay: 700,
                 useNativeDriver: true,
             }).start();
-        }, [])
+        }, [user])
     );
 
     const handleLogout = async () => {
@@ -304,30 +326,30 @@ export const ProfileScreen: React.FC = () => {
 
                     {/* Name & Badge */}
                     <Text style={styles.userName}>
-                        {userData ? `${userData.nombre} ${userData.apellidos}` : 'Cargando...'}
+                        {user ? `${user.nombre} ${user.apellidos}`.trim() : 'Cargando...'}
                     </Text>
                     <View style={styles.badgeContainer}>
-                        <Text style={styles.badgeText}>{userData?.perfil || 'Cultivador'}</Text>
+                        <Text style={styles.badgeText}>{farmerPerfil}</Text>
                     </View>
 
                     {/* Stats Row */}
                     <View style={styles.statsRow}>
                         <StatItem
-                            value={userData?.cosechas_id ? 1 : 0}
-                            label="Cosechas"
+                            value={huertosCount}
+                            label="Huertos"
                             delay={300}
                             focusKey={focusKey}
                         />
                         <View style={styles.statDivider} />
                         <StatItem
-                            value={0}
+                            value={getActiveDays()}
                             label={'Días\nactivo'}
                             delay={400}
                             focusKey={focusKey}
                         />
                         <View style={styles.statDivider} />
                         <StatItem
-                            value={userData?.tips_compartidos || 0}
+                            value={0}
                             label={'Tips\ncompartidos'}
                             delay={500}
                             focusKey={focusKey}

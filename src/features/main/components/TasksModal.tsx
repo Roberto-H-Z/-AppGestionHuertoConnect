@@ -16,8 +16,24 @@ import {
     Platform,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Crop, CropTask } from '../types/cropTypes';
-import { defaultCropTasks, generateId } from '../data/cropData';
+// NOTE: This modal is currently unused — the API does not support task lists yet.
+// Types defined locally to avoid breaking the build.
+interface CropTask {
+    id: string;
+    title: string;
+    completed: boolean;
+}
+interface Crop {
+    id: string;
+    name: string;
+    tasks: CropTask[];
+}
+
+const defaultCropTasks: string[] = [
+    'Riego', 'Fertilizar', 'Podar', 'Control de plagas',
+    'Deshierbar', 'Abonar', 'Trasplantar', 'Cosechar',
+];
+const generateId = (): string => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 interface TasksModalProps {
     visible: boolean;

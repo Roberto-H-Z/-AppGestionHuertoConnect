@@ -65,6 +65,8 @@ export const OtpVerificationScreen: React.FC = () => {
         }, [])
     );
 
+
+
     // Timer logic
     useEffect(() => {
         let interval: NodeJS.Timeout;
@@ -122,11 +124,16 @@ export const OtpVerificationScreen: React.FC = () => {
                 // Registro o Login guardan el token y acceden a la app
                 await signIn(result.token);
 
+                // Por el momento, se salta el onboarding (configuración del perfil del agricultor)
+                // y se manda al usuario directamente al Home ('Main'). Se preserva el código para el futuro.
+                /*
                 if (tipo === 'registro') {
                     navigation.replace('FarmerProfile');
                 } else {
                     navigation.replace('Main');
                 }
+                */
+                navigation.replace('Main');
             } else {
                 setError('Respuesta inesperada del servidor.');
             }
@@ -147,6 +154,7 @@ export const OtpVerificationScreen: React.FC = () => {
             const result = await authService.resendOtp(currentChallengeId);
             setCurrentChallengeId(result.challengeId);
             setResendCooldown(RESEND_COOLDOWN);
+
             setOtp(Array(OTP_LENGTH).fill(''));
             inputRefs.current[0]?.focus();
         } catch (err: any) {

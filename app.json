@@ -28,7 +28,13 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Permite a HuertoConnect usar tu ubicación para recomendar cultivos adecuados para tu zona."
+        }
+      ]
     ]
   }
 }

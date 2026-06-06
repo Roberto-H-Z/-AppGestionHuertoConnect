@@ -86,11 +86,17 @@ export const ForgotPasswordScreen: React.FC = () => {
         try {
             const result = await authService.forgotPassword(email);
 
-            navigation.navigate('OtpVerification', {
-                challengeId: result.challengeId,
-                email: email,
-                tipo: 'reset-password'
-            });
+            if (result.challengeId) {
+                navigation.navigate('OtpVerification', {
+                    challengeId: result.challengeId,
+                    email: email,
+                    tipo: 'reset-password'
+                });
+            } else {
+                // Anti-enumeración: el servidor siempre responde 200
+                // pero si no hay challengeId, mostramos mensaje genérico
+                setError(result.message || 'Si el correo existe, recibirás un código de verificación.');
+            }
         } catch (err: any) {
             setError(err.message || 'Error al solicitar el cambio de contraseña');
         } finally {

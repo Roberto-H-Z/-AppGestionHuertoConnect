@@ -1,7 +1,5 @@
 export { EmptyState } from './EmptyState';
-export { CropCard } from './CropCard';
-export { AddCropModal } from './AddCropModal';
-export { WateringModal } from './WateringModal';
+export { HuertoCard } from './CropCard';
+export { AddHuertoModal } from './AddCropModal';
 export { WeatherModal } from './WeatherModal';
-export { TasksModal } from './TasksModal';
 export { NotificationsModal } from './NotificationsModal';

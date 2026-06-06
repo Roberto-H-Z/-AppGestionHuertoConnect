@@ -3,7 +3,7 @@
  * badge, and editable fields. Static demo with mock data.
  */
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -15,14 +15,15 @@ import {
     Platform,
     Animated,
     KeyboardAvoidingView,
+    Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { perfilAgricultorService } from '../../onboarding/services/perfilAgricultorService';
-import { useCallback } from 'react';
-
-
+import { useAuth } from '../../auth/services/AuthContext';
+import { tokenStorage } from '../../../infrastructure/storage/tokenStorage';
+import { apiClient } from '../../../infrastructure/api/apiClient';
 
 // ═══════════════════════════════════════════
 // ██  MAIN SCREEN
@@ -30,38 +31,44 @@ import { useCallback } from 'react';
 
 export const EditProfileScreen: React.FC = () => {
     const navigation = useNavigation<any>();
+    const { user, checkSession } = useAuth();
 
     // ── Form state ──
-    const [userData, setUserData] = useState<any>(null);
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [perfil, setPerfil] = useState('');
     const [accesoAgua, setAccesoAgua] = useState('');
     const [createdAt, setCreatedAt] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
 
     useFocusEffect(
         useCallback(() => {
-            perfilAgricultorService.getMyProfile()
-                .then(data => {
-                    setUserData(data);
-                    setName(`${data.nombre} ${data.apellidos}`);
-                    setEmail(data.correo || '');
-                    setPerfil(data.perfil || '');
-                    setAccesoAgua(data.acceso_agua || '');
-                    
-                    if (data.created_at) {
-                        try {
-                            const date = new Date(data.created_at);
-                            setCreatedAt(date.toLocaleDateString());
-                        } catch (err) {
-                            setCreatedAt(data.created_at);
-                        }
-                    } else {
-                        setCreatedAt('');
-                    }
-                })
-                .catch(e => console.log('Error fetching user for edit profile:', e));
-        }, [])
+            // Load user data from context
+            if (user) {
+                setName(`${user.nombre} ${user.apellidos}`.trim());
+                setEmail(user.email || '');
+
+                if (user.created_at) {
+                    const date = new Date(user.created_at);
+                    setCreatedAt(
+                        Number.isNaN(date.getTime())
+                            ? user.created_at
+                            : date.toLocaleDateString('es-MX')
+                    );
+                } else {
+                    setCreatedAt('');
+                }
+            }
+
+            // Load local farmer settings
+            Promise.all([
+                tokenStorage.getItem('huertoconnect_farmer_perfil'),
+                tokenStorage.getItem('huertoconnect_farmer_acceso_agua')
+            ]).then(([perf, agua]) => {
+                setPerfil(perf || 'Cultivador');
+                setAccesoAgua(agua || 'Por definir');
+            }).catch(e => console.log('Error loading local profile config:', e));
+        }, [user])
     );
 
     // ── Animations ──
@@ -113,6 +120,46 @@ export const EditProfileScreen: React.FC = () => {
         }).start();
     }, []);
 
+    const handleSave = async () => {
+        if (!name.trim()) {
+            Alert.alert('Error', 'El nombre completo no puede estar vacío.');
+            return;
+        }
+        setIsSaving(true);
+        try {
+            // Split name into nombre and apellidos
+            const parts = name.trim().split(/\s+/);
+            const nombre = parts[0] || '';
+            const apellidos = parts.slice(1).join(' ') || '';
+
+            // 1. Update Core User details in backend using PATCH /api/usuarios/{user_id}
+            if (user?.id) {
+                await apiClient.patch(`/usuarios/${user.id}`, {
+                    nombre,
+                    apellidos,
+                    email: email.trim() || undefined
+                });
+            }
+
+            // 2. Update local storage for farmer-specific fields
+            await Promise.all([
+                tokenStorage.setItem('huertoconnect_farmer_perfil', perfil.trim()),
+                tokenStorage.setItem('huertoconnect_farmer_acceso_agua', accesoAgua.trim())
+            ]);
+
+            // 3. Refresh user session in context
+            await checkSession();
+
+            Alert.alert('Éxito', 'Perfil actualizado correctamente.');
+            navigation.goBack();
+        } catch (error: any) {
+            console.error('Error saving profile changes:', error);
+            Alert.alert('Error', error?.message || 'No se pudieron guardar los cambios.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
@@ -153,7 +200,7 @@ export const EditProfileScreen: React.FC = () => {
                         <View style={styles.avatarWrapper}>
                             <View style={styles.avatarCircle}>
                                 <Text style={styles.avatarInitials}>
-                                    {userData ? `${userData.nombre?.[0] || ''}${userData.apellidos?.[0] || ''}`.toUpperCase() : ''}
+                                    {user ? `${user.nombre?.[0] || ''}${user.apellidos?.[0] || ''}`.toUpperCase() : ''}
                                 </Text>
                             </View>
                             <View style={styles.cameraBadge}>
@@ -165,7 +212,7 @@ export const EditProfileScreen: React.FC = () => {
                             </View>
                         </View>
                         <Text style={styles.badgeText}>
-                            {userData?.perfil || 'Cultivador'}
+                            {perfil || 'Cultivador'}
                         </Text>
                     </Animated.View>
 
@@ -237,10 +284,11 @@ export const EditProfileScreen: React.FC = () => {
                         <View style={styles.fieldGroup}>
                             <Text style={styles.fieldLabel}>Miembro desde</Text>
                             <TextInput
-                                style={styles.textInput}
+                                style={[styles.textInput, { color: '#9E9E9E' }]}
                                 value={createdAt}
                                 placeholder="..."
                                 placeholderTextColor="#BDBDBD"
+                                editable={false}
                             />
                         </View>
                     </Animated.View>
@@ -248,17 +296,25 @@ export const EditProfileScreen: React.FC = () => {
                     {/* ── Save Button ── */}
                     <Animated.View style={{ opacity: buttonFade }}>
                         <TouchableOpacity
-                            style={styles.saveButton}
+                            style={[styles.saveButton, isSaving && { opacity: 0.7 }]}
                             activeOpacity={0.8}
+                            onPress={handleSave}
+                            disabled={isSaving}
                         >
-                            <MaterialCommunityIcons
-                                name="content-save-outline"
-                                size={20}
-                                color="#fff"
-                            />
-                            <Text style={styles.saveButtonText}>
-                                Guardar Cambios
-                            </Text>
+                            {isSaving ? (
+                                <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                                <>
+                                    <MaterialCommunityIcons
+                                        name="content-save-outline"
+                                        size={20}
+                                        color="#fff"
+                                    />
+                                    <Text style={styles.saveButtonText}>
+                                        Guardar Cambios
+                                    </Text>
+                                </>
+                            )}
                         </TouchableOpacity>
                     </Animated.View>
 
