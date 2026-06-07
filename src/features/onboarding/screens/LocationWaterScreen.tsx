@@ -197,7 +197,7 @@ export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation
                         <MaterialCommunityIcons
                             name="arrow-left"
                             size={24}
-                            color="#1B5E20"
+                            color="#111827"
                         />
                     </TouchableOpacity>
                 </Animated.View>
@@ -245,12 +245,12 @@ export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation
                             activeOpacity={0.8}
                         >
                             {isLoadingLocation ? (
-                                <ActivityIndicator size="small" color="#4CAF50" />
+                                <ActivityIndicator size="small" color="#059669" />
                             ) : (
                                 <MaterialCommunityIcons
                                     name="crosshairs-gps"
                                     size={22}
-                                    color="#4CAF50"
+                                    color="#059669"
                                 />
                             )}
                             <Text style={styles.gpsButtonText}>
@@ -272,7 +272,7 @@ export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation
                             <MaterialCommunityIcons
                                 name="map-marker-outline"
                                 size={20}
-                                color="#66BB6A"
+                                color="#6B7280"
                                 style={styles.inputIcon}
                             />
                             <TextInput
@@ -280,7 +280,7 @@ export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation
                                 value={locationText}
                                 onChangeText={handleManualLocation}
                                 placeholder="Ej: Col. Centro, Cosamaloapan, Ver."
-                                placeholderTextColor="#A5D6A7"
+                                placeholderTextColor="#9CA3AF"
                             />
                         </View>
 
@@ -289,7 +289,7 @@ export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation
                                 <MaterialCommunityIcons
                                     name="check-circle"
                                     size={18}
-                                    color="#4CAF50"
+                                    color="#059669"
                                 />
                                 <Text style={styles.checkText}>Ubicación registrada</Text>
                             </View>
@@ -331,7 +331,7 @@ export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation
                                     <MaterialCommunityIcons
                                         name={option.icon as any}
                                         size={24}
-                                        color={selectedWater === option.type ? '#fff' : '#4CAF50'}
+                                        color={selectedWater === option.type ? '#fff' : '#059669'}
                                     />
                                 </View>
                                 <View style={styles.waterTextContainer}>
@@ -351,7 +351,7 @@ export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation
                                     <MaterialCommunityIcons
                                         name="check-circle"
                                         size={22}
-                                        color="#4CAF50"
+                                        color="#059669"
                                         style={styles.waterCheck}
                                     />
                                 )}
@@ -382,7 +382,7 @@ export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#E8F5E9',
+        backgroundColor: '#FAFAFA',
     },
     scrollContent: {
         flexGrow: 1,
@@ -411,8 +411,8 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 24,
-        fontWeight: '700',
-        color: '#1B5E20',
+        fontWeight: '800',
+        color: '#111827',
         lineHeight: 32,
     },
     contentContainer: {
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: '#E8F5E9',
+        backgroundColor: '#FAFAFA',
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 10,
@@ -449,11 +449,11 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#1B5E20',
+        color: '#111827',
     },
     sectionSubtitle: {
         fontSize: 14,
-        color: '#66BB6A',
+        color: '#6B7280',
         marginBottom: 16,
     },
 
@@ -462,18 +462,18 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#E8F5E9',
+        backgroundColor: '#FFFFFF',
         borderRadius: 12,
         padding: 14,
         borderWidth: 1.5,
-        borderColor: '#4CAF50',
+        borderColor: '#E5E7EB',
         borderStyle: 'dashed',
         gap: 10,
     },
     gpsButtonText: {
         fontSize: 15,
         fontWeight: '600',
-        color: '#2E7D32',
+        color: '#059669',
     },
 
     // Separador
@@ -485,10 +485,10 @@ const styles = StyleSheet.create({
     separatorLine: {
         flex: 1,
         height: 1,
-        backgroundColor: '#C8E6C9',
+        backgroundColor: '#E5E7EB',
     },
     separatorText: {
-        color: '#A5D6A7',
+        color: '#9CA3AF',
         fontSize: 12,
         paddingHorizontal: 12,
     },
@@ -498,9 +498,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         borderWidth: 1.5,
-        borderColor: '#4CAF50',
+        borderColor: '#E5E7EB',
         borderRadius: 12,
-        backgroundColor: '#FAFFF5',
+        backgroundColor: '#FFFFFF',
         paddingHorizontal: 12,
     },
     inputIcon: {
@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingVertical: 12,
         fontSize: 14,
-        color: '#2E7D32',
+        color: '#059669',
     },
 
     // Check
@@ -522,7 +522,7 @@ const styles = StyleSheet.create({
     },
     checkText: {
         fontSize: 13,
-        color: '#4CAF50',
+        color: '#059669',
         fontWeight: '500',
     },
 
@@ -530,28 +530,28 @@ const styles = StyleSheet.create({
     waterCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FAFFF5',
+        backgroundColor: '#FFFFFF',
         borderRadius: 14,
         padding: 14,
         marginBottom: 10,
         borderWidth: 2,
-        borderColor: 'transparent',
+        borderColor: '#F3F4F6',
     },
     waterCardSelected: {
-        borderColor: '#4CAF50',
-        backgroundColor: '#f1f8f4',
+        borderColor: '#059669',
+        backgroundColor: '#ECFDF5',
     },
     waterIconContainer: {
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: '#E8F5E9',
+        backgroundColor: '#FAFAFA',
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 14,
     },
     waterIconSelected: {
-        backgroundColor: '#4CAF50',
+        backgroundColor: '#059669',
     },
     waterTextContainer: {
         flex: 1,
@@ -559,15 +559,15 @@ const styles = StyleSheet.create({
     waterLabel: {
         fontSize: 15,
         fontWeight: '600',
-        color: '#1B5E20',
+        color: '#111827',
         marginBottom: 2,
     },
     waterDescription: {
         fontSize: 13,
-        color: '#66BB6A',
+        color: '#6B7280',
     },
     waterLabelSelected: {
-        color: '#2E7D32',
+        color: '#059669',
     },
     waterCheck: {
         marginLeft: 8,

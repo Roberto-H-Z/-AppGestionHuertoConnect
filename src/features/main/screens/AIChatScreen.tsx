@@ -92,7 +92,7 @@ const fetchCurrentWeather = async (lat: number, lon: number): Promise<WeatherInf
 // ══════════════════════════════════════════════════════
 
 type ChatMode = 'chat' | 'cultivos' | 'plagas';
-type MessageType = 'text' | 'cultivos_result' | 'plagas_result' | 'error' | 'system';
+type MessageType = 'text' | 'cultivos_result' | 'plagas_result' | 'treatments_result' | 'error' | 'system';
 
 interface WeatherInfo {
     temperature: number;
@@ -114,6 +114,8 @@ interface Message {
     cultivosData?: CultivoRecomendado[];
     plagasData?: PlagaDetectada[];
     imagenUrl?: string;
+    treatmentsData?: any[];
+    pestName?: string;
     municipio?: string;
     region?: string;
     weatherInfo?: WeatherInfo;
@@ -205,6 +207,10 @@ const extractCultivos = (data: unknown): CultivoRecomendado[] => {
 
 const extractPlagas = (data: unknown): PlagaDetectada[] => {
     const d = data as Record<string, unknown>;
+    // El modelo YOLOv8 retorna un objeto simple bajo la clave "deteccion"
+    if (d?.deteccion && typeof d.deteccion === 'object' && !Array.isArray(d.deteccion)) {
+        return [d.deteccion as PlagaDetectada];
+    }
     const list = d?.detecciones || d?.plagas || d?.results || d?.resultado || d?.data;
     return Array.isArray(list) ? list.slice(0, 6) : Array.isArray(data) ? (data as PlagaDetectada[]).slice(0, 6) : [];
 };
@@ -347,7 +353,7 @@ const CultivosCard: React.FC<{ cultivos: CultivoRecomendado[]; municipio?: strin
 //  TARJETA PLAGAS
 // ══════════════════════════════════════════════════════
 
-const PlagasCard: React.FC<{ plagas: PlagaDetectada[]; imagenUrl?: string }> = ({ plagas, imagenUrl }) => (
+const PlagasCard: React.FC<{ plagas: PlagaDetectada[]; imagenUrl?: string; onAction?: (action: string, payload: any) => void }> = ({ plagas, imagenUrl, onAction }) => (
     <View style={[styles.resultCard, styles.resultCardPlagas]}>
         <View style={styles.resultCardHeader}>
             <View style={styles.resultCardIconOrange}>
@@ -366,7 +372,7 @@ const PlagasCard: React.FC<{ plagas: PlagaDetectada[]; imagenUrl?: string }> = (
         {plagas.length === 0 ? (
             <View style={styles.plagaOk}>
                 <MaterialCommunityIcons name="shield-check-outline" size={32} color="#4CAF50" />
-                <Text style={styles.plagaOkText}>No se detectaron plagas ✅{'\n'}La planta parece sana</Text>
+                <Text style={styles.plagaOkText}>No se detectaron plagas ✅ (V2){'\n'}La planta parece sana</Text>
             </View>
         ) : plagas.map((p, i) => {
             const conf = getConfianzaPct(p.confianza ?? p.confidence ?? p.score);
@@ -384,7 +390,18 @@ const PlagasCard: React.FC<{ plagas: PlagaDetectada[]; imagenUrl?: string }> = (
                             <View style={[styles.confBarFill, { width: `${pct}%` as any, backgroundColor: barColor }]} />
                         </View>
                     )}
-                    {p.tratamiento ? <Text style={styles.plagaTratamiento}>Tratamiento: {String(p.tratamiento)}</Text> : null}
+                    {p.tratamientos_ecologicos && p.tratamientos_ecologicos.length > 0 ? (
+                        <TouchableOpacity 
+                            style={styles.actionBtn}
+                            onPress={() => onAction && onAction('show_treatments', p)}
+                            activeOpacity={0.7}
+                        >
+                            <MaterialCommunityIcons name="leaf-circle-outline" size={16} color="#059669" />
+                            <Text style={styles.actionBtnText}>Ver tratamientos ecológicos</Text>
+                        </TouchableOpacity>
+                    ) : p.tratamiento ? (
+                        <Text style={styles.plagaTratamiento}>Tratamiento: {String(p.tratamiento)}</Text>
+                    ) : null}
                 </View>
             );
         })}
@@ -392,10 +409,73 @@ const PlagasCard: React.FC<{ plagas: PlagaDetectada[]; imagenUrl?: string }> = (
 );
 
 // ══════════════════════════════════════════════════════
+//  TARJETA TRATAMIENTOS
+// ══════════════════════════════════════════════════════
+
+const TreatmentsCard: React.FC<{ treatments: any[]; pestName: string }> = ({ treatments, pestName }) => (
+    <View style={[styles.resultCard, { borderColor: '#A7F3D0', shadowColor: '#059669' }]}>
+        <View style={styles.resultCardHeader}>
+            <View style={[styles.resultCardIconOrange, { backgroundColor: '#059669' }]}>
+                <MaterialCommunityIcons name="leaf" size={16} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+                <Text style={[styles.resultCardTitle, { color: '#059669' }]}>Tratamientos Ecológicos</Text>
+                <Text style={styles.resultCardSub}>Para {pestName}</Text>
+            </View>
+        </View>
+
+        {treatments.map((t, i) => (
+            <View key={i} style={[styles.plagaItem, { backgroundColor: '#F0FDF4', borderColor: '#D1FAE5' }]}>
+                <View style={[styles.plagaItemHeader, { marginBottom: 4 }]}>
+                    <MaterialCommunityIcons name="shield-check" size={16} color="#059669" />
+                    <Text style={[styles.plagaName, { color: '#065F46', flex: 1 }]}>{t.nombre || 'Tratamiento'}</Text>
+                    {t.tipo ? (
+                        <View style={styles.badge}>
+                            <Text style={styles.badgeText}>{String(t.tipo).toUpperCase()}</Text>
+                        </View>
+                    ) : null}
+                </View>
+                {t.descripcion ? <Text style={styles.plagaTratamiento}>{t.descripcion}</Text> : null}
+                {t.aplicacion ? (
+                    <View style={styles.treatmentUsage}>
+                        <MaterialCommunityIcons name="water-pump" size={14} color="#059669" />
+                        <Text style={styles.treatmentUsageText}>{t.aplicacion}</Text>
+                    </View>
+                ) : null}
+                {t.frecuencia ? (
+                    <View style={[styles.treatmentUsage, { marginTop: 4 }]}>
+                        <MaterialCommunityIcons name="calendar-clock" size={14} color="#059669" />
+                        <Text style={styles.treatmentUsageText}>{t.frecuencia}</Text>
+                    </View>
+                ) : null}
+            </View>
+        ))}
+    </View>
+);
+
+// ══════════════════════════════════════════════════════
+//  TEXTO CON FORMATO (SIMPLE MARKDOWN)
+// ══════════════════════════════════════════════════════
+
+const FormattedText: React.FC<{ text: string; style: any }> = ({ text, style }) => {
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return (
+        <Text style={style}>
+            {parts.map((part, i) => {
+                if (part.startsWith('**') && part.endsWith('**')) {
+                    return <Text key={i} style={{ fontWeight: 'bold', color: '#047857' }}>{part.slice(2, -2)}</Text>;
+                }
+                return <Text key={i}>{part}</Text>;
+            })}
+        </Text>
+    );
+};
+
+// ══════════════════════════════════════════════════════
 //  BURBUJA DE MENSAJE
 // ══════════════════════════════════════════════════════
 
-const MessageBubble: React.FC<{ msg: Message; accentColor: string }> = ({ msg, accentColor }) => {
+const MessageBubble: React.FC<{ msg: Message; accentColor: string; onAction?: (action: string, payload: any) => void }> = ({ msg, accentColor, onAction }) => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(msg.sender === 'user' ? 16 : -16)).current;
 
@@ -426,7 +506,10 @@ const MessageBubble: React.FC<{ msg: Message; accentColor: string }> = ({ msg, a
                     <CultivosCard cultivos={msg.cultivosData} municipio={msg.municipio} region={msg.region} weatherInfo={msg.weatherInfo} />
                 )}
                 {msg.type === 'plagas_result' && msg.plagasData && (
-                    <PlagasCard plagas={msg.plagasData} imagenUrl={msg.imagenUrl} />
+                    <PlagasCard plagas={msg.plagasData} imagenUrl={msg.imagenUrl} onAction={onAction} />
+                )}
+                {msg.type === 'treatments_result' && msg.treatmentsData && msg.pestName && (
+                    <TreatmentsCard treatments={msg.treatmentsData} pestName={msg.pestName} />
                 )}
                 {(msg.type === 'text' || msg.type === 'error' || msg.type === 'system') && (
                     <View style={[
@@ -434,9 +517,16 @@ const MessageBubble: React.FC<{ msg: Message; accentColor: string }> = ({ msg, a
                         isUser ? [styles.userBubble, { backgroundColor: accentColor }] : styles.aiBubble,
                         msg.type === 'error' && styles.errorBubble,
                     ]}>
-                        <Text style={[styles.msgText, isUser ? styles.userMsgText : styles.aiMsgText]}>
-                            {msg.text}
-                        </Text>
+                        {isUser ? (
+                            <Text style={[styles.msgText, styles.userMsgText]}>
+                                {msg.text}
+                            </Text>
+                        ) : (
+                            <FormattedText 
+                                text={msg.text} 
+                                style={[styles.msgText, styles.aiMsgText, msg.type === 'error' && { color: '#B91C1C' }]} 
+                            />
+                        )}
                     </View>
                 )}
                 <Text style={[styles.msgTime, isUser && { textAlign: 'right' }]}>{time}</Text>
@@ -568,6 +658,42 @@ export const AIChatScreen: React.FC = () => {
         setMessages(prev => [...prev, { ...msg, id: `${Date.now()}-${Math.random()}`, timestamp: new Date() }]);
         scrollToBottom();
     }, [scrollToBottom]);
+
+    const handleAction = useCallback((action: string, payload: any) => {
+        if (action === 'show_treatments') {
+            const p = payload as PlagaDetectada;
+            const pestName = p.plaga || p.clase || p.label || p.name || 'la plaga';
+            
+            // Mensaje del usuario preguntando
+            const userText = `¿Cómo puedo tratar ${pestName}?`;
+            addMessage({ text: userText, sender: 'user', type: 'text' });
+            
+            // Respuesta de la IA con los tratamientos
+            setTimeout(() => {
+                setIsTyping(true);
+                setTimeout(() => {
+                    if (p.tratamientos_ecologicos && Array.isArray(p.tratamientos_ecologicos)) {
+                        addMessage({ 
+                            text: 'Tratamientos encontrados.', 
+                            sender: 'ai', 
+                            type: 'treatments_result', 
+                            treatmentsData: p.tratamientos_ecologicos, 
+                            pestName 
+                        });
+                    } else if (p.tratamiento) {
+                        addMessage({ 
+                            text: `Aquí tienes una recomendación para tratar **${pestName}**:\n\n${p.tratamiento}`, 
+                            sender: 'ai', 
+                            type: 'text' 
+                        });
+                    } else {
+                        addMessage({ text: 'Lo siento, no encontré tratamientos específicos en la base de datos.', sender: 'ai', type: 'text' });
+                    }
+                    setIsTyping(false);
+                }, 1000);
+            }, 500);
+        }
+    }, [addMessage]);
 
     const persistMessage = useCallback(async (texto: string, rol: 'user' | 'assistant', currentId: string | null): Promise<string | null> => {
         try {
@@ -762,7 +888,7 @@ export const AIChatScreen: React.FC = () => {
                     keyboardShouldPersistTaps="handled"
                 >
                     {messages.map(msg => (
-                        <MessageBubble key={msg.id} msg={msg} accentColor={modeConfig.color} />
+                        <MessageBubble key={msg.id} msg={msg} accentColor={modeConfig.color} onAction={handleAction} />
                     ))}
 
                     {/* Chips de acciones rápidas */}
@@ -906,20 +1032,20 @@ const styles = StyleSheet.create({
     },
     msgContentWrapper: { flex: 1, maxWidth: width * 0.74, gap: 4 },
 
-    msgBubble: { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
+    msgBubble: { borderRadius: 20, paddingHorizontal: 16, paddingVertical: 12 },
     userBubble: { borderBottomRightRadius: 5 },
     aiBubble: {
-        backgroundColor: '#FFFFFF', borderBottomLeftRadius: 5,
-        borderWidth: 1, borderColor: '#EDEDED',
-        elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3,
+        backgroundColor: '#F0FDF4', borderBottomLeftRadius: 5,
+        borderWidth: 1, borderColor: '#D1FAE5',
+        elevation: 1, shadowColor: '#059669', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4,
     },
     errorBubble: {
         backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderBottomLeftRadius: 5,
     },
-    msgText: { fontSize: 14, lineHeight: 22, letterSpacing: -0.1 },
+    msgText: { fontSize: 14.5, lineHeight: 22, letterSpacing: -0.1 },
     userMsgText: { color: '#FFFFFF', fontWeight: '500' },
-    aiMsgText: { color: '#1F2937' },
-    msgTime: { fontSize: 10, color: '#D1D5DB', marginTop: 2, letterSpacing: 0.2 },
+    aiMsgText: { color: '#111827' },
+    msgTime: { fontSize: 10, color: '#D1D5DB', marginTop: 4, letterSpacing: 0.2 },
 
     // ── Typing indicator ─────────────────────────────────────────────────
     typingRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
@@ -1014,7 +1140,17 @@ const styles = StyleSheet.create({
     plagaConf: { fontSize: 12, color: '#DC2626', fontWeight: '700' },
     confBar: { height: 4, backgroundColor: '#FEE2E2', borderRadius: 2, overflow: 'hidden' },
     confBarFill: { height: 4, borderRadius: 2 },
-    plagaTratamiento: { fontSize: 11, color: '#6B7280', lineHeight: 16 },
+    plagaTratamiento: { fontSize: 13, color: '#4B5563', lineHeight: 18, marginTop: 10 },
+    actionBtn: { 
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+        backgroundColor: '#ECFDF5', paddingVertical: 8, paddingHorizontal: 14, 
+        borderRadius: 8, marginTop: 12, borderWidth: 1, borderColor: '#D1FAE5'
+    },
+    actionBtnText: { fontSize: 12.5, fontWeight: '600', color: '#059669' },
+    badge: { backgroundColor: '#D1FAE5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+    badgeText: { fontSize: 9, fontWeight: '700', color: '#059669' },
+    treatmentUsage: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 8 },
+    treatmentUsageText: { fontSize: 12, color: '#065F46', flex: 1, lineHeight: 16 },
 
     // ── History modal ────────────────────────────────────────────────────
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },

@@ -18,7 +18,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onAddHuerto }) => {
                 <MaterialCommunityIcons
                     name="sprout-outline"
                     size={60}
-                    color="#66BB6A"
+                    color="#059669"
                 />
             </View>
             <Text style={styles.title}>¡Bienvenido a tu huerto!</Text>
@@ -49,23 +49,23 @@ const styles = StyleSheet.create({
         width: 120,
         height: 120,
         borderRadius: 60,
-        backgroundColor: '#E8F5E9',
+        backgroundColor: '#ECFDF5',
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 24,
         borderWidth: 2,
-        borderColor: '#C8E6C9',
+        borderColor: '#D1FAE5',
     },
     title: {
         fontSize: 22,
-        fontWeight: '700',
-        color: '#1B5E20',
+        fontWeight: '800',
+        color: '#111827',
         marginBottom: 8,
         textAlign: 'center',
     },
     subtitle: {
         fontSize: 14,
-        color: '#66BB6A',
+        color: '#6B7280',
         textAlign: 'center',
         lineHeight: 20,
         marginBottom: 32,
@@ -73,14 +73,14 @@ const styles = StyleSheet.create({
     addButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#4CAF50',
+        backgroundColor: '#059669',
         paddingVertical: 14,
         paddingHorizontal: 28,
         borderRadius: 14,
         gap: 8,
-        shadowColor: '#4CAF50',
+        shadowColor: '#059669',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
+        shadowOpacity: 0.25,
         shadowRadius: 8,
         elevation: 6,
     },

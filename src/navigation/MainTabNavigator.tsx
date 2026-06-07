@@ -112,7 +112,7 @@ const PulseRing: React.FC<{ delay: number; active: boolean }> = ({ delay, active
                 height: CENTER_BUTTON_SIZE,
                 borderRadius: CENTER_BUTTON_SIZE / 2,
                 borderWidth: 2,
-                borderColor: '#66BB6A',
+                borderColor: '#059669',
                 opacity,
                 transform: [{ scale }],
             }}
@@ -200,7 +200,7 @@ const CenterButtonAnimated: React.FC<{ active: boolean }> = ({ active }) => {
     });
     const btnBg = colorAnim.interpolate({
         inputRange: [0, 1, 2, 3],
-        outputRange: ['#4CAF50', '#43A047', '#2E7D32', '#4CAF50'],
+        outputRange: ['#059669', '#047857', '#064E3B', '#059669'],
     });
 
     return (
@@ -220,7 +220,7 @@ const CenterButtonAnimated: React.FC<{ active: boolean }> = ({ active }) => {
                     active && {
                         backgroundColor: btnBg,
                         transform: [{ scale: scaleAnim }],
-                        shadowColor: '#4CAF50',
+                        shadowColor: '#059669',
                         shadowOffset: { width: 0, height: 0 },
                         shadowOpacity: shadowOp,
                         shadowRadius: shadowR,
@@ -268,7 +268,7 @@ const TabIcon: React.FC<{
             <MaterialCommunityIcons
                 name={iconName as any}
                 size={24}
-                color={isFocused ? '#4CAF50' : '#9E9E9E'}
+                color={isFocused ? '#059669' : '#9CA3AF'}
             />
         </Animated.View>
     );
@@ -314,7 +314,7 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
                                 <Text style={[
                                     styles.tabLabel,
                                     {
-                                        color: isFocused ? '#4CAF50' : '#9E9E9E',
+                                        color: isFocused ? '#059669' : '#9CA3AF',
                                         fontWeight: isFocused ? '700' : '600',
                                     },
                                 ]}>
@@ -342,7 +342,7 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
                             <Text style={[
                                 styles.tabLabel,
                                 {
-                                    color: isFocused ? '#4CAF50' : '#9E9E9E',
+                                    color: isFocused ? '#059669' : '#9CA3AF',
                                     fontWeight: isFocused ? '700' : '600',
                                 },
                             ]}>
@@ -458,12 +458,12 @@ const styles = StyleSheet.create({
         width: CENTER_BUTTON_SIZE,
         height: CENTER_BUTTON_SIZE,
         borderRadius: CENTER_BUTTON_SIZE / 2,
-        backgroundColor: '#4CAF50',
+        backgroundColor: '#059669',
         justifyContent: 'center',
         alignItems: 'center',
         ...Platform.select({
             ios: {
-                shadowColor: '#4CAF50',
+                shadowColor: '#059669',
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: 0.3,
                 shadowRadius: 6,
@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
             android: { elevation: 8 },
             web: {
                 // @ts-ignore
-                boxShadow: '0 4px 12px rgba(76, 175, 80, 0.3)',
+                boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)',
             },
         }),
     },
@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
     // Indicator line
     indicator: {
         height: 3,
-        backgroundColor: '#4CAF50',
+        backgroundColor: '#059669',
         borderRadius: 1.5,
         marginTop: 4,
     },

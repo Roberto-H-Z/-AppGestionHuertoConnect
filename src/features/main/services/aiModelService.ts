@@ -48,8 +48,9 @@ export interface PlagaDetectada {
     confidence?: number | string;
     score?: number | string;
     bbox?: number[];
-    descripcion?: string;
+    descripcion_plaga?: string;
     tratamiento?: string;
+    tratamientos_ecologicos?: any[];
     [key: string]: unknown;
 }
 

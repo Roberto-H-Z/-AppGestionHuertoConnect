@@ -137,7 +137,7 @@ export const FarmerProfileScreen: React.FC<{ navigation?: any }> = ({ navigation
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#E8F5E9',
+        backgroundColor: '#FAFAFA',
     },
     scrollContent: {
         flexGrow: 1,
@@ -150,8 +150,8 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 24,
-        fontWeight: '700',
-        color: '#1B5E20',
+        fontWeight: '800',
+        color: '#111827',
         textAlign: 'center',
         lineHeight: 32,
     },

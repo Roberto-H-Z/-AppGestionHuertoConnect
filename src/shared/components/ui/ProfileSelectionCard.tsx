@@ -35,7 +35,7 @@ export const ProfileSelectionCard: React.FC<ProfileSelectionCardProps> = ({
                 <MaterialCommunityIcons
                     name={icon}
                     size={32}
-                    color="#4CAF50"
+                    color="#059669"
                 />
             </View>
             <View style={styles.textContainer}>
@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
         padding: 20,
         marginBottom: 20,
         borderWidth: 2,
-        borderColor: 'transparent',
+        borderColor: '#F3F4F6',
         shadowColor: '#000',
         shadowOffset: {
             width: 0,
@@ -65,14 +65,14 @@ const styles = StyleSheet.create({
         elevation: 3,
     },
     containerSelected: {
-        borderColor: '#4CAF50',
-        backgroundColor: '#f1f8f4',
+        borderColor: '#059669',
+        backgroundColor: '#ECFDF5',
     },
     iconContainer: {
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: '#E8F5E9',
+        backgroundColor: '#FAFAFA',
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 16,
@@ -83,13 +83,13 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 16,
-        fontWeight: '600',
-        color: '#1B5E20',
+        fontWeight: '700',
+        color: '#111827',
         marginBottom: 4,
     },
     description: {
         fontSize: 13,
-        color: '#66BB6A',
+        color: '#6B7280',
         lineHeight: 18,
     },
 });

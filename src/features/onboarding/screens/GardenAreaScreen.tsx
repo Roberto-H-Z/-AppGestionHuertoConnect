@@ -164,7 +164,7 @@ export const GardenAreaScreen: React.FC<{ navigation?: any }> = ({ navigation })
                         <MaterialCommunityIcons
                             name="arrow-left"
                             size={24}
-                            color="#1B5E20"
+                            color="#111827"
                         />
                     </TouchableOpacity>
                 </Animated.View>
@@ -192,7 +192,7 @@ export const GardenAreaScreen: React.FC<{ navigation?: any }> = ({ navigation })
                         <MaterialCommunityIcons 
                             name="vector-square" 
                             size={20} 
-                            color={inputMode === 'dimensions' ? '#fff' : '#1B5E20'} 
+                            color={inputMode === 'dimensions' ? '#fff' : '#111827'} 
                         />
                         <Text style={[styles.toggleText, inputMode === 'dimensions' && styles.toggleTextActive]}>
                             Dimensiones
@@ -206,7 +206,7 @@ export const GardenAreaScreen: React.FC<{ navigation?: any }> = ({ navigation })
                         <MaterialCommunityIcons 
                             name="shape-polygon-plus" 
                             size={20} 
-                            color={inputMode === 'totalArea' ? '#fff' : '#1B5E20'} 
+                            color={inputMode === 'totalArea' ? '#fff' : '#111827'} 
                         />
                         <Text style={[styles.toggleText, inputMode === 'totalArea' && styles.toggleTextActive]}>
                             Área Libre
@@ -237,7 +237,7 @@ export const GardenAreaScreen: React.FC<{ navigation?: any }> = ({ navigation })
                                             onChangeText={(text) => handleDimensionChange(text, setLengthValue)}
                                             keyboardType="numeric"
                                             placeholder="0"
-                                            placeholderTextColor="#A5D6A7"
+                                            placeholderTextColor="#9CA3AF"
                                             maxLength={5}
                                         />
                                     </View>
@@ -309,7 +309,7 @@ export const GardenAreaScreen: React.FC<{ navigation?: any }> = ({ navigation })
                                             onChangeText={(text) => handleDimensionChange(text, setTotalAreaValue)}
                                             keyboardType="numeric"
                                             placeholder="0"
-                                            placeholderTextColor="#A5D6A7"
+                                            placeholderTextColor="#9CA3AF"
                                             maxLength={8}
                                         />
                                     </View>
@@ -323,14 +323,14 @@ export const GardenAreaScreen: React.FC<{ navigation?: any }> = ({ navigation })
                                         activeOpacity={0.7}
                                     >
                                         <Text style={styles.unitText}>{areaUnit}</Text>
-                                        <MaterialCommunityIcons name="swap-vertical" size={20} color="#2E7D32" />
+                                        <MaterialCommunityIcons name="swap-vertical" size={20} color="#059669" />
                                     </TouchableOpacity>
                                 </View>
                             </View>
 
                             <View style={styles.irregularPreviewContainer}>
                                 <View style={styles.iconCircle}>
-                                    <MaterialCommunityIcons name="image-filter-hdr" size={54} color="#66BB6A" />
+                                    <MaterialCommunityIcons name="image-filter-hdr" size={54} color="#059669" />
                                 </View>
                                 <Text style={styles.previewDimensions}>
                                     {totalAreaNum > 0 ? totalAreaValue : '0'} {areaUnit}
@@ -363,7 +363,7 @@ export const GardenAreaScreen: React.FC<{ navigation?: any }> = ({ navigation })
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#E8F5E9',
+        backgroundColor: '#FAFAFA',
     },
     scrollContent: {
         flexGrow: 1,
@@ -392,8 +392,8 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 24,
-        fontWeight: '700',
-        color: '#1B5E20',
+        fontWeight: '800',
+        color: '#111827',
         lineHeight: 32,
     },
 
@@ -422,27 +422,27 @@ const styles = StyleSheet.create({
     inputLabel: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#1B5E20',
+        color: '#111827',
         marginBottom: 8,
     },
     inputWrapper: {
         borderWidth: 1.5,
-        borderColor: '#4CAF50',
+        borderColor: '#E5E7EB',
         borderRadius: 12,
-        backgroundColor: '#FAFFF5',
+        backgroundColor: '#FFFFFF',
     },
     dimensionInput: {
         paddingHorizontal: 16,
         paddingVertical: 12,
         fontSize: 18,
         fontWeight: '600',
-        color: '#2E7D32',
+        color: '#059669',
     },
 
     // Preview
     previewLabel: {
         fontSize: 14,
-        color: '#66BB6A',
+        color: '#6B7280',
         marginBottom: 16,
     },
     previewContainer: {
@@ -452,23 +452,23 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     gardenPreview: {
-        backgroundColor: '#E8F5E9',
+        backgroundColor: '#ECFDF5',
         borderRadius: 12,
         borderWidth: 2,
-        borderColor: '#A5D6A7',
+        borderColor: '#059669',
         borderStyle: 'dashed',
         alignItems: 'center',
         justifyContent: 'center',
     },
     previewDimensions: {
         fontSize: 16,
-        fontWeight: '600',
-        color: '#2E7D32',
+        fontWeight: '700',
+        color: '#059669',
         marginBottom: 4,
     },
     previewArea: {
         fontSize: 14,
-        color: '#66BB6A',
+        color: '#111827',
     },
 
     // Drag handle
@@ -481,13 +481,13 @@ const styles = StyleSheet.create({
         width: 4,
         height: 4,
         borderRadius: 2,
-        backgroundColor: '#A5D6A7',
+        backgroundColor: '#059669',
         marginBottom: 3,
     },
 
     helpText: {
         fontSize: 12,
-        color: '#A5D6A7',
+        color: '#6B7280',
         textAlign: 'center',
         marginTop: 8,
     },
@@ -523,12 +523,12 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     toggleButtonActive: {
-        backgroundColor: '#4CAF50',
+        backgroundColor: '#059669',
     },
     toggleText: {
         fontSize: 15,
         fontWeight: '600',
-        color: '#1B5E20',
+        color: '#111827',
     },
     toggleTextActive: {
         color: '#fff',
@@ -540,9 +540,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         borderWidth: 1.5,
-        borderColor: '#4CAF50',
+        borderColor: '#E5E7EB',
         borderRadius: 12,
-        backgroundColor: '#FAFFF5',
+        backgroundColor: '#FFFFFF',
         paddingHorizontal: 16,
         paddingVertical: 14,
         height: 52, // Match the height of the TextInput roughly
@@ -550,16 +550,16 @@ const styles = StyleSheet.create({
     unitText: {
         fontSize: 15,
         fontWeight: '600',
-        color: '#2E7D32',
+        color: '#111827',
     },
     irregularPreviewContainer: {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: PREVIEW_MAX_SIZE * 0.7,
-        backgroundColor: '#f1f8e9',
+        backgroundColor: '#ECFDF5',
         borderRadius: 20,
         borderWidth: 1,
-        borderColor: '#C8E6C9',
+        borderColor: '#D1FAE5',
         borderStyle: 'dashed',
         marginTop: 10,
     },
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 16,
-        shadowColor: '#4CAF50',
+        shadowColor: '#059669',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
