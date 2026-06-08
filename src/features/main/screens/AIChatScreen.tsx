@@ -31,6 +31,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { chatbotService, ConversacionOut, MensajeOut } from '../services/chatbotService';
 import { aiModelService, CultivoRecomendado, PlagaDetectada } from '../services/aiModelService';
 import { geocodeMunicipio } from '../services/geocodingService';
+import { AppScreenHeader } from '../components';
+import { palette, radii, shadows } from '../theme';
 
 const { width } = Dimensions.get('window');
 
@@ -157,17 +159,17 @@ const MODE_CONFIG = {
 // ══════════════════════════════════════════════════════
 
 const QUICK_CHIPS_CHAT = [
-    { label: '💧 Cómo regar', prompt: '¿Cómo debo regar mis plantas?' },
-    { label: '🐛 Hay plaga', prompt: '¿Cómo identifico si hay una plaga?' },
-    { label: '🍅 Cultivar tomate', prompt: '¿Cómo cultivo tomates?' },
-    { label: '🌱 Abono orgánico', prompt: '¿Qué abono uso para mi huerto?' },
+    { label: 'Cómo regar', prompt: '¿Cómo debo regar mis plantas?' },
+    { label: 'Identificar plaga', prompt: '¿Cómo identifico si hay una plaga?' },
+    { label: 'Cultivar tomate', prompt: '¿Cómo cultivo tomates?' },
+    { label: 'Abono orgánico', prompt: '¿Qué abono uso para mi huerto?' },
 ];
 
 const QUICK_CHIPS_CULTIVOS = [
-    { label: '📍 Xalapa, Ver', prompt: 'Xalapa' },
-    { label: '📍 Monterrey, NL', prompt: 'Monterrey' },
-    { label: '📍 Mérida, Yuc', prompt: 'Mérida' },
-    { label: '📍 Oaxaca, Oax', prompt: 'Oaxaca' },
+    { label: 'Xalapa, Ver.', prompt: 'Xalapa' },
+    { label: 'Monterrey, N.L.', prompt: 'Monterrey' },
+    { label: 'Mérida, Yuc.', prompt: 'Mérida' },
+    { label: 'Oaxaca, Oax.', prompt: 'Oaxaca' },
 ];
 
 // ══════════════════════════════════════════════════════
@@ -827,29 +829,24 @@ export const AIChatScreen: React.FC = () => {
         <SafeAreaView style={styles.root}>
             <StatusBar style="dark" />
 
-            {/* ── HEADER ── */}
-            <View style={styles.header}>
-                <View style={styles.headerLeft}>
-                    <View style={styles.headerIconBg}>
-                        <MaterialCommunityIcons name="leaf" size={20} color="#059669" />
-                    </View>
-                    <View>
-                        <Text style={styles.headerTitle}>HuertoConnect IA</Text>
-                        <View style={styles.headerStatus}>
-                            <View style={styles.statusDot} />
-                            <Text style={styles.statusLabel}>Modelos activos</Text>
-                        </View>
-                    </View>
-                </View>
-                <View style={styles.headerActions}>
-                    <TouchableOpacity style={styles.headerBtn} onPress={() => { setMessages([]); setConvId(null); setMode('chat'); }}>
-                        <MaterialCommunityIcons name="plus" size={20} color="#059669" />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.headerBtn} onPress={() => { loadHistory(); setHistoryVisible(true); }}>
-                        <MaterialCommunityIcons name="history" size={20} color="#6B7280" />
-                    </TouchableOpacity>
-                </View>
-            </View>
+            <AppScreenHeader
+                eyebrow="Asistente inteligente"
+                title="Cuida mejor tu huerto"
+                subtitle="Consulta, recomienda cultivos o analiza señales de plagas."
+                icon="creation-outline"
+                actions={[
+                    {
+                        icon: 'plus',
+                        label: 'Nueva conversación',
+                        onPress: () => { setMessages([]); setConvId(null); setMode('chat'); },
+                    },
+                    {
+                        icon: 'history',
+                        label: 'Ver historial',
+                        onPress: () => { loadHistory(); setHistoryVisible(true); },
+                    },
+                ]}
+            />
 
             {/* ── SELECTOR DE MODO ── */}
             <View style={styles.modeBar}>
@@ -863,8 +860,10 @@ export const AIChatScreen: React.FC = () => {
                             style={[styles.modeTab, active && { backgroundColor: cfg.color }]}
                             onPress={() => setMode(m)}
                             activeOpacity={0.75}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: active }}
                         >
-                            <MaterialCommunityIcons name={cfg.icon} size={13} color={active ? '#fff' : '#9CA3AF'} />
+                            <MaterialCommunityIcons name={cfg.icon} size={18} color={active ? '#fff' : palette.muted} />
                             <Text style={[styles.modeTabLabel, { color: active ? '#fff' : '#6B7280' }]}>{cfg.label}</Text>
                         </TouchableOpacity>
                     );
@@ -903,6 +902,7 @@ export const AIChatScreen: React.FC = () => {
                                         onPress={() => handleChip(chip.prompt)}
                                         activeOpacity={0.7}
                                     >
+                                        <MaterialCommunityIcons name="arrow-top-right" size={14} color={modeConfig.color} />
                                         <Text style={[styles.chipText, { color: modeConfig.color }]}>{chip.label}</Text>
                                     </TouchableOpacity>
                                 ))}
@@ -965,59 +965,36 @@ export const AIChatScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
     // ── Base ────────────────────────────────────────────────────────────
-    root: { flex: 1, backgroundColor: '#FAFAFA' },
-
-    // ── Header ──────────────────────────────────────────────────────────
-    header: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingVertical: 13,
-        borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
-        elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.07, shadowRadius: 6,
-    },
-    headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 11 },
-    headerIconBg: {
-        width: 40, height: 40, borderRadius: 20,
-        backgroundColor: '#ECFDF5',
-        alignItems: 'center', justifyContent: 'center',
-    },
-    headerTitle: { fontSize: 16, fontWeight: '700', color: '#111827', letterSpacing: -0.3 },
-    headerStatus: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
-    statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#10B981' },
-    statusLabel: { fontSize: 11, color: '#6EE7B7', fontWeight: '500' },
-    headerActions: { flexDirection: 'row', gap: 8 },
-    headerBtn: {
-        width: 36, height: 36, borderRadius: 18,
-        backgroundColor: '#F3F4F6',
-        alignItems: 'center', justifyContent: 'center',
-    },
+    root: { flex: 1, backgroundColor: palette.canvas },
 
     // ── Mode selector ────────────────────────────────────────────────────
     modeBar: {
-        backgroundColor: '#FFFFFF',
-        paddingHorizontal: 14, paddingVertical: 10,
-        borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
+        backgroundColor: palette.canvas,
+        paddingHorizontal: 14, paddingBottom: 10,
     },
     modeTabsRow: {
         flexDirection: 'row',
-        backgroundColor: '#F3F4F6',
-        borderRadius: 12, padding: 3, gap: 2,
+        backgroundColor: palette.surface,
+        borderRadius: radii.medium, padding: 4, gap: 4,
+        borderWidth: 1, borderColor: palette.border,
     },
     modeTab: {
         flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        gap: 5, paddingVertical: 8, borderRadius: 10,
+        gap: 6, paddingVertical: 10, borderRadius: 14,
     },
-    modeTabLabel: { fontSize: 11, fontWeight: '600', letterSpacing: -0.1 },
+    modeTabLabel: { fontSize: 11.5, fontWeight: '700', letterSpacing: -0.1 },
 
     // ── Hint bar ─────────────────────────────────────────────────────────
     hintBar: {
         flexDirection: 'row', alignItems: 'center', gap: 7,
-        paddingHorizontal: 14, paddingVertical: 8,
-        borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
+        marginHorizontal: 14,
+        paddingHorizontal: 12, paddingVertical: 9,
+        borderRadius: radii.small,
     },
     hintText: { fontSize: 11.5, flex: 1, fontWeight: '500', letterSpacing: -0.1 },
 
     // ── Messages list ────────────────────────────────────────────────────
-    msgList: { flex: 1, backgroundColor: '#FAFAFA' },
+    msgList: { flex: 1, backgroundColor: palette.canvas },
     msgListContent: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10, gap: 10 },
 
     msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 7 },
@@ -1026,18 +1003,17 @@ const styles = StyleSheet.create({
 
     aiAvatarSmall: {
         width: 30, height: 30, borderRadius: 15,
-        backgroundColor: '#ECFDF5',
+        backgroundColor: palette.primarySoft,
         alignItems: 'center', justifyContent: 'center',
         flexShrink: 0,
     },
     msgContentWrapper: { flex: 1, maxWidth: width * 0.74, gap: 4 },
 
-    msgBubble: { borderRadius: 20, paddingHorizontal: 16, paddingVertical: 12 },
+    msgBubble: { borderRadius: radii.medium, paddingHorizontal: 16, paddingVertical: 12 },
     userBubble: { borderBottomRightRadius: 5 },
     aiBubble: {
-        backgroundColor: '#F0FDF4', borderBottomLeftRadius: 5,
-        borderWidth: 1, borderColor: '#D1FAE5',
-        elevation: 1, shadowColor: '#059669', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4,
+        backgroundColor: palette.surface, borderBottomLeftRadius: 5,
+        borderWidth: 1, borderColor: palette.border,
     },
     errorBubble: {
         backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderBottomLeftRadius: 5,
@@ -1060,27 +1036,27 @@ const styles = StyleSheet.create({
 
     // ── Quick chips ──────────────────────────────────────────────────────
     chipsContainer: { paddingTop: 6, paddingBottom: 10, gap: 10 },
-    chipsLabel: { fontSize: 11, color: '#9CA3AF', fontWeight: '600', marginLeft: 2, letterSpacing: 0.5 },
+    chipsLabel: { fontSize: 11, color: palette.muted, fontWeight: '800', marginLeft: 2, letterSpacing: 0.8, textTransform: 'uppercase' },
     chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     chip: {
-        paddingHorizontal: 13, paddingVertical: 8,
-        borderRadius: 20, borderWidth: 1.5,
-        backgroundColor: '#FFFFFF',
-        elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 3,
+        flexDirection: 'row', alignItems: 'center', gap: 5,
+        paddingHorizontal: 13, paddingVertical: 9,
+        borderRadius: radii.pill, borderWidth: 1,
+        backgroundColor: palette.surface,
     },
     chipText: { fontSize: 12, fontWeight: '600' },
 
     // ── Input bar ────────────────────────────────────────────────────────
     inputBar: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: palette.canvas,
         paddingHorizontal: 12, paddingTop: 10, paddingBottom: 90,
-        borderTopWidth: 1, borderTopColor: '#F0F0F0',
-        elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.06, shadowRadius: 8,
+        borderTopWidth: 1, borderTopColor: palette.border,
     },
     inputWrapper: {
         flexDirection: 'row', alignItems: 'flex-end',
-        backgroundColor: '#F9FAFB', borderRadius: 24, borderWidth: 1.5,
+        backgroundColor: palette.surface, borderRadius: 24, borderWidth: 1.5,
         paddingLeft: 13, paddingRight: 5, paddingVertical: 5, gap: 8,
+        ...shadows.card,
     },
     inputPrefixIcon: { paddingBottom: 4, flexShrink: 0 },
     input: { flex: 1, fontSize: 14, color: '#1F2937', maxHeight: 100, paddingVertical: 5, lineHeight: 20 },
