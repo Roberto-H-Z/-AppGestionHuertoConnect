@@ -20,6 +20,8 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../auth/services/AuthContext';
 import { tokenStorage } from '../../../infrastructure/storage/tokenStorage';
 import { huertoService } from '../services/huertoService';
+import { AppScreenHeader } from '../components';
+import { palette, radii, shadows } from '../theme';
 
 
 // ═══════════════════════════════════════════
@@ -159,7 +161,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ icon, label, subtitle, onPress, del
                         <MaterialCommunityIcons
                             name={icon as any}
                             size={20}
-                            color="#059669"
+                            color={palette.primary}
                         />
                     </View>
                     <View style={styles.menuTextContainer}>
@@ -288,9 +290,18 @@ export const ProfileScreen: React.FC = () => {
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
 
-            {/* ── Header ── */}
             <Animated.View style={[styles.header, { opacity: headerFade }]}>
-                <Text style={styles.headerTitle}>Mi Perfil</Text>
+                <AppScreenHeader
+                    eyebrow="Cuenta"
+                    title="Mi perfil"
+                    subtitle="Tu actividad, terreno y preferencias."
+                    icon="account-circle-outline"
+                    actions={[{
+                        icon: 'account-edit-outline',
+                        label: 'Editar perfil',
+                        onPress: () => navigation.navigate('EditProfile'),
+                    }]}
+                />
             </Animated.View>
 
             <ScrollView
@@ -329,7 +340,12 @@ export const ProfileScreen: React.FC = () => {
                         {user ? `${user.nombre} ${user.apellidos}`.trim() : 'Cargando...'}
                     </Text>
                     <View style={styles.badgeContainer}>
+                        <MaterialCommunityIcons name="sprout" size={14} color={palette.primary} />
                         <Text style={styles.badgeText}>{farmerPerfil}</Text>
+                    </View>
+                    <View style={styles.waterRow}>
+                        <MaterialCommunityIcons name="water-outline" size={15} color={palette.sage} />
+                        <Text style={styles.waterText}>Acceso al agua: {accesoAgua}</Text>
                     </View>
 
                     {/* Stats Row */}
@@ -404,24 +420,11 @@ export const ProfileScreen: React.FC = () => {
 // ═══════════════════════════════════════════
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#FAFAFA',
-    },
+    container: { flex: 1, backgroundColor: palette.canvas },
 
     // ── Header ──────────────────────────────────────────────────────────
     header: {
-        paddingHorizontal: 16,
-        paddingTop: Platform.OS === 'web' ? 20 : 10,
-        paddingBottom: 14,
-        backgroundColor: '#FFFFFF',
-        borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
-        elevation: 3,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.07,
-        shadowRadius: 6,
+        backgroundColor: palette.canvas,
     },
     headerTitle: {
         fontSize: 18,
@@ -436,19 +439,13 @@ const styles = StyleSheet.create({
 
     // ── User Card ────────────────────────────────────────────────────────
     userCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 22,
+        backgroundColor: palette.forest,
+        borderRadius: radii.large,
         paddingVertical: 28,
         paddingHorizontal: 20,
         alignItems: 'center',
         marginBottom: 14,
-        borderWidth: 1,
-        borderColor: '#F3F4F6',
-        elevation: 3,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
+        ...shadows.card,
     },
 
     // ── Avatar ──────────────────────────────────────────────────────────
@@ -457,31 +454,36 @@ const styles = StyleSheet.create({
         width: 84,
         height: 84,
         borderRadius: 42,
-        backgroundColor: '#059669',
+        backgroundColor: palette.primary,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 4,
-        borderColor: '#ECFDF5',
+        borderColor: '#FFFFFF',
     },
 
     // ── User Info ────────────────────────────────────────────────────────
     userName: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#111827',
+        color: '#FFFFFF',
         marginBottom: 6,
         letterSpacing: -0.4,
     },
     badgeContainer: {
-        backgroundColor: '#ECFDF5',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: 'rgba(255,255,255,0.12)',
         paddingHorizontal: 14,
         paddingVertical: 5,
         borderRadius: 20,
         marginBottom: 20,
         borderWidth: 1,
-        borderColor: '#D1FAE5',
+        borderColor: 'rgba(255,255,255,0.15)',
     },
-    badgeText: { fontSize: 13, fontWeight: '600', color: '#059669' },
+    badgeText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
+    waterRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: -10, marginBottom: 18 },
+    waterText: { color: '#C4D4C9', fontSize: 12 },
 
     // ── Stats ────────────────────────────────────────────────────────────
     statsRow: {
@@ -489,23 +491,19 @@ const styles = StyleSheet.create({
         width: '100%', paddingTop: 8,
     },
     statItem: { flex: 1, alignItems: 'center' },
-    statValue: { fontSize: 26, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
-    statLabel: { fontSize: 12, color: '#6B7280', marginTop: 2, textAlign: 'center' },
-    statDivider: { width: 1, height: 36, backgroundColor: '#E5E7EB' },
+    statValue: { fontSize: 26, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.5 },
+    statLabel: { fontSize: 12, color: '#B9CBBF', marginTop: 2, textAlign: 'center' },
+    statDivider: { width: 1, height: 36, backgroundColor: 'rgba(255,255,255,0.14)' },
 
     // ── Menu Card ────────────────────────────────────────────────────────
     menuCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 22,
+        backgroundColor: palette.surface,
+        borderRadius: radii.large,
         paddingVertical: 6,
         marginBottom: 14,
         borderWidth: 1,
-        borderColor: '#F3F4F6',
-        elevation: 3,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
+        borderColor: palette.border,
+        ...shadows.card,
     },
     menuItem: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -514,7 +512,7 @@ const styles = StyleSheet.create({
     menuItemLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
     menuIconContainer: {
         width: 42, height: 42, borderRadius: 13,
-        backgroundColor: '#ECFDF5', alignItems: 'center', justifyContent: 'center', marginRight: 14,
+        backgroundColor: palette.primarySoft, alignItems: 'center', justifyContent: 'center', marginRight: 14,
     },
     menuTextContainer: { flex: 1 },
     menuLabel: { fontSize: 15, fontWeight: '600', color: '#1F2937' },

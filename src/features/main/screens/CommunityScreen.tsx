@@ -22,6 +22,8 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { AppScreenHeader } from '../components';
+import { palette, radii, shadows } from '../theme';
 
 const { width } = Dimensions.get('window');
 
@@ -194,7 +196,7 @@ const PostCard: React.FC<{ post: Post; onLike: (id: string) => void }> = ({ post
             <View style={styles.postHeader}>
                 <View style={styles.authorInfo}>
                     <View style={styles.avatar}>
-                        <Text style={styles.avatarEmoji}>{post.author.avatar}</Text>
+                        <MaterialCommunityIcons name="account" size={22} color={palette.primary} />
                     </View>
                     <View style={styles.authorTextContainer}>
                         <Text style={styles.authorName}>{post.author.name}</Text>
@@ -264,7 +266,7 @@ export const CommunityScreen: React.FC = () => {
     const handleCreatePost = (title: string, description: string, cropType: string) => {
         const newPost: Post = {
             id: Date.now().toString(),
-            author: { name: 'Tú', avatar: '🧑‍🌾', location: 'Tu ubicación' },
+            author: { name: 'Tú', avatar: 'farmer', location: 'Tu ubicación' },
             cropType, title, description,
             likes: 0, comments: 0, shares: 0,
             timestamp: 'Ahora mismo', isLiked: false,
@@ -278,18 +280,17 @@ export const CommunityScreen: React.FC = () => {
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
 
-            {/* Header */}
-            <View style={styles.header}>
-                <View style={styles.headerLeft}>
-                    <View style={styles.headerIconBg}>
-                        <MaterialCommunityIcons name="account-group" size={22} color="#059669" />
-                    </View>
-                    <Text style={styles.headerTitle}>Comunidad</Text>
-                </View>
-                <TouchableOpacity style={styles.headerAction}>
-                    <MaterialCommunityIcons name="magnify" size={22} color="#374151" />
-                </TouchableOpacity>
-            </View>
+            <AppScreenHeader
+                eyebrow="Comunidad"
+                title="Aprendemos cultivando"
+                subtitle="Comparte avances, dudas y consejos con otros agricultores."
+                icon="account-group-outline"
+                actions={[{
+                    icon: 'plus',
+                    label: 'Crear publicación',
+                    onPress: () => setModalVisible(true),
+                }]}
+            />
 
             {/* Filters */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersContainer} contentContainerStyle={styles.filtersContent}>
@@ -300,6 +301,18 @@ export const CommunityScreen: React.FC = () => {
 
             {/* Posts feed */}
             <ScrollView style={styles.feed} contentContainerStyle={styles.feedContent} showsVerticalScrollIndicator={false}>
+                <View style={styles.communityCard}>
+                    <View style={styles.communityCardIcon}>
+                        <MaterialCommunityIcons name="sprout-outline" size={26} color={palette.primary} />
+                    </View>
+                    <View style={styles.communityCardCopy}>
+                        <Text style={styles.communityCardTitle}>Tu experiencia puede ayudar</Text>
+                        <Text style={styles.communityCardText}>Publica una práctica que te funcionó o pregunta a la comunidad.</Text>
+                    </View>
+                    <TouchableOpacity style={styles.communityCardAction} onPress={() => setModalVisible(true)}>
+                        <MaterialCommunityIcons name="arrow-right" size={19} color="#FFFFFF" />
+                    </TouchableOpacity>
+                </View>
                 {filteredPosts.map(post => (
                     <PostCard key={post.id} post={post} onLike={handleLike} />
                 ))}
@@ -309,8 +322,12 @@ export const CommunityScreen: React.FC = () => {
                         <View style={styles.emptyIconBg}>
                             <MaterialCommunityIcons name="account-group-outline" size={40} color="#059669" />
                         </View>
-                        <Text style={styles.emptyStateText}>No hay publicaciones de {selectedFilter}</Text>
-                        <Text style={styles.emptyStateSubtext}>¡Sé el primero en publicar!</Text>
+                        <Text style={styles.emptyStateText}>Aún no hay publicaciones de {selectedFilter}</Text>
+                        <Text style={styles.emptyStateSubtext}>Inicia la conversación con una duda o un consejo.</Text>
+                        <TouchableOpacity style={styles.emptyAction} onPress={() => setModalVisible(true)}>
+                            <MaterialCommunityIcons name="pencil-outline" size={17} color="#FFFFFF" />
+                            <Text style={styles.emptyActionText}>Crear publicación</Text>
+                        </TouchableOpacity>
                     </View>
                 )}
             </ScrollView>
@@ -330,42 +347,45 @@ export const CommunityScreen: React.FC = () => {
 // ═══════════════════════════════════════════
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#FAFAFA' },
-
-    // ── Header ──────────────────────────────────────────────
-    header: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 16, paddingVertical: 13,
-        backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
-        elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.07, shadowRadius: 6,
-    },
-    headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    headerIconBg: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#ECFDF5', alignItems: 'center', justifyContent: 'center' },
-    headerTitle: { fontSize: 18, fontWeight: '700', color: '#111827', letterSpacing: -0.3 },
-    headerAction: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
+    container: { flex: 1, backgroundColor: palette.canvas },
 
     // ── Filters ───────────────────────────────────────────────
-    filtersContainer: { maxHeight: 52, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+    filtersContainer: { maxHeight: 54, backgroundColor: palette.canvas },
     filtersContent: { paddingHorizontal: 14, paddingVertical: 10, gap: 8 },
-    filterChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F3F4F6' },
-    filterChipActive: { backgroundColor: '#059669' },
-    filterChipText: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
+    filterChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: radii.pill, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
+    filterChipActive: { backgroundColor: palette.primary, borderColor: palette.primary },
+    filterChipText: { fontSize: 13, fontWeight: '700', color: palette.muted },
     filterChipTextActive: { color: '#fff' },
 
     // ── Feed ──────────────────────────────────────────────────
     feed: { flex: 1 },
-    feedContent: { paddingTop: 12, paddingBottom: 90 },
+    feedContent: { paddingTop: 4, paddingBottom: 100 },
+    communityCard: {
+        marginHorizontal: 14,
+        marginBottom: 14,
+        padding: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        borderRadius: radii.large,
+        backgroundColor: palette.forest,
+        ...shadows.card,
+    },
+    communityCardIcon: { width: 48, height: 48, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+    communityCardCopy: { flex: 1 },
+    communityCardTitle: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+    communityCardText: { marginTop: 3, color: '#C8D7CD', fontSize: 12, lineHeight: 17 },
+    communityCardAction: { width: 38, height: 38, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.primary },
 
     // ── Post card ─────────────────────────────────────────────
     postCard: {
-        backgroundColor: '#FFFFFF', marginHorizontal: 14, marginBottom: 12, borderRadius: 18, padding: 16,
-        borderWidth: 1, borderColor: '#F3F4F6',
-        elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 6,
+        backgroundColor: palette.surface, marginHorizontal: 14, marginBottom: 12, borderRadius: radii.large, padding: 16,
+        borderWidth: 1, borderColor: palette.border,
+        ...shadows.card,
     },
     postHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
     authorInfo: { flexDirection: 'row', flex: 1 },
-    avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#ECFDF5', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
-    avatarEmoji: { fontSize: 22 },
+    avatar: { width: 42, height: 42, borderRadius: 16, backgroundColor: palette.primarySoft, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
     authorTextContainer: { flex: 1, justifyContent: 'center' },
     authorName: { fontSize: 14, fontWeight: '700', color: '#111827', marginBottom: 3, letterSpacing: -0.1 },
     metaRow: { flexDirection: 'row', alignItems: 'center' },
@@ -388,10 +408,12 @@ const styles = StyleSheet.create({
     interactionTextActive: { color: '#EF4444' },
 
     // ── Empty state ───────────────────────────────────────────
-    emptyState: { alignItems: 'center', paddingVertical: 60, gap: 10 },
+    emptyState: { alignItems: 'center', paddingVertical: 42, paddingHorizontal: 28, gap: 10 },
     emptyIconBg: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#ECFDF5', alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
     emptyStateText: { fontSize: 15, color: '#374151', fontWeight: '600' },
     emptyStateSubtext: { fontSize: 13, color: '#9CA3AF' },
+    emptyAction: { marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16, paddingVertical: 11, borderRadius: radii.pill, backgroundColor: palette.primary },
+    emptyActionText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
 
     // ── FAB ───────────────────────────────────────────────────
     fab: {
