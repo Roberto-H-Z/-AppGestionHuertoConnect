@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import {
     HomeScreen,
     MonitoringScreen,
@@ -21,70 +22,43 @@ const icons: Record<string, string> = {
     Profile: 'account-circle-outline',
 };
 
-interface TabItemProps {
-    route: any;
-    label: string;
-    isFocused: boolean;
-    onPress: () => void;
-}
-
-const TabItem: React.FC<TabItemProps> = ({ route, label, isFocused, onPress }) => {
-    const lift = useRef(new Animated.Value(isFocused ? 1 : 0)).current;
-
-    useEffect(() => {
-        Animated.spring(lift, {
-            toValue: isFocused ? 1 : 0,
-            friction: 7,
-            tension: 100,
-            useNativeDriver: true,
-        }).start();
-    }, [isFocused, lift]);
-
-    return (
-        <Pressable
-            accessibilityRole="tab"
-            accessibilityState={{ selected: isFocused }}
-            accessibilityLabel={label}
-            onPress={onPress}
-            style={({ pressed }) => [styles.item, pressed && styles.pressed]}
-        >
-            <Animated.View
-                style={[
-                    styles.iconShell,
-                    {
-                        transform: [{
-                            translateY: lift.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: [0, -19],
-                            }),
-                        }],
-                    },
-                ]}
-            >
-                <MaterialCommunityIcons
-                    name={icons[route.name] as any}
-                    size={24}
-                    color={isFocused ? '#FFFFFF' : palette.muted}
-                />
-            </Animated.View>
-            <Text style={[styles.label, isFocused && styles.labelActive]}>{label}</Text>
-        </Pressable>
-    );
-};
-
 const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
     const [barWidth, setBarWidth] = useState(0);
+    const [indicatorPosition, setIndicatorPosition] = useState(state.index);
     const activeIndex = useRef(new Animated.Value(state.index)).current;
     const itemWidth = barWidth / state.routes.length;
 
     useEffect(() => {
+        const listener = activeIndex.addListener(({ value }) => setIndicatorPosition(value));
+
         Animated.spring(activeIndex, {
             toValue: state.index,
-            friction: 8,
-            tension: 90,
-            useNativeDriver: true,
+            friction: 9,
+            tension: 95,
+            useNativeDriver: false,
         }).start();
+
+        return () => activeIndex.removeListener(listener);
     }, [activeIndex, state.index]);
+
+    const notchCenter = itemWidth * (indicatorPosition + 0.5);
+    const leftShoulder = Math.max(30, notchCenter - 42);
+    const rightShoulder = Math.min(barWidth - 30, notchCenter + 42);
+    const backgroundPath = barWidth > 0
+        ? [
+            'M 30 0',
+            `H ${leftShoulder}`,
+            `C ${notchCenter - 30} 0 ${notchCenter - 31} 27 ${notchCenter} 27`,
+            `C ${notchCenter + 31} 27 ${notchCenter + 30} 0 ${rightShoulder} 0`,
+            `H ${barWidth - 30}`,
+            `Q ${barWidth} 0 ${barWidth} 30`,
+            'V 72',
+            'H 0',
+            'V 30',
+            'Q 0 0 30 0',
+            'Z',
+        ].join(' ')
+        : '';
 
     return (
         <View style={styles.wrapper}>
@@ -92,22 +66,41 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
                 style={styles.tabBar}
                 onLayout={(event) => setBarWidth(event.nativeEvent.layout.width)}
             >
-                {barWidth > 0 && (
-                    <Animated.View
-                        pointerEvents="none"
-                        style={[
-                            styles.activeIndicatorSlot,
-                            {
-                                width: itemWidth,
-                                transform: [{ translateX: Animated.multiply(activeIndex, itemWidth) }],
-                            },
-                        ]}
-                    >
-                        <View style={styles.activeCutout}>
-                            <View style={styles.activeIndicator} />
-                        </View>
-                    </Animated.View>
-                )}
+                {barWidth > 0 ? (
+                    <>
+                        <Svg
+                            pointerEvents="none"
+                            width={barWidth}
+                            height={72}
+                            style={styles.barShape}
+                        >
+                            <Path
+                                d={backgroundPath}
+                                fill="#FFFFFF"
+                                stroke={palette.border}
+                                strokeWidth={1}
+                            />
+                        </Svg>
+                        <Animated.View
+                            pointerEvents="none"
+                            style={[
+                                styles.activeIndicatorSlot,
+                                {
+                                    width: itemWidth,
+                                    transform: [{ translateX: Animated.multiply(activeIndex, itemWidth) }],
+                                },
+                            ]}
+                        >
+                            <View style={styles.activeIndicator}>
+                                <MaterialCommunityIcons
+                                    name={icons[state.routes[state.index].name] as any}
+                                    size={25}
+                                    color="#FFFFFF"
+                                />
+                            </View>
+                        </Animated.View>
+                    </>
+                ) : null}
                 {state.routes.map((route: any, index: number) => {
                     const isFocused = state.index === index;
                     const label = String(descriptors[route.key].options.tabBarLabel ?? route.name);
@@ -122,13 +115,23 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
                     };
 
                     return (
-                        <TabItem
+                        <Pressable
                             key={route.key}
-                            route={route}
-                            label={label}
-                            isFocused={isFocused}
+                            accessibilityRole="tab"
+                            accessibilityState={{ selected: isFocused }}
+                            accessibilityLabel={label}
                             onPress={onPress}
-                        />
+                            style={({ pressed }) => [styles.item, pressed && styles.pressed]}
+                        >
+                            <View style={styles.iconShell}>
+                                <MaterialCommunityIcons
+                                    name={icons[route.name] as any}
+                                    size={22}
+                                    color={isFocused ? 'transparent' : palette.muted}
+                                />
+                            </View>
+                            <Text style={[styles.label, isFocused && styles.labelActive]}>{label}</Text>
+                        </Pressable>
                     );
                 })}
             </View>
@@ -152,17 +155,8 @@ const styles = StyleSheet.create({
         right: 12,
         bottom: 10,
         left: 12,
-    },
-    tabBar: {
-        height: 72,
-        paddingHorizontal: 6,
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#FFFFFF',
-        borderRadius: 32,
-        borderWidth: 1,
-        borderColor: palette.border,
-        overflow: 'visible',
+        height: 96,
+        justifyContent: 'flex-end',
         ...Platform.select({
             ios: {
                 shadowColor: palette.forest,
@@ -173,33 +167,36 @@ const styles = StyleSheet.create({
             android: { elevation: 12 },
             web: {
                 // @ts-ignore React Native Web supports boxShadow.
-                boxShadow: '0 12px 30px rgba(22, 59, 45, 0.14)',
+                filter: 'drop-shadow(0 10px 14px rgba(22, 59, 45, 0.14))',
             },
         }),
     },
+    tabBar: {
+        height: 72,
+        flexDirection: 'row',
+        alignItems: 'center',
+        overflow: 'visible',
+    },
+    barShape: { ...StyleSheet.absoluteFillObject },
     activeIndicatorSlot: {
         position: 'absolute',
-        top: -22,
+        top: -27,
         left: 0,
         alignItems: 'center',
-        zIndex: 2,
-    },
-    activeCutout: {
-        width: 66,
-        height: 66,
-        borderRadius: 33,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: palette.canvas,
+        zIndex: 4,
     },
     activeIndicator: {
-        width: 52,
-        height: 52,
-        borderRadius: 26,
+        width: 54,
+        height: 54,
+        borderRadius: 27,
+        alignItems: 'center',
+        justifyContent: 'center',
         backgroundColor: palette.primary,
+        borderWidth: 3,
+        borderColor: palette.canvas,
         shadowColor: palette.primary,
-        shadowOffset: { width: 0, height: 5 },
-        shadowOpacity: 0.24,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.22,
         shadowRadius: 9,
         elevation: 8,
     },
@@ -208,16 +205,15 @@ const styles = StyleSheet.create({
         height: 72,
         alignItems: 'center',
         justifyContent: 'flex-end',
-        paddingBottom: 9,
+        paddingBottom: 10,
         zIndex: 3,
     },
     iconShell: {
-        width: 52,
-        height: 52,
-        borderRadius: 26,
+        width: 36,
+        height: 30,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: -5,
+        marginBottom: 2,
     },
     label: { color: palette.muted, fontSize: 10, fontWeight: '600' },
     labelActive: { color: palette.primary, fontWeight: '800' },
