@@ -21,6 +21,57 @@ const icons: Record<string, string> = {
     Profile: 'account-circle-outline',
 };
 
+interface TabItemProps {
+    route: any;
+    label: string;
+    isFocused: boolean;
+    onPress: () => void;
+}
+
+const TabItem: React.FC<TabItemProps> = ({ route, label, isFocused, onPress }) => {
+    const lift = useRef(new Animated.Value(isFocused ? 1 : 0)).current;
+
+    useEffect(() => {
+        Animated.spring(lift, {
+            toValue: isFocused ? 1 : 0,
+            friction: 7,
+            tension: 100,
+            useNativeDriver: true,
+        }).start();
+    }, [isFocused, lift]);
+
+    return (
+        <Pressable
+            accessibilityRole="tab"
+            accessibilityState={{ selected: isFocused }}
+            accessibilityLabel={label}
+            onPress={onPress}
+            style={({ pressed }) => [styles.item, pressed && styles.pressed]}
+        >
+            <Animated.View
+                style={[
+                    styles.iconShell,
+                    {
+                        transform: [{
+                            translateY: lift.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [0, -22],
+                            }),
+                        }],
+                    },
+                ]}
+            >
+                <MaterialCommunityIcons
+                    name={icons[route.name] as any}
+                    size={24}
+                    color={isFocused ? '#FFFFFF' : palette.muted}
+                />
+            </Animated.View>
+            <Text style={[styles.label, isFocused && styles.labelActive]}>{label}</Text>
+        </Pressable>
+    );
+};
+
 const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
     const [barWidth, setBarWidth] = useState(0);
     const activeIndex = useRef(new Animated.Value(state.index)).current;
@@ -55,39 +106,29 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
                         <View style={styles.activeIndicator} />
                     </Animated.View>
                 )}
-            {state.routes.map((route: any, index: number) => {
-                const isFocused = state.index === index;
-                const label = descriptors[route.key].options.tabBarLabel ?? route.name;
+                {state.routes.map((route: any, index: number) => {
+                    const isFocused = state.index === index;
+                    const label = String(descriptors[route.key].options.tabBarLabel ?? route.name);
 
-                const onPress = () => {
-                    const event = navigation.emit({
-                        type: 'tabPress',
-                        target: route.key,
-                        canPreventDefault: true,
-                    });
-                    if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name);
-                };
+                    const onPress = () => {
+                        const event = navigation.emit({
+                            type: 'tabPress',
+                            target: route.key,
+                            canPreventDefault: true,
+                        });
+                        if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name);
+                    };
 
-                return (
-                    <Pressable
-                        key={route.key}
-                        accessibilityRole="tab"
-                        accessibilityState={{ selected: isFocused }}
-                        accessibilityLabel={String(label)}
-                        onPress={onPress}
-                        style={({ pressed }) => [styles.item, pressed && styles.pressed]}
-                    >
-                        <View style={styles.iconShell}>
-                            <MaterialCommunityIcons
-                                name={icons[route.name] as any}
-                                size={23}
-                                color={isFocused ? '#FFFFFF' : palette.muted}
-                            />
-                        </View>
-                        <Text style={[styles.label, isFocused && styles.labelActive]}>{label}</Text>
-                    </Pressable>
-                );
-            })}
+                    return (
+                        <TabItem
+                            key={route.key}
+                            route={route}
+                            label={label}
+                            isFocused={isFocused}
+                            onPress={onPress}
+                        />
+                    );
+                })}
             </View>
         </View>
     );
@@ -136,27 +177,29 @@ const styles = StyleSheet.create({
     },
     activeIndicatorSlot: {
         position: 'absolute',
-        top: 7,
+        top: -15,
         left: 0,
         alignItems: 'center',
     },
     activeIndicator: {
-        width: 44,
-        height: 40,
-        borderRadius: 15,
+        width: 56,
+        height: 56,
+        borderRadius: 20,
         backgroundColor: palette.primary,
+        borderWidth: 4,
+        borderColor: '#FFFFFF',
         shadowColor: palette.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.24,
-        shadowRadius: 8,
-        elevation: 5,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 8,
     },
     item: {
         flex: 1,
-        minHeight: 60,
+        height: 72,
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: 3,
+        justifyContent: 'flex-end',
+        paddingBottom: 9,
         zIndex: 1,
     },
     iconShell: {
@@ -165,6 +208,7 @@ const styles = StyleSheet.create({
         borderRadius: 15,
         alignItems: 'center',
         justifyContent: 'center',
+        marginBottom: 1,
     },
     label: { color: palette.muted, fontSize: 10, fontWeight: '600' },
     labelActive: { color: palette.primary, fontWeight: '800' },
