@@ -13,6 +13,8 @@ import {
 import { palette } from '../features/main/theme';
 
 const Tab = createBottomTabNavigator();
+const SIDE_INSET = 16;
+const TOP_CORNER_RADIUS = 16;
 
 const icons: Record<string, string> = {
     Home: 'home-variant-outline',
@@ -26,7 +28,8 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
     const [barWidth, setBarWidth] = useState(0);
     const [indicatorPosition, setIndicatorPosition] = useState(state.index);
     const activeIndex = useRef(new Animated.Value(state.index)).current;
-    const itemWidth = barWidth / state.routes.length;
+    const contentWidth = Math.max(0, barWidth - SIDE_INSET * 2);
+    const itemWidth = contentWidth / state.routes.length;
     const movingRouteIndex = Math.max(
         0,
         Math.min(state.routes.length - 1, Math.round(indicatorPosition))
@@ -45,21 +48,21 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
         return () => activeIndex.removeListener(listener);
     }, [activeIndex, state.index]);
 
-    const notchCenter = itemWidth * (indicatorPosition + 0.5);
-    const leftShoulder = Math.max(30, notchCenter - 42);
-    const rightShoulder = Math.min(barWidth - 30, notchCenter + 42);
+    const notchCenter = SIDE_INSET + itemWidth * (indicatorPosition + 0.5);
+    const leftShoulder = notchCenter - 36;
+    const rightShoulder = notchCenter + 36;
     const backgroundPath = barWidth > 0
         ? [
-            'M 30 0',
+            `M ${TOP_CORNER_RADIUS} 0`,
             `H ${leftShoulder}`,
-            `C ${notchCenter - 30} 0 ${notchCenter - 31} 27 ${notchCenter} 27`,
-            `C ${notchCenter + 31} 27 ${notchCenter + 30} 0 ${rightShoulder} 0`,
-            `H ${barWidth - 30}`,
-            `Q ${barWidth} 0 ${barWidth} 30`,
+            `C ${notchCenter - 27} 0 ${notchCenter - 29} 25 ${notchCenter} 25`,
+            `C ${notchCenter + 29} 25 ${notchCenter + 27} 0 ${rightShoulder} 0`,
+            `H ${barWidth - TOP_CORNER_RADIUS}`,
+            `Q ${barWidth} 0 ${barWidth} ${TOP_CORNER_RADIUS}`,
             'V 72',
             'H 0',
-            'V 30',
-            'Q 0 0 30 0',
+            `V ${TOP_CORNER_RADIUS}`,
+            `Q 0 0 ${TOP_CORNER_RADIUS} 0`,
             'Z',
         ].join(' ')
         : '';
@@ -91,6 +94,7 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
                                 styles.activeIndicatorSlot,
                                 {
                                     width: itemWidth,
+                                    left: SIDE_INSET,
                                     transform: [{ translateX: Animated.multiply(activeIndex, itemWidth) }],
                                 },
                             ]}
@@ -105,56 +109,58 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
                         </Animated.View>
                     </>
                 ) : null}
-                {state.routes.map((route: any, index: number) => {
-                    const isFocused = state.index === index;
-                    const label = String(descriptors[route.key].options.tabBarLabel ?? route.name);
+                <View style={styles.itemsRow}>
+                    {state.routes.map((route: any, index: number) => {
+                        const isFocused = state.index === index;
+                        const label = String(descriptors[route.key].options.tabBarLabel ?? route.name);
 
-                    const onPress = () => {
-                        const event = navigation.emit({
-                            type: 'tabPress',
-                            target: route.key,
-                            canPreventDefault: true,
-                        });
-                        if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name);
-                    };
+                        const onPress = () => {
+                            const event = navigation.emit({
+                                type: 'tabPress',
+                                target: route.key,
+                                canPreventDefault: true,
+                            });
+                            if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name);
+                        };
 
-                    return (
-                        <Pressable
-                            key={route.key}
-                            accessibilityRole="tab"
-                            accessibilityState={{ selected: isFocused }}
-                            accessibilityLabel={label}
-                            onPress={onPress}
-                            style={({ pressed }) => [styles.item, pressed && styles.pressed]}
-                        >
-                            <Animated.View
-                                style={[
-                                    styles.iconShell,
-                                    {
-                                        opacity: isFocused
-                                            ? 0
-                                            : activeIndex.interpolate({
-                                                inputRange: [
-                                                    Math.max(-1, index - 1),
-                                                    index,
-                                                    Math.min(state.routes.length, index + 1),
-                                                ],
-                                                outputRange: [1, 0, 1],
-                                                extrapolate: 'clamp',
-                                            }),
-                                    },
-                                ]}
+                        return (
+                            <Pressable
+                                key={route.key}
+                                accessibilityRole="tab"
+                                accessibilityState={{ selected: isFocused }}
+                                accessibilityLabel={label}
+                                onPress={onPress}
+                                style={({ pressed }) => [styles.item, pressed && styles.pressed]}
                             >
-                                <MaterialCommunityIcons
-                                    name={icons[route.name] as any}
-                                    size={22}
-                                    color={palette.muted}
-                                />
-                            </Animated.View>
-                            <Text style={[styles.label, isFocused && styles.labelActive]}>{label}</Text>
-                        </Pressable>
-                    );
-                })}
+                                <Animated.View
+                                    style={[
+                                        styles.iconShell,
+                                        {
+                                            opacity: isFocused
+                                                ? 0
+                                                : activeIndex.interpolate({
+                                                    inputRange: [
+                                                        Math.max(-1, index - 1),
+                                                        index,
+                                                        Math.min(state.routes.length, index + 1),
+                                                    ],
+                                                    outputRange: [1, 0, 1],
+                                                    extrapolate: 'clamp',
+                                                }),
+                                        },
+                                    ]}
+                                >
+                                    <MaterialCommunityIcons
+                                        name={icons[route.name] as any}
+                                        size={22}
+                                        color={palette.muted}
+                                    />
+                                </Animated.View>
+                                <Text style={[styles.label, isFocused && styles.labelActive]}>{label}</Text>
+                            </Pressable>
+                        );
+                    })}
+                </View>
             </View>
         </View>
     );
@@ -199,10 +205,18 @@ const styles = StyleSheet.create({
         overflow: 'visible',
     },
     barShape: { ...StyleSheet.absoluteFillObject },
+    itemsRow: {
+        position: 'absolute',
+        top: 0,
+        right: SIDE_INSET,
+        bottom: 0,
+        left: SIDE_INSET,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
     activeIndicatorSlot: {
         position: 'absolute',
         top: -27,
-        left: 0,
         alignItems: 'center',
         zIndex: 4,
     },
