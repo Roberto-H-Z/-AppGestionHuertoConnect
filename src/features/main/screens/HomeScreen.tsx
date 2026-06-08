@@ -35,9 +35,10 @@ import {
     CultivoCreate,
 } from '../types/cropTypes';
 import { huertoService } from '../services/huertoService';
-import { EmptyState, HuertoCard, AddHuertoModal, WeatherModal, NotificationsModal } from '../components';
+import { AppScreenHeader, EmptyState, HuertoCard, AddHuertoModal, WeatherModal, NotificationsModal } from '../components';
 import { WeatherData, fetchWeatherByLocation } from '../services/weatherService';
 import { useAuth } from '../../auth/services/AuthContext';
+import { palette, radii, shadows } from '../theme';
 
 export const HomeScreen: React.FC = () => {
     const navigation = useNavigation<any>();
@@ -240,25 +241,17 @@ export const HomeScreen: React.FC = () => {
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
 
-            {/* Header */}
-            <View style={styles.header}>
-                <View style={styles.headerLeft}>
-                    <View style={styles.headerIconBg}>
-                        <MaterialCommunityIcons name="leaf" size={20} color="#059669" />
-                    </View>
-                    <View>
-                        <Text style={styles.greeting}>Hola, bienvenido 👋</Text>
-                        <Text style={styles.userName}>{userName}</Text>
-                    </View>
-                </View>
-                <TouchableOpacity
-                    style={styles.notificationButton}
-                    activeOpacity={0.7}
-                    onPress={() => setNotificationsVisible(true)}
-                >
-                    <MaterialCommunityIcons name="bell-outline" size={22} color="#374151" />
-                </TouchableOpacity>
-            </View>
+            <AppScreenHeader
+                eyebrow="Tu huerto hoy"
+                title={`Hola, ${userName}`}
+                subtitle="Revisa el estado de tus cultivos y próximas acciones."
+                icon="leaf"
+                actions={[{
+                    icon: 'bell-outline',
+                    label: 'Ver notificaciones',
+                    onPress: () => setNotificationsVisible(true),
+                }]}
+            />
 
             {/* Content */}
             {hasHuertos ? (
@@ -275,6 +268,33 @@ export const HomeScreen: React.FC = () => {
                         />
                     }
                 >
+                    <TouchableOpacity
+                        style={styles.overviewCard}
+                        activeOpacity={0.85}
+                        onPress={handleWeatherPress}
+                        accessibilityRole="button"
+                        accessibilityLabel="Ver detalle del clima"
+                    >
+                        <View style={styles.overviewTop}>
+                            <View>
+                                <Text style={styles.overviewEyebrow}>Resumen de hoy</Text>
+                                <Text style={styles.overviewTitle}>
+                                    {huertosConDetalles.length} {huertosConDetalles.length === 1 ? 'huerto activo' : 'huertos activos'}
+                                </Text>
+                            </View>
+                            <View style={styles.weatherBadge}>
+                                <MaterialCommunityIcons name="weather-partly-cloudy" size={18} color={palette.amber} />
+                                <Text style={styles.weatherBadgeText}>{weatherText}</Text>
+                            </View>
+                        </View>
+                        <View style={styles.overviewDivider} />
+                        <View style={styles.overviewFooter}>
+                            <MaterialCommunityIcons name="lightbulb-on-outline" size={18} color={palette.primary} />
+                            <Text style={styles.overviewHint}>Consulta el clima antes de regar o aplicar tratamientos.</Text>
+                            <MaterialCommunityIcons name="chevron-right" size={20} color={palette.sage} />
+                        </View>
+                    </TouchableOpacity>
+
                     {/* Section header */}
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Mis Huertos</Text>
@@ -348,92 +368,67 @@ export const HomeScreen: React.FC = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FAFAFA',
-    },
-    // ── Header ──────────────────────────────────────────────────────────
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingTop: Platform.OS === 'web' ? 20 : 10,
-        paddingBottom: 14,
-        backgroundColor: '#FFFFFF',
-        borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
-        elevation: 3,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.07,
-        shadowRadius: 6,
-    },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 11,
-    },
-    headerIconBg: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#ECFDF5',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    greeting: {
-        fontSize: 12,
-        color: '#6B7280',
-        fontWeight: '500',
-    },
-    userName: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#111827',
-        letterSpacing: -0.4,
-    },
-    notificationButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#F3F4F6',
-        alignItems: 'center',
-        justifyContent: 'center',
+        backgroundColor: palette.canvas,
     },
     // ── Content ──────────────────────────────────────────────────────────
     scrollView: {
         flex: 1,
     },
     scrollContent: {
-        paddingTop: 8,
+        paddingTop: 4,
+        paddingHorizontal: 14,
     },
+    overviewCard: {
+        marginBottom: 20,
+        padding: 18,
+        borderRadius: radii.large,
+        backgroundColor: palette.forest,
+        ...shadows.card,
+    },
+    overviewTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
+    overviewEyebrow: { color: '#AFC9B7', fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
+    overviewTitle: { marginTop: 5, color: '#FFFFFF', fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
+    weatherBadge: {
+        maxWidth: '48%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderRadius: radii.pill,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+    },
+    weatherBadgeText: { flexShrink: 1, color: '#FFFFFF', fontSize: 11.5, fontWeight: '700' },
+    overviewDivider: { height: 1, marginVertical: 15, backgroundColor: 'rgba(255,255,255,0.12)' },
+    overviewFooter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    overviewHint: { flex: 1, color: '#D7E4DB', fontSize: 12.5, lineHeight: 18 },
     sectionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 16,
         marginBottom: 12,
-        marginTop: 8,
+        marginTop: 0,
     },
     sectionTitle: {
         fontSize: 17,
         fontWeight: '700',
-        color: '#111827',
+        color: palette.ink,
         letterSpacing: -0.3,
     },
     addMoreButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#ECFDF5',
+        backgroundColor: palette.primarySoft,
         paddingHorizontal: 12,
         paddingVertical: 7,
         borderRadius: 20,
         gap: 4,
         borderWidth: 1,
-        borderColor: '#D1FAE5',
+        borderColor: palette.border,
     },
     addMoreText: {
         fontSize: 13,
-        color: '#059669',
+        color: palette.primary,
         fontWeight: '600',
     },
     // ── FAB ──────────────────────────────────────────────────────────────
@@ -444,10 +439,10 @@ const styles = StyleSheet.create({
         width: 52,
         height: 52,
         borderRadius: 26,
-        backgroundColor: '#059669',
+        backgroundColor: palette.primary,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#059669',
+        shadowColor: palette.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.35,
         shadowRadius: 10,

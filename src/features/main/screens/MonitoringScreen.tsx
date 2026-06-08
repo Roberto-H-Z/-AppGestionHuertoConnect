@@ -13,6 +13,8 @@ import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiClient } from '../../../infrastructure/api/apiClient';
+import { AppScreenHeader } from '../components';
+import { palette, radii, shadows } from '../theme';
 
 type StageStatus = 'completed' | 'in-progress' | 'pending';
 
@@ -203,17 +205,33 @@ export const MonitoringScreen: React.FC = () => {
         () => (selectedCropId ? timelines.filter((t) => t.cropId === selectedCropId) : timelines),
         [selectedCropId, timelines]
     );
+    const totalStages = timelines.reduce((total, timeline) => total + timeline.stages.length, 0);
+    const completedStages = timelines.reduce(
+        (total, timeline) => total + timeline.stages.filter((stage) => stage.status === 'completed').length,
+        0
+    );
+    const progress = totalStages > 0 ? Math.round((completedStages / totalStages) * 100) : 0;
 
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
 
-            {/* Header */}
-            <View style={styles.header}>
-                <View style={styles.headerIconBg}>
-                    <MaterialCommunityIcons name="timeline-clock-outline" size={20} color="#059669" />
+            <AppScreenHeader
+                eyebrow="Seguimiento"
+                title="Progreso de cultivos"
+                subtitle="Etapas, actividades y próximos cuidados."
+                icon="chart-timeline-variant"
+            />
+
+            <View style={styles.progressCard}>
+                <View style={styles.progressCopy}>
+                    <Text style={styles.progressLabel}>Avance general</Text>
+                    <Text style={styles.progressValue}>{progress}%</Text>
+                    <Text style={styles.progressMeta}>{completedStages} de {totalStages} etapas completadas</Text>
                 </View>
-                <Text style={styles.headerTitle}>Línea de Tiempo</Text>
+                <View style={styles.progressRing}>
+                    <MaterialCommunityIcons name="sprout" size={28} color={palette.primary} />
+                </View>
             </View>
 
             {/* Crop filter chips */}
@@ -288,28 +306,40 @@ export const MonitoringScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#FAFAFA' },
-    // ── Header
-    header: {
-        flexDirection: 'row', alignItems: 'center', gap: 10,
-        paddingHorizontal: 16, paddingTop: Platform.OS === 'web' ? 20 : 10, paddingBottom: 13,
-        backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
-        elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.07, shadowRadius: 6,
+    container: { flex: 1, backgroundColor: palette.canvas },
+    progressCard: {
+        marginHorizontal: 14,
+        marginBottom: 12,
+        padding: 18,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderRadius: radii.large,
+        backgroundColor: palette.forest,
+        ...shadows.card,
     },
-    headerIconBg: {
-        width: 38, height: 38, borderRadius: 19,
-        backgroundColor: '#ECFDF5', alignItems: 'center', justifyContent: 'center',
+    progressCopy: { flex: 1 },
+    progressLabel: { color: '#B9CBBF', fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
+    progressValue: { marginTop: 4, color: '#FFFFFF', fontSize: 30, fontWeight: '800', letterSpacing: -1 },
+    progressMeta: { marginTop: 2, color: '#D6E2D9', fontSize: 12.5 },
+    progressRing: {
+        width: 58,
+        height: 58,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#FFFFFF',
     },
-    headerTitle: { fontSize: 18, fontWeight: '700', color: '#111827', letterSpacing: -0.3 },
     // ── Chips
-    chipsWrapper: { backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+    chipsWrapper: { backgroundColor: palette.canvas },
     chipsContent: { paddingHorizontal: 14, paddingVertical: 10, gap: 8 },
     chip: {
         flexDirection: 'row', alignItems: 'center', gap: 5,
-        paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F3F4F6',
+        paddingHorizontal: 14, paddingVertical: 9, borderRadius: radii.pill, backgroundColor: palette.surface,
+        borderWidth: 1, borderColor: palette.border,
     },
-    chipActive: { backgroundColor: '#059669' },
-    chipText: { fontSize: 13, color: '#6B7280', fontWeight: '600' },
+    chipActive: { backgroundColor: palette.primary, borderColor: palette.primary },
+    chipText: { fontSize: 13, color: palette.muted, fontWeight: '700' },
     chipTextActive: { color: '#fff' },
     // ── Timeline
     scrollView: { flex: 1 },
@@ -328,7 +358,7 @@ const styles = StyleSheet.create({
     railLine: { flex: 1, width: 2, backgroundColor: '#D1FAE5', marginTop: 4 },
     dot: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
     stageCard: {
-        flex: 1, borderRadius: 16, padding: 14, marginBottom: 14,
+        flex: 1, borderRadius: radii.medium, padding: 15, marginBottom: 14,
         shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1,
     },
     stageCardHeader: { flexDirection: 'row', gap: 10, alignItems: 'center' },
