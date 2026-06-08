@@ -55,7 +55,7 @@ const TabItem: React.FC<TabItemProps> = ({ route, label, isFocused, onPress }) =
                         transform: [{
                             translateY: lift.interpolate({
                                 inputRange: [0, 1],
-                                outputRange: [0, -22],
+                                outputRange: [0, -19],
                             }),
                         }],
                     },
@@ -103,7 +103,9 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
                             },
                         ]}
                     >
-                        <View style={styles.activeIndicator} />
+                        <View style={styles.activeCutout}>
+                            <View style={styles.activeIndicator} />
+                        </View>
                     </Animated.View>
                 )}
                 {state.routes.map((route: any, index: number) => {
@@ -157,7 +159,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#FFFFFF',
-        borderRadius: 24,
+        borderRadius: 32,
         borderWidth: 1,
         borderColor: palette.border,
         overflow: 'visible',
@@ -177,21 +179,28 @@ const styles = StyleSheet.create({
     },
     activeIndicatorSlot: {
         position: 'absolute',
-        top: -15,
+        top: -22,
         left: 0,
         alignItems: 'center',
+        zIndex: 2,
+    },
+    activeCutout: {
+        width: 66,
+        height: 66,
+        borderRadius: 33,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: palette.canvas,
     },
     activeIndicator: {
-        width: 56,
-        height: 56,
-        borderRadius: 20,
+        width: 52,
+        height: 52,
+        borderRadius: 26,
         backgroundColor: palette.primary,
-        borderWidth: 4,
-        borderColor: '#FFFFFF',
         shadowColor: palette.primary,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.3,
-        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 5 },
+        shadowOpacity: 0.24,
+        shadowRadius: 9,
         elevation: 8,
     },
     item: {
@@ -200,15 +209,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'flex-end',
         paddingBottom: 9,
-        zIndex: 1,
+        zIndex: 3,
     },
     iconShell: {
-        width: 44,
-        height: 40,
-        borderRadius: 15,
+        width: 52,
+        height: 52,
+        borderRadius: 26,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 1,
+        marginBottom: -5,
     },
     label: { color: palette.muted, fontSize: 10, fontWeight: '600' },
     labelActive: { color: palette.primary, fontWeight: '800' },
