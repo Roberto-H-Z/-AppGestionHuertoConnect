@@ -15,6 +15,7 @@ import { palette } from '../features/main/theme';
 const Tab = createBottomTabNavigator();
 const SIDE_INSET = 16;
 const TOP_CORNER_RADIUS = 16;
+const BAR_HEIGHT = 62;
 
 const icons: Record<string, string> = {
     Home: 'home-variant-outline',
@@ -59,7 +60,7 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
             `C ${notchCenter + 29} 25 ${notchCenter + 27} 0 ${rightShoulder} 0`,
             `H ${barWidth - TOP_CORNER_RADIUS}`,
             `Q ${barWidth} 0 ${barWidth} ${TOP_CORNER_RADIUS}`,
-            'V 72',
+            `V ${BAR_HEIGHT}`,
             'H 0',
             `V ${TOP_CORNER_RADIUS}`,
             `Q 0 0 ${TOP_CORNER_RADIUS} 0`,
@@ -78,7 +79,7 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
                         <Svg
                             pointerEvents="none"
                             width={barWidth}
-                            height={72}
+                            height={BAR_HEIGHT}
                             style={styles.barShape}
                         >
                             <Path
@@ -182,7 +183,7 @@ const styles = StyleSheet.create({
         right: 0,
         bottom: 0,
         left: 0,
-        height: 96,
+        height: 82,
         justifyContent: 'flex-end',
         ...Platform.select({
             ios: {
@@ -199,7 +200,7 @@ const styles = StyleSheet.create({
         }),
     },
     tabBar: {
-        height: 72,
+        height: BAR_HEIGHT,
         flexDirection: 'row',
         alignItems: 'center',
         overflow: 'visible',
@@ -216,7 +217,7 @@ const styles = StyleSheet.create({
     },
     activeIndicatorSlot: {
         position: 'absolute',
-        top: -27,
+        top: -19,
         alignItems: 'center',
         zIndex: 4,
     },
@@ -237,10 +238,10 @@ const styles = StyleSheet.create({
     },
     item: {
         flex: 1,
-        height: 72,
+        height: BAR_HEIGHT,
         alignItems: 'center',
         justifyContent: 'flex-end',
-        paddingBottom: 10,
+        paddingBottom: 7,
         zIndex: 3,
     },
     iconShell: {
@@ -248,7 +249,7 @@ const styles = StyleSheet.create({
         height: 30,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 2,
+        marginBottom: 0,
     },
     label: { color: palette.muted, fontSize: 10, fontWeight: '600' },
     labelActive: { color: palette.primary, fontWeight: '800' },
