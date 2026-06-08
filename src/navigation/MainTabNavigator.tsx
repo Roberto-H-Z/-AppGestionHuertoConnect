@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import {
     HomeScreen,
@@ -27,14 +27,18 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
     const [indicatorPosition, setIndicatorPosition] = useState(state.index);
     const activeIndex = useRef(new Animated.Value(state.index)).current;
     const itemWidth = barWidth / state.routes.length;
+    const movingRouteIndex = Math.max(
+        0,
+        Math.min(state.routes.length - 1, Math.round(indicatorPosition))
+    );
 
     useEffect(() => {
         const listener = activeIndex.addListener(({ value }) => setIndicatorPosition(value));
 
-        Animated.spring(activeIndex, {
+        Animated.timing(activeIndex, {
             toValue: state.index,
-            friction: 9,
-            tension: 95,
+            duration: 380,
+            easing: Easing.bezier(0.22, 1, 0.36, 1),
             useNativeDriver: false,
         }).start();
 
@@ -93,7 +97,7 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
                         >
                             <View style={styles.activeIndicator}>
                                 <MaterialCommunityIcons
-                                    name={icons[state.routes[state.index].name] as any}
+                                    name={icons[state.routes[movingRouteIndex].name] as any}
                                     size={25}
                                     color="#FFFFFF"
                                 />
@@ -123,13 +127,30 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
                             onPress={onPress}
                             style={({ pressed }) => [styles.item, pressed && styles.pressed]}
                         >
-                            <View style={styles.iconShell}>
+                            <Animated.View
+                                style={[
+                                    styles.iconShell,
+                                    {
+                                        opacity: isFocused
+                                            ? 0
+                                            : activeIndex.interpolate({
+                                                inputRange: [
+                                                    Math.max(-1, index - 1),
+                                                    index,
+                                                    Math.min(state.routes.length, index + 1),
+                                                ],
+                                                outputRange: [1, 0, 1],
+                                                extrapolate: 'clamp',
+                                            }),
+                                    },
+                                ]}
+                            >
                                 <MaterialCommunityIcons
                                     name={icons[route.name] as any}
                                     size={22}
-                                    color={isFocused ? 'transparent' : palette.muted}
+                                    color={palette.muted}
                                 />
-                            </View>
+                            </Animated.View>
                             <Text style={[styles.label, isFocused && styles.labelActive]}>{label}</Text>
                         </Pressable>
                     );
@@ -152,9 +173,9 @@ export const MainTabNavigator = () => (
 const styles = StyleSheet.create({
     wrapper: {
         position: 'absolute',
-        right: 12,
-        bottom: 10,
-        left: 12,
+        right: 0,
+        bottom: 0,
+        left: 0,
         height: 96,
         justifyContent: 'flex-end',
         ...Platform.select({
