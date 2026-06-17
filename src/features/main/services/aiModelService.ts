@@ -36,31 +36,49 @@ export interface GardenRecommendationResponse {
 // ── Petición al modelo de plagas ────────────────────────────────
 export interface PestDetectionRequest {
     imagen_url: string;
-}
-
-export interface PestDetectionImageRequest {
-    uri: string;
-    fileName?: string;
-    mimeType?: string;
+    huerto_id?: string | null;
+    cultivo_id?: string | null;
 }
 
 // ── Respuesta del modelo de plagas (YOLOv8) ─────────────────────
+export interface TratamientoEcologico {
+    nombre?: string;
+    descripcion?: string;
+    aplicacion?: string;
+    frecuencia?: string;
+    tipo?: string;
+    [key: string]: unknown;
+}
+
 export interface PlagaDetectada {
     plaga?: string;
+    nombre_cientifico?: string;
     clase?: string;
     label?: string;
     name?: string;
     confianza?: number | string;
     confidence?: number | string;
     score?: number | string;
+    severidad?: string;
     bbox?: number[];
     descripcion_plaga?: string;
+    cultivos_afectados?: string[];
     tratamiento?: string;
-    tratamientos_ecologicos?: any[];
+    tratamientos_ecologicos?: TratamientoEcologico[];
+    alerta_recomendada?: boolean;
+    mitigacion_viable?: boolean;
+    nota_mitigacion?: string | null;
     [key: string]: unknown;
 }
 
 export interface PestDetectionResponse {
+    // Respuesta real del API: objeto singular 'deteccion'
+    deteccion?: PlagaDetectada;
+    imagen_analizada?: string;
+    modelo_version?: string;
+    modo?: string;
+    mensaje?: string;
+    // Campos legacy por si cambian
     detecciones?: PlagaDetectada[];
     plagas?: PlagaDetectada[];
     results?: PlagaDetectada[];
@@ -88,33 +106,13 @@ export const aiModelService = {
     },
 
     /**
-     * POST /plagas/detectar (microservicio YOLOv8 en puerto 8003)
+     * POST /plagas/detectar
      * Modelo YOLOv8: detecta plagas en una imagen pública (URL).
      */
     detectPest: async (payload: PestDetectionRequest): Promise<PestDetectionResponse> => {
         const response = await apiClient.post<PestDetectionResponse>(
             `${environment.services.plagasModel}/detectar`,
             payload
-        );
-        return response.data;
-    },
-
-    /**
-     * POST /plagas/detectar (microservicio YOLOv8 en puerto 8003)
-     * Modelo YOLOv8: detecta plagas desde una imagen local (FormData).
-     * Envía el archivo como multipart/form-data.
-     */
-    detectPestFromImage: async (image: PestDetectionImageRequest): Promise<PestDetectionResponse> => {
-        const formData = new FormData();
-        formData.append('file', {
-            uri: image.uri,
-            name: image.fileName || 'planta.jpg',
-            type: image.mimeType || 'image/jpeg',
-        } as any);
-
-        const response = await apiClient.post<PestDetectionResponse>(
-            `${environment.services.plagasModel}/detectar`,
-            formData
         );
         return response.data;
     },

@@ -26,11 +26,10 @@ import {
     Image,
     SafeAreaView,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { chatbotService, ConversacionOut, MensajeOut } from '../services/chatbotService';
-import { aiModelService, CultivoRecomendado, PlagaDetectada, PestDetectionImageRequest } from '../services/aiModelService';
+import { aiModelService, CultivoRecomendado, PlagaDetectada } from '../services/aiModelService';
 import { geocodeMunicipio } from '../services/geocodingService';
 import { AppScreenHeader } from '../components';
 import { palette, radii, shadows } from '../theme';
@@ -150,8 +149,8 @@ const MODE_CONFIG = {
         icon: 'bug-outline' as const,
         color: '#DC2626',
         lightBg: '#FEF2F2',
-        placeholder: 'Describe los síntomas (opcional)...',
-        hint: 'Toca 📷 para seleccionar una foto de tu planta',
+        placeholder: 'Pega la URL pública de la foto de tu planta...',
+        hint: 'IA: YOLOv8 detectará plagas en la imagen',
     },
 };
 
@@ -192,10 +191,10 @@ const getAssistantResponse = (input: string): string => {
     if (n.includes('clima') || n.includes('temperatura') || n.includes('cultiv') || n.includes('sembrar') || n.includes('plantar'))
         return '🌽 Para recomendaciones de cultivos según el clima de TU zona, usa el modo "Cultivos IA" — el modelo de Inteligencia Artificial analizará los datos meteorológicos de tu municipio y te dirá qué plantar.';
     if (n.includes('url') || n.includes('foto') || n.includes('imagen') || n.includes('fotograf'))
-        return '🐛 Para analizar fotos de tu planta con IA, cambia al modo "Detectar Plaga" en los botones de arriba. Ahí podrás seleccionar una foto de la galería de tu teléfono y el modelo YOLOv8 detectará plagas.';
+        return '🐛 Para analizar fotos de tu planta con IA, cambia al modo "Detectar Plaga" en los botones de arriba. Ahí podrás pegar la URL de una foto pública de tu planta y el modelo YOLOv8 detectará plagas.';
     if (n.length < 20 && /^[a-záéíóúñA-ZÁÉÍÓÚÑ\s]+$/.test(input.trim()))
         return '🌿 Parece que escribiste el nombre de una ciudad. Si quieres recomendaciones de cultivos para esa zona, usa el modo "Cultivos IA" en los botones de arriba y vuelve a escribir el municipio ahí.';
-    return 'Soy el asistente de HuertoConnect. Puedo ayudarte con:\n\n• 💧 Riego y nutrición de plantas\n• 🐛 Identificación y control de plagas\n• 🌱 Selección de cultivos\n• 🌤️ Clima y temporadas de siembra\n\nPara análisis con IA real:\n• Cultivos IA → escribe tu municipio\n• Detectar Plaga → selecciona una foto de tu galería';
+    return 'Soy el asistente de HuertoConnect. Puedo ayudarte con:\n\n• 💧 Riego y nutrición de plantas\n• 🐛 Identificación y control de plagas\n• 🌱 Selección de cultivos\n• 🌤️ Clima y temporadas de siembra\n\nPara análisis con IA real:\n• Cultivos IA → escribe tu municipio\n• Detectar Plaga → pega la URL de una foto';
 };
 
 // ══════════════════════════════════════════════════════
@@ -631,7 +630,6 @@ export const AIChatScreen: React.FC = () => {
     const [conversations, setConversations] = useState<ConversacionOut[]>([]);
     const [historyVisible, setHistoryVisible] = useState(false);
     const [historyLoading, setHistoryLoading] = useState(false);
-    const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
 
     const scrollRef = useRef<ScrollView>(null);
     const modeConfig = MODE_CONFIG[mode];
@@ -641,7 +639,7 @@ export const AIChatScreen: React.FC = () => {
         const welcomes: Record<ChatMode, string> = {
             chat: '¡Hola! Soy tu asistente de horticultura 🌿\n\nPuedo ayudarte con riego, plagas, cultivos y fertilización.\n\nO usa los modos de IA arriba para análisis con Inteligencia Artificial real.',
             cultivos: '🌽 Modo Cultivos IA activado\n\nEscribe el nombre de tu municipio (puede ser cualquier ciudad de México) y el modelo de IA analizará el clima real de esa zona para recomendarte los mejores cultivos.',
-            plagas: '🐛 Modo Detección de Plagas activado\n\nToca el botón 📷 para seleccionar una foto de tu planta desde la galería. El modelo YOLOv8 analizará la imagen y detectará posibles plagas con un nivel de confianza.',
+            plagas: '🐛 Modo Detección de Plagas activado\n\nPega la URL pública de una foto de tu planta. El modelo YOLOv8 analizará la imagen y detectará posibles plagas con un nivel de confianza.',
         };
         setMessages([{
             id: `welcome-${mode}-${Date.now()}`,
@@ -652,7 +650,6 @@ export const AIChatScreen: React.FC = () => {
         }]);
         setConvId(null);
         setInputText('');
-        setSelectedImage(null);
     }, [mode]);
 
     const scrollToBottom = useCallback(() => {
@@ -787,30 +784,21 @@ export const AIChatScreen: React.FC = () => {
 
             // ── PLAGAS: YOLOv8 ───────────────────────────────────
             } else if (mode === 'plagas') {
-                if (!selectedImage) {
+                if (!trimmed.startsWith('http')) {
                     addMessage({
-                        text: 'Por favor, selecciona una foto de tu planta tocando el botón 📷 antes de enviar.',
+                        text: 'La URL debe comenzar con https://...\n\nEjemplo:\nhttps://images.unsplash.com/photo-xxx.jpg',
                         sender: 'ai', type: 'error',
                     });
                     return;
                 }
-                const imageUri = selectedImage.uri;
-                const description = trimmed || 'Analizar imagen';
-                currentId = await persistMessage(`[Foto adjunta] ${description}`, 'user', currentId) ?? currentId;
-                
-                const imageRequest: PestDetectionImageRequest = {
-                    uri: imageUri,
-                    fileName: selectedImage.fileName || `planta_${Date.now()}.jpg`,
-                    mimeType: selectedImage.mimeType || 'image/jpeg',
-                };
-                const response = await aiModelService.detectPestFromImage(imageRequest);
+                currentId = await persistMessage(`Analizar imagen: ${trimmed}`, 'user', currentId) ?? currentId;
+                const response = await aiModelService.detectPest({ imagen_url: trimmed });
                 const plagas = extractPlagas(response);
                 const reply = plagas.length > 0
                     ? `Detecté ${plagas.length} posible${plagas.length > 1 ? 's' : ''} plaga${plagas.length > 1 ? 's' : ''} en la imagen`
                     : 'La imagen fue analizada. No se detectaron plagas — la planta parece sana.';
-                addMessage({ text: reply, sender: 'ai', type: 'plagas_result', plagasData: plagas, imagenUrl: imageUri });
+                addMessage({ text: reply, sender: 'ai', type: 'plagas_result', plagasData: plagas, imagenUrl: trimmed });
                 await persistMessage(reply, 'assistant', currentId);
-                setSelectedImage(null);
 
             // ── ASISTENTE: texto libre ───────────────────────────
             } else {
@@ -827,35 +815,7 @@ export const AIChatScreen: React.FC = () => {
             setIsTyping(false);
             scrollToBottom();
         }
-    }, [isTyping, mode, convId, addMessage, persistMessage, scrollToBottom, selectedImage]);
-
-    // ── Seleccionar imagen de galería ─────────────────────────────
-    const pickImage = useCallback(async () => {
-        try {
-            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (status !== 'granted') {
-                Alert.alert(
-                    'Permiso necesario',
-                    'Necesitamos acceso a tu galería para analizar fotos de tus plantas.',
-                    [{ text: 'Entendido' }]
-                );
-                return;
-            }
-
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ['images'],
-                allowsEditing: true,
-                quality: 0.8,
-                base64: false,
-            });
-
-            if (!result.canceled && result.assets.length > 0) {
-                setSelectedImage(result.assets[0]);
-            }
-        } catch (error) {
-            Alert.alert('Error', 'No se pudo abrir la galería. Intenta de nuevo.');
-        }
-    }, []);
+    }, [isTyping, mode, convId, addMessage, persistMessage, scrollToBottom]);
 
     const handleSend = useCallback(() => sendMessage(inputText), [sendMessage, inputText]);
     const handleChip = useCallback((prompt: string) => sendMessage(prompt), [sendMessage]);
@@ -864,7 +824,6 @@ export const AIChatScreen: React.FC = () => {
 
     const quickChips = mode === 'cultivos' ? QUICK_CHIPS_CULTIVOS : mode === 'chat' ? QUICK_CHIPS_CHAT : [];
     const showChips = messages.length <= 1 && quickChips.length > 0;
-    const canSend = mode === 'plagas' ? !!selectedImage : !!inputText.trim();
 
     return (
         <SafeAreaView style={styles.root}>
@@ -955,51 +914,15 @@ export const AIChatScreen: React.FC = () => {
                     <View style={{ height: 8 }} />
                 </ScrollView>
 
-                {/* ── IMAGE PREVIEW (plagas mode) ── */}
-                {mode === 'plagas' && selectedImage && (
-                    <View style={styles.imagePreviewBar}>
-                        <Image source={{ uri: selectedImage.uri }} style={styles.imagePreviewThumb} />
-                        <View style={styles.imagePreviewInfo}>
-                            <Text style={styles.imagePreviewName} numberOfLines={1}>
-                                📷 Foto seleccionada
-                            </Text>
-                            <Text style={styles.imagePreviewHint}>Toca enviar para analizar</Text>
-                        </View>
-                        <TouchableOpacity
-                            style={styles.imagePreviewRemove}
-                            onPress={() => setSelectedImage(null)}
-                            activeOpacity={0.7}
-                        >
-                            <MaterialCommunityIcons name="close-circle" size={22} color="#EF4444" />
-                        </TouchableOpacity>
-                    </View>
-                )}
-
                 {/* ── INPUT BAR ── */}
                 <View style={styles.inputBar}>
                     <View style={[styles.inputWrapper, { borderColor: modeConfig.color + '55' }]}>
-                        {/* Gallery button for plagas mode */}
-                        {mode === 'plagas' ? (
-                            <TouchableOpacity
-                                style={[styles.galleryBtn, { backgroundColor: selectedImage ? '#DCFCE7' : modeConfig.lightBg }]}
-                                onPress={pickImage}
-                                activeOpacity={0.7}
-                                disabled={isTyping}
-                            >
-                                <MaterialCommunityIcons
-                                    name={selectedImage ? 'check-circle' : 'camera-plus-outline'}
-                                    size={20}
-                                    color={selectedImage ? '#16A34A' : modeConfig.color}
-                                />
-                            </TouchableOpacity>
-                        ) : (
-                            <MaterialCommunityIcons
-                                name={mode === 'cultivos' ? 'map-marker-outline' : 'message-outline'}
-                                size={18}
-                                color={modeConfig.color}
-                                style={styles.inputPrefixIcon}
-                            />
-                        )}
+                        <MaterialCommunityIcons
+                            name={mode === 'cultivos' ? 'map-marker-outline' : mode === 'plagas' ? 'link-variant' : 'message-outline'}
+                            size={18}
+                            color={modeConfig.color}
+                            style={styles.inputPrefixIcon}
+                        />
                         <TextInput
                             style={styles.input}
                             placeholder={modeConfig.placeholder}
@@ -1011,9 +934,9 @@ export const AIChatScreen: React.FC = () => {
                             blurOnSubmit={false}
                         />
                         <TouchableOpacity
-                            style={[styles.sendBtn, { backgroundColor: modeConfig.color }, (!canSend || isTyping) && styles.sendBtnDisabled]}
+                            style={[styles.sendBtn, { backgroundColor: modeConfig.color }, (!inputText.trim() || isTyping) && styles.sendBtnDisabled]}
                             onPress={handleSend}
-                            disabled={!canSend || isTyping}
+                            disabled={!inputText.trim() || isTyping}
                             activeOpacity={0.8}
                         >
                             {isTyping
@@ -1139,26 +1062,6 @@ const styles = StyleSheet.create({
     input: { flex: 1, fontSize: 14, color: '#1F2937', maxHeight: 100, paddingVertical: 5, lineHeight: 20 },
     sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
     sendBtnDisabled: { opacity: 0.35 },
-    galleryBtn: {
-        width: 38, height: 38, borderRadius: 19,
-        alignItems: 'center', justifyContent: 'center',
-        flexShrink: 0, marginBottom: 1,
-    },
-
-    // ── Image preview ────────────────────────────────────────────────────
-    imagePreviewBar: {
-        flexDirection: 'row', alignItems: 'center',
-        backgroundColor: '#FEF2F2', borderTopWidth: 1, borderTopColor: '#FECACA',
-        paddingHorizontal: 14, paddingVertical: 10, gap: 12,
-    },
-    imagePreviewThumb: {
-        width: 48, height: 48, borderRadius: 10,
-        borderWidth: 1, borderColor: '#FECACA',
-    },
-    imagePreviewInfo: { flex: 1, gap: 2 },
-    imagePreviewName: { fontSize: 13, fontWeight: '600', color: '#DC2626' },
-    imagePreviewHint: { fontSize: 11, color: '#9CA3AF' },
-    imagePreviewRemove: { padding: 4 },
 
     // ── Result cards ─────────────────────────────────────────────────────
     resultCard: {

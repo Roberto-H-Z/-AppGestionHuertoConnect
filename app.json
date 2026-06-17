@@ -34,7 +34,9 @@
         {
           "locationWhenInUsePermission": "Permite a HuertoConnect usar tu ubicación para recomendar cultivos adecuados para tu zona."
         }
-      ]
+      ],
+      "expo-font",
+      "expo-web-browser"
     ]
   }
 }
