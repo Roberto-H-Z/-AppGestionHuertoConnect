@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { HuertoConDetalles, ESTADO_COLORS, SiembraConCultivo } from '../types/cropTypes';
+import { palette, radii, shadows } from '../theme';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -124,7 +125,7 @@ export const HuertoCard: React.FC<HuertoCardProps> = ({
         Animated.timing(rotateAnim, {
             toValue: expanded ? 0 : 1,
             duration: 250,
-            useNativeDriver: true,
+            useNativeDriver: false,
         }).start();
         setExpanded(!expanded);
     };
@@ -254,16 +255,14 @@ export const HuertoCard: React.FC<HuertoCardProps> = ({
 
 const styles = StyleSheet.create({
     card: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        marginHorizontal: 16,
+        backgroundColor: palette.surface,
+        borderRadius: radii.large,
+        marginHorizontal: 0,
         marginBottom: 14,
         overflow: 'hidden',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 3,
+        borderWidth: 1,
+        borderColor: palette.border,
+        ...shadows.card,
     },
     cardHeader: {
         flexDirection: 'row',
@@ -290,7 +289,7 @@ const styles = StyleSheet.create({
     huertoName: {
         fontSize: 17,
         fontWeight: '700',
-        color: '#1B5E20',
+        color: palette.forest,
         flex: 1,
         marginRight: 8,
     },
@@ -305,7 +304,7 @@ const styles = StyleSheet.create({
     },
     municipioText: {
         fontSize: 12,
-        color: '#9E9E9E',
+        color: palette.muted,
         fontWeight: '500',
         marginBottom: 4,
     },
@@ -329,11 +328,11 @@ const styles = StyleSheet.create({
     sectionLabel: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#424242',
+        color: palette.text,
         marginBottom: 8,
     },
     saludSection: {
-        backgroundColor: '#FAFAFA',
+        backgroundColor: palette.surfaceMuted,
         borderRadius: 12,
         padding: 14,
         marginBottom: 12,
@@ -396,7 +395,7 @@ const styles = StyleSheet.create({
     siembraItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FAFAFA',
+        backgroundColor: palette.surfaceMuted,
         borderRadius: 10,
         padding: 10,
         marginBottom: 6,
@@ -416,11 +415,11 @@ const styles = StyleSheet.create({
     siembraNombre: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#1B5E20',
+        color: palette.forest,
     },
     siembraFecha: {
         fontSize: 11,
-        color: '#9E9E9E',
+        color: palette.muted,
         marginTop: 1,
     },
     siembraEstadoBadge: {
@@ -445,7 +444,7 @@ const styles = StyleSheet.create({
     summaryTitle: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#1B5E20',
+        color: palette.forest,
         marginBottom: 10,
     },
     summaryGrid: {
@@ -467,13 +466,13 @@ const styles = StyleSheet.create({
     },
     summaryLabel: {
         fontSize: 11,
-        color: '#9E9E9E',
+        color: palette.muted,
         marginTop: 6,
         fontWeight: '500',
     },
     summaryValue: {
         fontSize: 13,
-        color: '#1B5E20',
+        color: palette.forest,
         fontWeight: '700',
         marginTop: 2,
     },

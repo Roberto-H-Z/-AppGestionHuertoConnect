@@ -48,8 +48,8 @@ const ToggleRow: React.FC<{
 
     useEffect(() => {
         Animated.parallel([
-            Animated.timing(slideAnim, { toValue: 0, duration: 400, delay, useNativeDriver: true }),
-            Animated.timing(fadeAnim, { toValue: 1, duration: 400, delay, useNativeDriver: true }),
+            Animated.timing(slideAnim, { toValue: 0, duration: 400, delay, useNativeDriver: false }),
+            Animated.timing(fadeAnim, { toValue: 1, duration: 400, delay, useNativeDriver: false }),
         ]).start();
     }, []);
 
@@ -93,14 +93,14 @@ export const NotificationSettingsScreen: React.FC = () => {
     });
 
     useEffect(() => {
-        Animated.timing(headerFade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+        Animated.timing(headerFade, { toValue: 1, duration: 400, useNativeDriver: false }).start();
         Animated.parallel([
-            Animated.timing(bannerFade, { toValue: 1, duration: 450, delay: 100, useNativeDriver: true }),
-            Animated.timing(bannerSlide, { toValue: 0, duration: 450, delay: 100, useNativeDriver: true }),
+            Animated.timing(bannerFade, { toValue: 1, duration: 450, delay: 100, useNativeDriver: false }),
+            Animated.timing(bannerSlide, { toValue: 0, duration: 450, delay: 100, useNativeDriver: false }),
         ]).start();
         Animated.parallel([
-            Animated.timing(scheduleFade, { toValue: 1, duration: 450, delay: 700, useNativeDriver: true }),
-            Animated.timing(scheduleSlide, { toValue: 0, duration: 450, delay: 700, useNativeDriver: true }),
+            Animated.timing(scheduleFade, { toValue: 1, duration: 450, delay: 700, useNativeDriver: false }),
+            Animated.timing(scheduleSlide, { toValue: 0, duration: 450, delay: 700, useNativeDriver: false }),
         ]).start();
     }, []);
 

@@ -90,14 +90,14 @@ const StatItem: React.FC<StatItemProps> = ({ value, label, delay, focusKey }) =>
                 toValue: 1,
                 duration: 500,
                 delay,
-                useNativeDriver: true,
+                useNativeDriver: false,
             }),
             Animated.spring(scaleAnim, {
                 toValue: 1,
                 friction: 6,
                 tension: 80,
                 delay,
-                useNativeDriver: true,
+                useNativeDriver: false,
             }),
         ]).start();
     }, [focusKey]);
@@ -133,13 +133,13 @@ const MenuItem: React.FC<MenuItemProps> = ({ icon, label, subtitle, onPress, del
                 toValue: 0,
                 duration: 400,
                 delay,
-                useNativeDriver: true,
+                useNativeDriver: false,
             }),
             Animated.timing(fadeAnim, {
                 toValue: 1,
                 duration: 400,
                 delay,
-                useNativeDriver: true,
+                useNativeDriver: false,
             }),
         ]).start();
     }, [focusKey]);
@@ -189,8 +189,8 @@ export const ProfileScreen: React.FC = () => {
     const navigation = useNavigation<any>();
     const { signOut, user } = useAuth();
     const [focusKey, setFocusKey] = useState(0);
-    const [farmerPerfil, setFarmerPerfil] = useState('Cultivador');
-    const [accesoAgua, setAccesoAgua] = useState('Por definir');
+    const [farmerPerfil, setFarmerPerfil] = useState('Agricultor');
+    const [accesoAgua, setAccesoAgua] = useState('No especificado');
     const [huertosCount, setHuertosCount] = useState(0);
 
     // ── Animations ──
@@ -228,10 +228,15 @@ export const ProfileScreen: React.FC = () => {
                 tokenStorage.getItem('huertoconnect_farmer_acceso_agua'),
                 huertoService.getHuertos().catch(() => [])
             ]).then(([perfil, agua, huertos]) => {
-                if (perfil) setFarmerPerfil(perfil);
-                if (agua) setAccesoAgua(agua);
-                setHuertosCount(huertos.length);
-            }).catch(e => console.log('Error loading local profile settings:', e));
+                setFarmerPerfil(perfil || 'Agricultor');
+                setAccesoAgua(agua || 'No especificado');
+                setHuertosCount(huertos.length > 0 ? huertos.length : 0);
+            }).catch(e => {
+                console.log('Error loading local profile settings:', e);
+                setFarmerPerfil('Agricultor');
+                setAccesoAgua('No especificado');
+                setHuertosCount(0);
+            });
 
             // Increment key so children (StatItem, MenuItem) also replay
             setFocusKey((k) => k + 1);
@@ -240,7 +245,7 @@ export const ProfileScreen: React.FC = () => {
             Animated.timing(headerFade, {
                 toValue: 1,
                 duration: 400,
-                useNativeDriver: true,
+                useNativeDriver: false,
             }).start();
 
             // Avatar bounce in
@@ -249,7 +254,7 @@ export const ProfileScreen: React.FC = () => {
                 friction: 5,
                 tension: 80,
                 delay: 150,
-                useNativeDriver: true,
+                useNativeDriver: false,
             }).start();
 
             // User card slide up
@@ -258,13 +263,13 @@ export const ProfileScreen: React.FC = () => {
                     toValue: 1,
                     duration: 500,
                     delay: 200,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 }),
                 Animated.timing(cardSlide, {
                     toValue: 0,
                     duration: 500,
                     delay: 200,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 }),
             ]).start();
 
@@ -273,7 +278,7 @@ export const ProfileScreen: React.FC = () => {
                 toValue: 1,
                 duration: 400,
                 delay: 700,
-                useNativeDriver: true,
+                useNativeDriver: false,
             }).start();
         }, [user])
     );

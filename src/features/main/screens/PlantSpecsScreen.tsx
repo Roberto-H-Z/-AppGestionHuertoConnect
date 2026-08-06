@@ -114,8 +114,8 @@ const SpecRowItem: React.FC<{ label: string; value: string; delay: number; animK
         fadeAnim.setValue(0);
         slideAnim.setValue(12);
         Animated.parallel([
-            Animated.timing(fadeAnim, { toValue: 1, duration: 320, delay, useNativeDriver: true }),
-            Animated.timing(slideAnim, { toValue: 0, duration: 320, delay, useNativeDriver: true }),
+            Animated.timing(fadeAnim, { toValue: 1, duration: 320, delay, useNativeDriver: false }),
+            Animated.timing(slideAnim, { toValue: 0, duration: 320, delay, useNativeDriver: false }),
         ]).start();
     }, [animKey]);
 
@@ -155,15 +155,15 @@ export const PlantSpecsScreen: React.FC = () => {
     const cardSlide = useRef(new Animated.Value(28)).current;
 
     useEffect(() => {
-        Animated.timing(headerFade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+        Animated.timing(headerFade, { toValue: 1, duration: 400, useNativeDriver: false }).start();
         Animated.parallel([
-            Animated.timing(imageFade, { toValue: 1, duration: 500, delay: 100, useNativeDriver: true }),
-            Animated.spring(imageScale, { toValue: 1, friction: 6, tension: 60, delay: 100, useNativeDriver: true }),
+            Animated.timing(imageFade, { toValue: 1, duration: 500, delay: 100, useNativeDriver: false }),
+            Animated.spring(imageScale, { toValue: 1, friction: 6, tension: 60, delay: 100, useNativeDriver: false }),
         ]).start();
-        Animated.timing(tabsFade, { toValue: 1, duration: 400, delay: 250, useNativeDriver: true }).start();
+        Animated.timing(tabsFade, { toValue: 1, duration: 400, delay: 250, useNativeDriver: false }).start();
         Animated.parallel([
-            Animated.timing(cardFade, { toValue: 1, duration: 450, delay: 350, useNativeDriver: true }),
-            Animated.timing(cardSlide, { toValue: 0, duration: 450, delay: 350, useNativeDriver: true }),
+            Animated.timing(cardFade, { toValue: 1, duration: 450, delay: 350, useNativeDriver: false }),
+            Animated.timing(cardSlide, { toValue: 0, duration: 450, delay: 350, useNativeDriver: false }),
         ]).start();
     }, []);
 

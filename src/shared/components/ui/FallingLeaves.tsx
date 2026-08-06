@@ -131,7 +131,7 @@ const Leaf: React.FC<{ config: LeafConfig; tiltX: number }> = React.memo(
                 toValue: tiltX * 60, // max 60px drift based on tilt
                 duration: 300,
                 easing: Easing.out(Easing.ease),
-                useNativeDriver: true,
+                useNativeDriver: false,
             }).start();
         }, [tiltX, tiltOffset]);
 
@@ -148,13 +148,13 @@ const Leaf: React.FC<{ config: LeafConfig; tiltX: number }> = React.memo(
                         toValue: config.swayAmount,
                         duration: config.swayDuration,
                         easing: Easing.inOut(Easing.sin),
-                        useNativeDriver: true,
+                        useNativeDriver: false,
                     }),
                     Animated.timing(translateX, {
                         toValue: -config.swayAmount,
                         duration: config.swayDuration,
                         easing: Easing.inOut(Easing.sin),
-                        useNativeDriver: true,
+                        useNativeDriver: false,
                     }),
                 ])
             );
@@ -165,7 +165,7 @@ const Leaf: React.FC<{ config: LeafConfig; tiltX: number }> = React.memo(
                     toValue: 1,
                     duration: config.rotateDuration,
                     easing: Easing.linear,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 })
             );
 
@@ -176,7 +176,7 @@ const Leaf: React.FC<{ config: LeafConfig; tiltX: number }> = React.memo(
                     toValue: SCREEN_HEIGHT + config.size * 3,
                     duration,
                     easing: Easing.linear,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 }).start(({ finished }) => {
                     if (finished) {
                         // Recycle from just above screen with slight X variation

@@ -66,13 +66,13 @@ export const EditProfileScreen: React.FC = () => {
     const buttonFade = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        Animated.timing(headerFade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-        Animated.spring(avatarScale, { toValue: 1, friction: 5, tension: 80, delay: 150, useNativeDriver: true }).start();
+        Animated.timing(headerFade, { toValue: 1, duration: 400, useNativeDriver: false }).start();
+        Animated.spring(avatarScale, { toValue: 1, friction: 5, tension: 80, delay: 150, useNativeDriver: false }).start();
         Animated.parallel([
-            Animated.timing(formFade, { toValue: 1, duration: 500, delay: 250, useNativeDriver: true }),
-            Animated.timing(formSlide, { toValue: 0, duration: 500, delay: 250, useNativeDriver: true }),
+            Animated.timing(formFade, { toValue: 1, duration: 500, delay: 250, useNativeDriver: false }),
+            Animated.timing(formSlide, { toValue: 0, duration: 500, delay: 250, useNativeDriver: false }),
         ]).start();
-        Animated.timing(buttonFade, { toValue: 1, duration: 400, delay: 500, useNativeDriver: true }).start();
+        Animated.timing(buttonFade, { toValue: 1, duration: 400, delay: 500, useNativeDriver: false }).start();
     }, []);
 
     const handleSave = async () => {

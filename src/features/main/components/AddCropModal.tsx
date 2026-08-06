@@ -101,12 +101,12 @@ const SavingLoader: React.FC = () => {
     useEffect(() => {
         const pulse = Animated.loop(
             Animated.sequence([
-                Animated.timing(pulseAnim, { toValue: 1.05, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-                Animated.timing(pulseAnim, { toValue: 0.92, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+                Animated.timing(pulseAnim, { toValue: 1.05, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+                Animated.timing(pulseAnim, { toValue: 0.92, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
             ])
         );
         const rotation = Animated.loop(
-            Animated.timing(rotateAnim, { toValue: 1, duration: 2400, easing: Easing.linear, useNativeDriver: true })
+            Animated.timing(rotateAnim, { toValue: 1, duration: 2400, easing: Easing.linear, useNativeDriver: false })
         );
         pulse.start();
         rotation.start();

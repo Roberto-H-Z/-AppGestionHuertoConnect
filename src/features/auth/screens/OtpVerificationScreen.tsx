@@ -54,12 +54,12 @@ export const OtpVerificationScreen: React.FC = () => {
                 Animated.timing(fadeAnim, {
                     toValue: 1,
                     duration: 400,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 }),
                 Animated.timing(formSlide, {
                     toValue: 0,
                     duration: 600,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 }),
             ]).start();
         }, [])

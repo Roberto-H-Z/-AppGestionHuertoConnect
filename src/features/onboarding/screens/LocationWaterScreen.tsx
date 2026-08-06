@@ -55,18 +55,18 @@ export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation
                 Animated.timing(fadeAnim, {
                     toValue: 1,
                     duration: 800,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 }),
                 Animated.timing(slideAnim, {
                     toValue: 0,
                     duration: 800,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 }),
                 Animated.timing(contentSlide, {
                     toValue: 0,
                     duration: 1000,
                     delay: 200,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 }),
             ]).start();
         }, [fadeAnim, slideAnim, contentSlide])

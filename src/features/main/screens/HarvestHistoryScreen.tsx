@@ -32,12 +32,7 @@ interface HarvestItem {
 // ██  MOCK DATA
 // ═══════════════════════════════════════════
 
-const STATS: StatCard[] = [
-    { icon: 'calendar-check-outline', value: '0', label: 'Cosechas Totales', color: '#059669' },
-    { icon: 'basket-outline', value: '0 kg', label: 'Recolectados', color: '#0891B2' },
-    { icon: 'clock-fast', value: '0 días', label: 'Promedio', color: '#7C3AED' },
-    { icon: 'trophy-outline', value: '0%', label: 'Tasa de Éxito', color: '#D97706' },
-];
+const STATS: StatCard[] = [];
 
 const HARVESTS: HarvestItem[] = [];
 
@@ -51,8 +46,8 @@ const StatCardItem: React.FC<StatCard & { delay: number }> = ({ icon, value, lab
 
     useEffect(() => {
         Animated.parallel([
-            Animated.timing(fadeAnim, { toValue: 1, duration: 450, delay, useNativeDriver: true }),
-            Animated.spring(scaleAnim, { toValue: 1, friction: 6, tension: 80, delay, useNativeDriver: true }),
+            Animated.timing(fadeAnim, { toValue: 1, duration: 450, delay, useNativeDriver: false }),
+            Animated.spring(scaleAnim, { toValue: 1, friction: 6, tension: 80, delay, useNativeDriver: false }),
         ]).start();
     }, []);
 
@@ -77,8 +72,8 @@ const HarvestCard: React.FC<HarvestItem & { delay: number }> = ({ name, date, qu
 
     useEffect(() => {
         Animated.parallel([
-            Animated.timing(slideAnim, { toValue: 0, duration: 450, delay, useNativeDriver: true }),
-            Animated.timing(fadeAnim, { toValue: 1, duration: 450, delay, useNativeDriver: true }),
+            Animated.timing(slideAnim, { toValue: 0, duration: 450, delay, useNativeDriver: false }),
+            Animated.timing(fadeAnim, { toValue: 1, duration: 450, delay, useNativeDriver: false }),
         ]).start();
     }, []);
 
@@ -117,7 +112,7 @@ export const HarvestHistoryScreen: React.FC = () => {
     const headerFade = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        Animated.timing(headerFade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+        Animated.timing(headerFade, { toValue: 1, duration: 400, useNativeDriver: false }).start();
     }, []);
 
     return (

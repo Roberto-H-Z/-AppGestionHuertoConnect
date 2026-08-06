@@ -68,7 +68,7 @@ const CreatePostModal: React.FC<{
 
     useEffect(() => {
         if (visible) {
-            Animated.spring(slideAnim, { toValue: 1, friction: 8, useNativeDriver: true }).start();
+            Animated.spring(slideAnim, { toValue: 1, friction: 8, useNativeDriver: false }).start();
         } else {
             slideAnim.setValue(0);
         }
@@ -163,8 +163,8 @@ const CreatePostModal: React.FC<{
 const FilterChip: React.FC<{ label: string; isActive: boolean; onPress: () => void }> = ({ label, isActive, onPress }) => {
     const scaleAnim = useRef(new Animated.Value(1)).current;
 
-    const handlePressIn = () => Animated.spring(scaleAnim, { toValue: 0.95, useNativeDriver: true }).start();
-    const handlePressOut = () => Animated.spring(scaleAnim, { toValue: 1, friction: 3, useNativeDriver: true }).start();
+    const handlePressIn = () => Animated.spring(scaleAnim, { toValue: 0.95, useNativeDriver: false }).start();
+    const handlePressOut = () => Animated.spring(scaleAnim, { toValue: 1, friction: 3, useNativeDriver: false }).start();
 
     return (
         <TouchableOpacity onPressIn={handlePressIn} onPressOut={handlePressOut} onPress={onPress} activeOpacity={0.8}>
@@ -185,8 +185,8 @@ const PostCard: React.FC<{ post: Post; onLike: (id: string) => void }> = ({ post
 
     useEffect(() => {
         Animated.parallel([
-            Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
-            Animated.spring(slideAnim, { toValue: 0, friction: 8, useNativeDriver: true }),
+            Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: false }),
+            Animated.spring(slideAnim, { toValue: 0, friction: 8, useNativeDriver: false }),
         ]).start();
     }, []);
 

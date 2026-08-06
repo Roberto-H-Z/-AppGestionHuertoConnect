@@ -30,6 +30,7 @@ import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { chatbotService, ConversacionOut, MensajeOut } from '../services/chatbotService';
 import { aiModelService, CultivoRecomendado, PlagaDetectada } from '../services/aiModelService';
+import { agentService } from '../services/agentService';
 import { geocodeMunicipio } from '../services/geocodingService';
 import { AppScreenHeader } from '../components';
 import { palette, radii, shadows } from '../theme';
@@ -53,7 +54,7 @@ const formatTime = (date: Date): string => {
 // ── Mapeo de códigos WMO a iconos y colores ───────────────────────────
 const getWeatherInfo = (code: number): { condition: string; icon: string; color: string } => {
     if (code === 0 || code === 1) return { condition: 'Despejado', icon: 'weather-sunny', color: '#FFB300' };
-    if (code <= 3)  return { condition: 'Nublado', icon: 'weather-partly-cloudy', color: '#78909C' };
+    if (code <= 3) return { condition: 'Nublado', icon: 'weather-partly-cloudy', color: '#78909C' };
     if (code <= 48) return { condition: 'Niebla', icon: 'weather-fog', color: '#90A4AE' };
     if (code <= 55) return { condition: 'Llovizna', icon: 'weather-partly-rainy', color: '#42A5F5' };
     if (code <= 65) return { condition: 'Lluvia', icon: 'weather-rainy', color: '#1E88E5' };
@@ -129,12 +130,12 @@ interface Message {
 
 const MODE_CONFIG = {
     chat: {
-        label: 'Asistente',
-        icon: 'robot-outline' as const,
+        label: 'Asistente IA',
+        icon: 'creation-outline' as const,
         color: '#059669',
         lightBg: '#ECFDF5',
-        placeholder: 'Escribe tu pregunta sobre el huerto...',
-        hint: 'Pregúntame sobre riego, plagas, cultivos o fertilización',
+        placeholder: 'Pregúntale a Brot sobre tu huerto...',
+        hint: 'Brot — IA generativa especializada en horticultura mexicana',
     },
     cultivos: {
         label: 'Cultivos IA',
@@ -204,7 +205,7 @@ const getAssistantResponse = (input: string): string => {
 const extractCultivos = (data: unknown): CultivoRecomendado[] => {
     const d = data as Record<string, unknown>;
     const list = d?.recomendaciones || d?.cultivos || d?.predicciones || d?.resultado || d?.data;
-    return Array.isArray(list) ? list.slice(0, 8) : Array.isArray(data) ? (data as CultivoRecomendado[]).slice(0, 8) : [];
+    return Array.isArray(list) ? list.slice(0, 15) : Array.isArray(data) ? (data as CultivoRecomendado[]).slice(0, 15) : [];
 };
 
 const extractPlagas = (data: unknown): PlagaDetectada[] => {
@@ -243,8 +244,8 @@ const TypingIndicator: React.FC = () => {
         const anim = (d: Animated.Value, delay: number) =>
             Animated.loop(Animated.sequence([
                 Animated.delay(delay),
-                Animated.timing(d, { toValue: 1, duration: 320, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-                Animated.timing(d, { toValue: 0, duration: 320, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+                Animated.timing(d, { toValue: 1, duration: 320, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+                Animated.timing(d, { toValue: 0, duration: 320, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
             ]));
         const a1 = anim(d1, 0); const a2 = anim(d2, 140); const a3 = anim(d3, 280);
         a1.start(); a2.start(); a3.start();
@@ -328,23 +329,40 @@ const CultivosCard: React.FC<{ cultivos: CultivoRecomendado[]; municipio?: strin
                 <MaterialCommunityIcons name="sprout-outline" size={28} color="#C8E6C9" />
                 <Text style={styles.emptyResultText}>No se encontraron recomendaciones.{'\n'}Intenta con otro municipio.</Text>
             </View>
-        ) : cultivos.map((c, i) => {
-            const conf = getConfianzaPct(c.probabilidad ?? c.score ?? c.confianza);
+        ) : cultivos.map((c: any, i) => {
             return (
-                <View key={i} style={styles.cultivoItem}>
-                    <View style={styles.cultivoNumber}>
+                <View key={i} style={[styles.cultivoItem, { alignItems: 'flex-start' }]}>
+                    <View style={[styles.cultivoNumber, { marginTop: 2 }]}>
                         <Text style={styles.cultivoNumberText}>{i + 1}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.cultivoName}>{getNombreCultivo(c, i)}</Text>
-                        {c.descripcion ? <Text style={styles.cultivoDesc}>{String(c.descripcion)}</Text> : null}
-                        {c.temporada ? <Text style={styles.cultivoMeta}>Temporada: {String(c.temporada)}</Text> : null}
-                    </View>
-                    {conf !== null ? (
-                        <View style={styles.confBadge}>
-                            <Text style={styles.confBadgeText}>{conf.toFixed(0)}%</Text>
+
+                        {(c.justificacion || c.descripcion) ? (
+                            <Text style={styles.cultivoDesc}>{String(c.justificacion || c.descripcion)}</Text>
+                        ) : null}
+
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                            {(c.temporada_ideal || c.temporada) ? (
+                                <View style={styles.badgeSmall}>
+                                    <MaterialCommunityIcons name="calendar-month-outline" size={12} color="#059669" />
+                                    <Text style={styles.badgeTextSmall}>{String(c.temporada_ideal || c.temporada)}</Text>
+                                </View>
+                            ) : null}
+                            {c.rango_temperatura ? (
+                                <View style={styles.badgeSmall}>
+                                    <MaterialCommunityIcons name="thermometer" size={12} color="#059669" />
+                                    <Text style={styles.badgeTextSmall}>{String(c.rango_temperatura)}</Text>
+                                </View>
+                            ) : null}
+                            {c.tecnica_riego ? (
+                                <View style={styles.badgeSmall}>
+                                    <MaterialCommunityIcons name="water-outline" size={12} color="#059669" />
+                                    <Text style={styles.badgeTextSmall}>{String(c.tecnica_riego)}</Text>
+                                </View>
+                            ) : null}
                         </View>
-                    ) : null}
+                    </View>
                 </View>
             );
         })}
@@ -393,7 +411,7 @@ const PlagasCard: React.FC<{ plagas: PlagaDetectada[]; imagenUrl?: string; onAct
                         </View>
                     )}
                     {p.tratamientos_ecologicos && p.tratamientos_ecologicos.length > 0 ? (
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={styles.actionBtn}
                             onPress={() => onAction && onAction('show_treatments', p)}
                             activeOpacity={0.7}
@@ -460,16 +478,57 @@ const TreatmentsCard: React.FC<{ treatments: any[]; pestName: string }> = ({ tre
 // ══════════════════════════════════════════════════════
 
 const FormattedText: React.FC<{ text: string; style: any }> = ({ text, style }) => {
-    const parts = text.split(/(\*\*.*?\*\*)/g);
+    const lines = text.split('\n');
     return (
-        <Text style={style}>
-            {parts.map((part, i) => {
-                if (part.startsWith('**') && part.endsWith('**')) {
-                    return <Text key={i} style={{ fontWeight: 'bold', color: '#047857' }}>{part.slice(2, -2)}</Text>;
+        <View style={{ width: '100%' }}>
+            {lines.map((line, lineIndex) => {
+                const isHeading = line.startsWith('#');
+                const isList = line.trim().startsWith('- ') || line.trim().startsWith('* ');
+
+                let cleanLine = line;
+                if (isHeading) {
+                    cleanLine = line.replace(/^#+\s/, '');
+                } else if (isList) {
+                    cleanLine = line.trim().substring(2);
                 }
-                return <Text key={i}>{part}</Text>;
+
+                if (cleanLine.trim() === '') {
+                    return <View key={lineIndex} style={{ height: 6 }} />;
+                }
+
+                // Parsear negritas
+                const parts = cleanLine.split(/(\*\*.*?\*\*)/g);
+                const lineContent = parts.map((part, i) => {
+                    if (part.startsWith('**') && part.endsWith('**')) {
+                        return <Text key={i} style={{ fontWeight: 'bold', color: '#047857' }}>{part.slice(2, -2)}</Text>;
+                    }
+                    return <Text key={i}>{part}</Text>;
+                });
+
+                if (isHeading) {
+                    return (
+                        <Text key={lineIndex} style={[style, { fontSize: 15.5, fontWeight: '800', color: '#065F46', marginTop: 10, marginBottom: 4 }]} >
+                            {lineContent}
+                        </Text>
+                    );
+                }
+
+                if (isList) {
+                    return (
+                        <View key={lineIndex} style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 4, paddingRight: 8 }}>
+                            <Text style={[style, { marginRight: 6, color: '#059669', fontWeight: 'bold' }]}>•</Text>
+                            <Text style={[style, { flex: 1 }]}>{lineContent}</Text>
+                        </View>
+                    );
+                }
+
+                return (
+                    <Text key={lineIndex} style={[style, { marginTop: 3 }]}>
+                        {lineContent}
+                    </Text>
+                );
             })}
-        </Text>
+        </View>
     );
 };
 
@@ -483,8 +542,8 @@ const MessageBubble: React.FC<{ msg: Message; accentColor: string; onAction?: (a
 
     useEffect(() => {
         Animated.parallel([
-            Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-            Animated.spring(slideAnim, { toValue: 0, friction: 9, tension: 100, useNativeDriver: true }),
+            Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: false }),
+            Animated.spring(slideAnim, { toValue: 0, friction: 9, tension: 100, useNativeDriver: false }),
         ]).start();
     }, []);
 
@@ -524,9 +583,9 @@ const MessageBubble: React.FC<{ msg: Message; accentColor: string; onAction?: (a
                                 {msg.text}
                             </Text>
                         ) : (
-                            <FormattedText 
-                                text={msg.text} 
-                                style={[styles.msgText, styles.aiMsgText, msg.type === 'error' && { color: '#B91C1C' }]} 
+                            <FormattedText
+                                text={msg.text}
+                                style={[styles.msgText, styles.aiMsgText, msg.type === 'error' && { color: '#B91C1C' }]}
                             />
                         )}
                     </View>
@@ -627,6 +686,8 @@ export const AIChatScreen: React.FC = () => {
     const [inputText, setInputText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const [convId, setConvId] = useState<string | null>(null);
+    /** Session ID del agente IA — mantiene contexto entre mensajes del modo chat */
+    const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
     const [conversations, setConversations] = useState<ConversacionOut[]>([]);
     const [historyVisible, setHistoryVisible] = useState(false);
     const [historyLoading, setHistoryLoading] = useState(false);
@@ -634,12 +695,12 @@ export const AIChatScreen: React.FC = () => {
     const scrollRef = useRef<ScrollView>(null);
     const modeConfig = MODE_CONFIG[mode];
 
-    // Mensaje de bienvenida y chips al cambiar modo
+    // Mensaje de bienvenida al cambiar modo (NO reiniciamos agentSessionId aquí para mantener contexto)
     useEffect(() => {
         const welcomes: Record<ChatMode, string> = {
-            chat: '¡Hola! Soy tu asistente de horticultura 🌿\n\nPuedo ayudarte con riego, plagas, cultivos y fertilización.\n\nO usa los modos de IA arriba para análisis con Inteligencia Artificial real.',
-            cultivos: '🌽 Modo Cultivos IA activado\n\nEscribe el nombre de tu municipio (puede ser cualquier ciudad de México) y el modelo de IA analizará el clima real de esa zona para recomendarte los mejores cultivos.',
-            plagas: '🐛 Modo Detección de Plagas activado\n\nPega la URL pública de una foto de tu planta. El modelo YOLOv8 analizará la imagen y detectará posibles plagas con un nivel de confianza.',
+            chat: '¡Hola! Soy **Brot** 🌿 — el asistente de IA de HuertoConnect.\n\nEstoy especializado en horticultura mexicana. Cuéntame sobre tu huerto, mis plagas, condiciones de tu zona o qué quieres sembrar y te ayudo con recomendaciones personalizadas.',
+            cultivos: '🌽 **Modo Cultivos IA** activado\n\nEscribe el nombre de tu municipio (cualquier ciudad de México) y el modelo Random Forest analizará el clima real de esa zona para recomendarte los mejores cultivos.',
+            plagas: '🐛 **Modo Detección de Plagas** activado\n\nPega la URL pública de una foto de tu planta (debe comenzar con https://). El modelo YOLOv8 analizará la imagen y detectará posibles plagas con nivel de confianza y tratamientos ecológicos recomendados.',
         };
         setMessages([{
             id: `welcome-${mode}-${Date.now()}`,
@@ -650,6 +711,8 @@ export const AIChatScreen: React.FC = () => {
         }]);
         setConvId(null);
         setInputText('');
+        // Al cambiar de modo, reset la sesión del agente (nueva conversación)
+        if (mode !== 'chat') setAgentSessionId(null);
     }, [mode]);
 
     const scrollToBottom = useCallback(() => {
@@ -665,28 +728,28 @@ export const AIChatScreen: React.FC = () => {
         if (action === 'show_treatments') {
             const p = payload as PlagaDetectada;
             const pestName = p.plaga || p.clase || p.label || p.name || 'la plaga';
-            
+
             // Mensaje del usuario preguntando
             const userText = `¿Cómo puedo tratar ${pestName}?`;
             addMessage({ text: userText, sender: 'user', type: 'text' });
-            
+
             // Respuesta de la IA con los tratamientos
             setTimeout(() => {
                 setIsTyping(true);
                 setTimeout(() => {
                     if (p.tratamientos_ecologicos && Array.isArray(p.tratamientos_ecologicos)) {
-                        addMessage({ 
-                            text: 'Tratamientos encontrados.', 
-                            sender: 'ai', 
-                            type: 'treatments_result', 
-                            treatmentsData: p.tratamientos_ecologicos, 
-                            pestName 
+                        addMessage({
+                            text: 'Tratamientos encontrados.',
+                            sender: 'ai',
+                            type: 'treatments_result',
+                            treatmentsData: p.tratamientos_ecologicos,
+                            pestName
                         });
                     } else if (p.tratamiento) {
-                        addMessage({ 
-                            text: `Aquí tienes una recomendación para tratar **${pestName}**:\n\n${p.tratamiento}`, 
-                            sender: 'ai', 
-                            type: 'text' 
+                        addMessage({
+                            text: `Aquí tienes una recomendación para tratar **${pestName}**:\n\n${p.tratamiento}`,
+                            sender: 'ai',
+                            type: 'text'
                         });
                     } else {
                         addMessage({ text: 'Lo siento, no encontré tratamientos específicos en la base de datos.', sender: 'ai', type: 'text' });
@@ -782,7 +845,7 @@ export const AIChatScreen: React.FC = () => {
                 });
                 await persistMessage(reply, 'assistant', currentId);
 
-            // ── PLAGAS: YOLOv8 ───────────────────────────────────
+                // ── PLAGAS: YOLOv8 ───────────────────────────────────
             } else if (mode === 'plagas') {
                 if (!trimmed.startsWith('http')) {
                     addMessage({
@@ -792,7 +855,7 @@ export const AIChatScreen: React.FC = () => {
                     return;
                 }
                 currentId = await persistMessage(`Analizar imagen: ${trimmed}`, 'user', currentId) ?? currentId;
-                const response = await aiModelService.detectPest({ imagen_url: trimmed });
+                const response = await aiModelService.detectPest(trimmed);
                 const plagas = extractPlagas(response);
                 const reply = plagas.length > 0
                     ? `Detecté ${plagas.length} posible${plagas.length > 1 ? 's' : ''} plaga${plagas.length > 1 ? 's' : ''} en la imagen`
@@ -800,11 +863,71 @@ export const AIChatScreen: React.FC = () => {
                 addMessage({ text: reply, sender: 'ai', type: 'plagas_result', plagasData: plagas, imagenUrl: trimmed });
                 await persistMessage(reply, 'assistant', currentId);
 
-            // ── ASISTENTE: texto libre ───────────────────────────
+                // ── ASISTENTE IA: Brot (modelo generativo) ──────────
             } else {
+                // Guardar mensaje en el chatbot (historial en BD)
                 currentId = await persistMessage(trimmed, 'user', currentId) ?? currentId;
-                const reply = getAssistantResponse(trimmed);
-                addMessage({ text: reply, sender: 'ai', type: 'text' });
+
+                // Detectar si el usuario pregunta por clima, cultivos o una ubicación
+                const locationMatch = trimmed.match(/(?:clima|temperatura|tiempo|sembrar|cultivar|plantar|recomendaci(?:ó|o)n)\s+(?:en|de|para)\s+([a-zA-ZáéíóúÁÉÍÓÚñÑ]+(?:\s+[a-zA-ZáéíóúÁÉÍÓÚñÑ]+){0,2})/i);
+
+                let extraContext = '';
+                let weatherDataContext: any = null;
+
+                if (locationMatch && locationMatch[1].trim().length > 2) {
+                    const cityName = locationMatch[1].trim();
+                    const geo = await geocodeMunicipio(cityName);
+
+                    if (geo) {
+                        try {
+                            const [response, weatherInfo] = await Promise.all([
+                                aiModelService.recommendGarden({ lat: geo.lat, lon: geo.lon, municipio: geo.name }),
+                                fetchCurrentWeather(geo.lat, geo.lon),
+                            ]);
+                            const cultivos = extractCultivos(response);
+                            weatherDataContext = { geo, weatherInfo, cultivos };
+
+                            const weatherStr = weatherInfo ? `El clima actual allí es ${weatherInfo.temperature}°C, ${weatherInfo.condition}.` : '';
+                            const cultivosStr = cultivos.length > 0 ? `Cultivos viables sugeridos: ${cultivos.map(c => c.nombre || c.cultivo).join(', ')}.` : '';
+
+                            const currentDate = new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+                            extraContext = `\n\n[SISTEMA - INSTRUCCIÓN ESTRICTA: El usuario te pregunta sobre la ubicación ${geo.name}. Tienes esta información en tiempo real que debes utilizar: 1) Fecha actual: ${currentDate}. 2) Clima actual en su ciudad: ${weatherStr}. 3) Sugerencias básicas de la BD: ${cultivosStr}. TÚ DEBES: Saludar confirmando el clima actual en su ciudad, y RECOMENDAR AMPLIAMENTE varios cultivos (basándote en la fecha, temporada y clima). Usa las sugerencias básicas pero agrega muchas más de tu propio conocimiento. Oculta el hecho de que recibiste esto como "contexto" o "sistema".]`;
+                        } catch (e) {
+                            console.warn('Error fetching weather context:', e);
+                        }
+                    }
+                }
+
+                // Llamar al agente IA generativo con la sesión activa + el contexto
+                let reply = '';
+                let newSessionId = agentSessionId;
+                try {
+                    const agentRes = await agentService.chat(
+                        trimmed + extraContext,
+                        agentSessionId
+                    );
+                    reply = agentRes.answer || 'Lo siento, no pude generar una respuesta. Intenta de nuevo.';
+                    newSessionId = agentRes.conversation_id || agentSessionId;
+                    if (newSessionId !== agentSessionId) setAgentSessionId(newSessionId);
+                } catch (agentErr: any) {
+                    // Si el agente falla, fallback a respuesta local
+                    console.warn('[AIChatScreen] Agente IA falló, usando fallback:', agentErr?.message);
+                    reply = getAssistantResponse(trimmed);
+                }
+
+                // Renderizar la respuesta del LLM y, si existe, el widget del clima interactivo
+                if (weatherDataContext) {
+                    addMessage({
+                        text: reply, sender: 'ai', type: 'cultivos_result',
+                        cultivosData: weatherDataContext.cultivos,
+                        municipio: weatherDataContext.geo.name,
+                        region: weatherDataContext.geo.region,
+                        weatherInfo: weatherDataContext.weatherInfo ?? undefined
+                    });
+                } else {
+                    addMessage({ text: reply, sender: 'ai', type: 'text' });
+                }
+
                 await persistMessage(reply, 'assistant', currentId);
             }
 
@@ -838,7 +961,7 @@ export const AIChatScreen: React.FC = () => {
                     {
                         icon: 'plus',
                         label: 'Nueva conversación',
-                        onPress: () => { setMessages([]); setConvId(null); setMode('chat'); },
+                        onPress: () => { setMessages([]); setConvId(null); setAgentSessionId(null); setMode('chat'); },
                     },
                     {
                         icon: 'history',
@@ -851,23 +974,23 @@ export const AIChatScreen: React.FC = () => {
             {/* ── SELECTOR DE MODO ── */}
             <View style={styles.modeBar}>
                 <View style={styles.modeTabsRow}>
-                {(['chat', 'cultivos', 'plagas'] as ChatMode[]).map(m => {
-                    const cfg = MODE_CONFIG[m];
-                    const active = mode === m;
-                    return (
-                        <TouchableOpacity
-                            key={m}
-                            style={[styles.modeTab, active && { backgroundColor: cfg.color }]}
-                            onPress={() => setMode(m)}
-                            activeOpacity={0.75}
-                            accessibilityRole="button"
-                            accessibilityState={{ selected: active }}
-                        >
-                            <MaterialCommunityIcons name={cfg.icon} size={18} color={active ? '#fff' : palette.muted} />
-                            <Text style={[styles.modeTabLabel, { color: active ? '#fff' : '#6B7280' }]}>{cfg.label}</Text>
-                        </TouchableOpacity>
-                    );
-                })}
+                    {(['chat', 'cultivos', 'plagas'] as ChatMode[]).map(m => {
+                        const cfg = MODE_CONFIG[m];
+                        const active = mode === m;
+                        return (
+                            <TouchableOpacity
+                                key={m}
+                                style={[styles.modeTab, active && { backgroundColor: cfg.color }]}
+                                onPress={() => setMode(m)}
+                                activeOpacity={0.75}
+                                accessibilityRole="button"
+                                accessibilityState={{ selected: active }}
+                            >
+                                <MaterialCommunityIcons name={cfg.icon} size={18} color={active ? '#fff' : palette.muted} />
+                                <Text style={[styles.modeTabLabel, { color: active ? '#fff' : '#6B7280' }]}>{cfg.label}</Text>
+                            </TouchableOpacity>
+                        );
+                    })}
                 </View>
             </View>
 
@@ -1090,8 +1213,8 @@ const styles = StyleSheet.create({
     cultivoName: { fontSize: 13, fontWeight: '600', color: '#065F46', letterSpacing: -0.2 },
     cultivoDesc: { fontSize: 11, color: '#6B7280', marginTop: 2, lineHeight: 16 },
     cultivoMeta: { fontSize: 10, color: '#9CA3AF', marginTop: 2 },
-    confBadge: { backgroundColor: '#ECFDF5', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-    confBadgeText: { fontSize: 11, fontWeight: '700', color: '#059669' },
+    badgeSmall: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#D1FAE5', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3, gap: 3 },
+    badgeTextSmall: { fontSize: 9.5, color: '#065F46', fontWeight: '600' },
 
     // ── Weather strip ────────────────────────────────────────────────────
     weatherStrip: {
@@ -1117,9 +1240,9 @@ const styles = StyleSheet.create({
     confBar: { height: 4, backgroundColor: '#FEE2E2', borderRadius: 2, overflow: 'hidden' },
     confBarFill: { height: 4, borderRadius: 2 },
     plagaTratamiento: { fontSize: 13, color: '#4B5563', lineHeight: 18, marginTop: 10 },
-    actionBtn: { 
+    actionBtn: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-        backgroundColor: '#ECFDF5', paddingVertical: 8, paddingHorizontal: 14, 
+        backgroundColor: '#ECFDF5', paddingVertical: 8, paddingHorizontal: 14,
         borderRadius: 8, marginTop: 12, borderWidth: 1, borderColor: '#D1FAE5'
     },
     actionBtnText: { fontSize: 12.5, fontWeight: '600', color: '#059669' },

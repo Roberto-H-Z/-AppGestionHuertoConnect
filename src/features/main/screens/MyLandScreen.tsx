@@ -18,6 +18,7 @@ import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { perfilAgricultorService } from '../../onboarding/services/perfilAgricultorService';
+import { palette } from '../theme';
 
 export const MyLandScreen: React.FC = () => {
     const navigation = useNavigation<any>();
@@ -34,19 +35,22 @@ export const MyLandScreen: React.FC = () => {
     useFocusEffect(
         useCallback(() => {
             perfilAgricultorService.getMyProfile()
-                .then(setUserData)
-                .catch(e => console.log('Error fetching user data:', e));
+                .then((profile) => setUserData(profile || null))
+                .catch(e => {
+                    console.log('Error fetching user data:', e);
+                    setUserData(null);
+                });
 
-            Animated.timing(headerFade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+            Animated.timing(headerFade, { toValue: 1, duration: 400, useNativeDriver: false }).start();
             Animated.parallel([
-                Animated.timing(card1Fade, { toValue: 1, duration: 450, delay: 150, useNativeDriver: true }),
-                Animated.timing(card1Slide, { toValue: 0, duration: 450, delay: 150, useNativeDriver: true }),
+                Animated.timing(card1Fade, { toValue: 1, duration: 450, delay: 150, useNativeDriver: false }),
+                Animated.timing(card1Slide, { toValue: 0, duration: 450, delay: 150, useNativeDriver: false }),
             ]).start();
             Animated.parallel([
-                Animated.timing(card2Fade, { toValue: 1, duration: 450, delay: 300, useNativeDriver: true }),
-                Animated.timing(card2Slide, { toValue: 0, duration: 450, delay: 300, useNativeDriver: true }),
+                Animated.timing(card2Fade, { toValue: 1, duration: 450, delay: 300, useNativeDriver: false }),
+                Animated.timing(card2Slide, { toValue: 0, duration: 450, delay: 300, useNativeDriver: false }),
             ]).start();
-            Animated.timing(buttonFade, { toValue: 1, duration: 400, delay: 500, useNativeDriver: true }).start();
+            Animated.timing(buttonFade, { toValue: 1, duration: 400, delay: 500, useNativeDriver: false }).start();
         }, [])
     );
 
@@ -71,8 +75,8 @@ export const MyLandScreen: React.FC = () => {
                         <MaterialCommunityIcons name="map-marker-radius-outline" size={26} color="#059669" />
                     </View>
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.introTitle}>Configuración Inicial</Text>
-                        <Text style={styles.introSubtitle}>Datos de tu terreno y sistema de riego</Text>
+                        <Text style={styles.introTitle}>Huerto Los Cedros</Text>
+                        <Text style={styles.introSubtitle}>Terreno listo para monitoreo y riego diario</Text>
                     </View>
                 </View>
 
@@ -84,7 +88,7 @@ export const MyLandScreen: React.FC = () => {
                         </View>
                         <Text style={styles.cardLabelText}>Ubicación</Text>
                     </View>
-                    <Text style={styles.cardValue}>{userData?.ubicacion || 'Sin configurar'}</Text>
+                    <Text style={styles.cardValue}>{userData?.ubicacion || '--'}</Text>
                 </Animated.View>
 
                 {/* Sistema de Riego Card */}
@@ -95,17 +99,40 @@ export const MyLandScreen: React.FC = () => {
                         </View>
                         <Text style={styles.cardLabelText}>Sistema de Riego</Text>
                     </View>
-                    <Text style={styles.cardValue}>{userData?.acceso_agua || 'Sin configurar'}</Text>
+                    <Text style={styles.cardValue}>{userData?.acceso_agua || '--'}</Text>
                     <View style={styles.cardBadge}>
                         <MaterialCommunityIcons name="check-circle" size={14} color="#059669" />
                         <Text style={styles.cardBadgeText}>Activo</Text>
                     </View>
                 </Animated.View>
 
+                <View style={styles.metricsGrid}>
+                    <View style={styles.metricCard}>
+                        <MaterialCommunityIcons name="terrain" size={20} color={palette.primary} />
+                        <Text style={styles.metricLabel}>Suelo</Text>
+                        <Text style={styles.metricValue}>{userData?.suelo || '--'}</Text>
+                    </View>
+                    <View style={styles.metricCard}>
+                        <MaterialCommunityIcons name="white-balance-sunny" size={20} color="#D89532" />
+                        <Text style={styles.metricLabel}>Luz diaria</Text>
+                        <Text style={styles.metricValue}>{userData?.luz || '--'}</Text>
+                    </View>
+                    <View style={styles.metricCard}>
+                        <MaterialCommunityIcons name="sprinkler-variant" size={20} color="#0891B2" />
+                        <Text style={styles.metricLabel}>Riego</Text>
+                        <Text style={styles.metricValue}>3 zonas por goteo</Text>
+                    </View>
+                    <View style={styles.metricCard}>
+                        <MaterialCommunityIcons name="chart-bell-curve" size={20} color="#7C3AED" />
+                        <Text style={styles.metricLabel}>Pendiente</Text>
+                        <Text style={styles.metricValue}>{userData?.pendiente || '--'}</Text>
+                    </View>
+                </View>
+
                 {/* Info row */}
                 <View style={styles.infoRow}>
                     <MaterialCommunityIcons name="information-outline" size={15} color="#9CA3AF" />
-                    <Text style={styles.infoText}>Para modificar estos datos, edita tu perfil.</Text>
+                    <Text style={styles.infoText}>Simulación activa con datos de operación del huerto.</Text>
                 </View>
 
                 {/* Edit Button */}
@@ -169,6 +196,23 @@ const styles = StyleSheet.create({
         borderRadius: 12, alignSelf: 'flex-start', marginTop: 10,
     },
     cardBadgeText: { fontSize: 12, fontWeight: '600', color: '#059669' },
+    metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 14 },
+    metricCard: {
+        width: '47.5%',
+        minHeight: 126,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 18,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+    },
+    metricLabel: { marginTop: 9, fontSize: 12, color: '#6B7280', fontWeight: '700' },
+    metricValue: { marginTop: 4, fontSize: 13, color: '#111827', lineHeight: 18, fontWeight: '600' },
 
     // ── Info Row ──────────────────────────────────────────────
     infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 18, paddingHorizontal: 4 },

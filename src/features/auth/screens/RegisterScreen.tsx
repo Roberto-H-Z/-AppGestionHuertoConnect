@@ -198,19 +198,19 @@ export const RegisterScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                 Animated.timing(slideAnim, {
                     toValue: 0,
                     duration: 600,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 }),
                 Animated.spring(logoScale, {
                     toValue: 1,
                     friction: 4,
                     tension: 40,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 }),
                 Animated.timing(formSlide, {
                     toValue: 0,
                     duration: 800,
                     delay: 200,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 }),
             ]).start();
         }, [slideAnim, logoScale, formSlide, resetValidation])

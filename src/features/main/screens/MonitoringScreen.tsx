@@ -70,6 +70,7 @@ const statusConfig: Record<StageStatus, { bg: string; border: string; dotBg: str
     },
 };
 
+
 const TimelineDot: React.FC<{ status: StageStatus }> = ({ status }) => {
     const cfg = statusConfig[status];
     return (
@@ -158,31 +159,70 @@ export const MonitoringScreen: React.FC = () => {
     const loadTimeline = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await apiClient.get('/huertos-realizados/timeline');
-            const mappedTimelines: CropTimeline[] = (response.data || []).map((timeline: any) => ({
-                cropId: timeline.crop_id,
-                cropName: timeline.crop_name,
-                cropIcon: timeline.crop_icon || 'sprout',
-                stages: (timeline.stages || []).map((stage: any) => ({
-                    id: stage.id,
-                    name: stage.name,
-                    dayLabel: stage.day_label,
-                    status: stage.status,
-                    description: stage.description,
-                    activities: (stage.activities || []).map((activity: any) => ({
-                        id: activity.id,
-                        action: activity.action,
-                        detail: activity.detail,
-                        date: activity.date,
-                        icon: activity.icon,
-                        iconColor: activity.icon_color,
-                    })),
-                })),
-            }));
+            // Cargamos los huertos reales del usuario
+            const huertosRes = await apiClient.get('/huertos');
+            const huertos: any[] = huertosRes.data || [];
 
-            setTimelines(mappedTimelines);
+            if (huertos.length === 0) {
+                setTimelines([]);
+                setSelectedCropId(null);
+                return;
+            }
+
+            // Para cada huerto, cargamos sus siembras y construimos una línea de tiempo básica
+            const timelines: CropTimeline[] = await Promise.all(
+                huertos.slice(0, 5).map(async (huerto: any) => {
+                    let siembras: any[] = [];
+                    try {
+                        const siembrasRes = await apiClient.get(`/cultivos/siembras/${huerto.id}`);
+                        siembras = siembrasRes.data || [];
+                    } catch { /* sin siembras */ }
+
+                    const stages: TimelineStage[] = siembras.slice(0, 3).map((s: any, idx: number) => {
+                        const status: StageStatus =
+                            s.estado === 'Cosechado' ? 'completed' :
+                                s.estado === 'Activo' && idx === 0 ? 'in-progress' : 'pending';
+                        return {
+                            id: s.id,
+                            name: s.cultivo_nombre || `Cultivo ${idx + 1}`,
+                            dayLabel: s.fecha_siembra
+                                ? `Día ${Math.ceil((Date.now() - new Date(s.fecha_siembra).getTime()) / 86400000)}`
+                                : 'Día 1',
+                            status,
+                            description: status === 'completed'
+                                ? 'Cosecha completada exitosamente.'
+                                : status === 'in-progress'
+                                    ? 'Cultivo activo — revisa el riego y nutrición.'
+                                    : 'Listo para iniciar esta etapa.',
+                            activities: [],
+                        };
+                    });
+
+                    // Si no hay siembras, etapa de inicio por defecto
+                    if (stages.length === 0) {
+                        stages.push({
+                            id: `${huerto.id}-inicio`,
+                            name: 'Creación del huerto',
+                            dayLabel: 'Día 1',
+                            status: 'completed',
+                            description: 'Huerto registrado en el sistema.',
+                            activities: [],
+                        });
+                    }
+
+                    return {
+                        cropId: huerto.id,
+                        cropName: huerto.nombre,
+                        cropIcon: 'sprout',
+                        stages,
+                    };
+                })
+            );
+
+            const nextTimelines = timelines;
+            setTimelines(nextTimelines);
             setSelectedCropId((currentCropId) =>
-                currentCropId && mappedTimelines.some((t) => t.cropId === currentCropId)
+                currentCropId && nextTimelines.some((t) => t.cropId === currentCropId)
                     ? currentCropId
                     : null
             );

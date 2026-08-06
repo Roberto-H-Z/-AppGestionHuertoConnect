@@ -32,7 +32,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const storedToken = await tokenStorage.getToken();
 
             if (storedToken) {
-                // Valida la sesion real guardada antes de mostrar datos privados.
+                // Valida la sesión real contra el servidor antes de mostrar datos privados.
                 const userData = await authService.getSession();
 
                 setToken(storedToken);
@@ -78,7 +78,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
      */
     const signOut = async () => {
         try {
-            // Solo avisa al servidor cuando existe una sesion real guardada.
             if (token) {
                 await authService.logout().catch(e => console.warn('Logout API falló', e));
             }

@@ -18,6 +18,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Input, Button } from '../../../shared/components/ui';
 import { useFormValidation } from '../hooks/useFormValidation';
 import { authService } from '../services/authService';
+import { useAuth } from '../services/AuthContext';
 
 // Logo de HuertoConnect
 const Logo = require('../../../../assets/hurtooo.png');
@@ -31,6 +32,7 @@ const { width, height } = Dimensions.get('window');
 
 export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
     const { handleValidateField, getFieldStatus, isTouched, validateAllFields, markTouched, resetValidation } = useFormValidation();
+    const { signIn } = useAuth();
 
     // ── Form state ──
     const [email, setEmail] = useState('');
@@ -63,24 +65,24 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                 Animated.timing(fadeAnim, {
                     toValue: 1,
                     duration: 400,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 }),
                 Animated.timing(slideAnim, {
                     toValue: 0,
                     duration: 800,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 }),
                 Animated.spring(logoScale, {
                     toValue: 1,
                     friction: 4,
                     tension: 40,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 }),
                 Animated.timing(formSlide, {
                     toValue: 0,
                     duration: 1000,
                     delay: 300,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 }),
             ]).start();
         }, [fadeAnim, slideAnim, logoScale, formSlide, resetValidation])
@@ -150,6 +152,8 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
         }
     };
 
+
+
     return (
         <ImageBackground
             source={BackgroundImage}
@@ -210,81 +214,83 @@ export const LoginScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                             <View style={styles.formGlow} />
                             <View style={styles.formGlass}>
 
-                            {/* Error message */}
-                            {error && (
-                                <View style={styles.errorContainer}>
-                                    <MaterialCommunityIcons
-                                        name="alert-circle-outline"
-                                        size={16}
-                                        color="#ff6b6b"
-                                    />
-                                    <Text style={styles.errorText}>{error}</Text>
-                                </View>
-                            )}
+                                {/* Error message */}
+                                {error && (
+                                    <View style={styles.errorContainer}>
+                                        <MaterialCommunityIcons
+                                            name="alert-circle-outline"
+                                            size={16}
+                                            color="#ff6b6b"
+                                        />
+                                        <Text style={styles.errorText}>{error}</Text>
+                                    </View>
+                                )}
 
-                            <Input
-                                label="Correo electrónico"
-                                placeholder="ejemplo@correo.com"
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                value={email}
-                                onChangeText={handleEmailChange}
-                                onBlur={handleEmailBlur}
-                                validationStatus={isTouched('email') ? emailStatus.status : 'idle'}
-                                validationMessage={isTouched('email') ? emailStatus.message : undefined}
-                                inputContainerStyle={styles.softInput}
-                            />
-
-                            <Input
-                                label="Contraseña"
-                                placeholder="••••••••"
-                                isPassword
-                                value={password}
-                                onChangeText={handlePasswordChange}
-                                onBlur={handlePasswordBlur}
-                                validationStatus={isTouched('loginPassword') ? passwordStatus.status : 'idle'}
-                                validationMessage={isTouched('loginPassword') ? passwordStatus.message : undefined}
-                                inputContainerStyle={styles.softInput}
-                            />
-
-                            <TouchableOpacity
-                                style={styles.forgotPassword}
-                                onPress={() => navigation?.navigate('ForgotPassword')}
-                            >
-                                <MaterialCommunityIcons
-                                    name="lock-reset"
-                                    size={16}
-                                    color="rgba(209, 250, 229, 0.78)"
+                                <Input
+                                    label="Correo electrónico"
+                                    placeholder="ejemplo@correo.com"
+                                    keyboardType="email-address"
+                                    autoCapitalize="none"
+                                    value={email}
+                                    onChangeText={handleEmailChange}
+                                    onBlur={handleEmailBlur}
+                                    validationStatus={isTouched('email') ? emailStatus.status : 'idle'}
+                                    validationMessage={isTouched('email') ? emailStatus.message : undefined}
+                                    inputContainerStyle={styles.softInput}
                                 />
-                                <Text style={styles.forgotPasswordText}>
-                                    ¿Olvidaste tu contraseña?
-                                </Text>
-                            </TouchableOpacity>
 
-                            <Button
-                                title={isLoading ? "Iniciando..." : "Iniciar Sesión"}
-                                onPress={handleLogin}
-                                disabled={isLoading}
-                                style={styles.loginButton}
-                            />
+                                <Input
+                                    label="Contraseña"
+                                    placeholder="••••••••"
+                                    isPassword
+                                    value={password}
+                                    onChangeText={handlePasswordChange}
+                                    onBlur={handlePasswordBlur}
+                                    validationStatus={isTouched('loginPassword') ? passwordStatus.status : 'idle'}
+                                    validationMessage={isTouched('loginPassword') ? passwordStatus.message : undefined}
+                                    inputContainerStyle={styles.softInput}
+                                />
 
-                            {/* Separador */}
-                            <View style={styles.separator}>
-                                <View style={styles.separatorLine} />
-                                <Text style={styles.separatorText}>o</Text>
-                                <View style={styles.separatorLine} />
-                            </View>
+                                <TouchableOpacity
+                                    style={styles.forgotPassword}
+                                    onPress={() => navigation?.navigate('ForgotPassword')}
+                                >
+                                    <MaterialCommunityIcons
+                                        name="lock-reset"
+                                        size={16}
+                                        color="rgba(209, 250, 229, 0.78)"
+                                    />
+                                    <Text style={styles.forgotPasswordText}>
+                                        ¿Olvidaste tu contraseña?
+                                    </Text>
+                                </TouchableOpacity>
 
-                            {/* Link registro */}
-                            <TouchableOpacity
-                                style={styles.registerLink}
-                                onPress={() => navigation?.navigate('Register')}
-                            >
-                                <Text style={styles.registerText}>
-                                    ¿No tienes cuenta?{' '}
-                                    <Text style={styles.registerTextBold}>Regístrate aquí</Text>
-                                </Text>
-                            </TouchableOpacity>
+                                <Button
+                                    title={isLoading ? "Iniciando..." : "Iniciar Sesión"}
+                                    onPress={handleLogin}
+                                    disabled={isLoading}
+                                    style={styles.loginButton}
+                                />
+
+
+
+                                {/* Separador */}
+                                <View style={styles.separator}>
+                                    <View style={styles.separatorLine} />
+                                    <Text style={styles.separatorText}>o</Text>
+                                    <View style={styles.separatorLine} />
+                                </View>
+
+                                {/* Link registro */}
+                                <TouchableOpacity
+                                    style={styles.registerLink}
+                                    onPress={() => navigation?.navigate('Register')}
+                                >
+                                    <Text style={styles.registerText}>
+                                        ¿No tienes cuenta?{' '}
+                                        <Text style={styles.registerTextBold}>Regístrate aquí</Text>
+                                    </Text>
+                                </TouchableOpacity>
                             </View>
                         </View>
                     </Animated.View>
@@ -441,8 +447,9 @@ const styles = StyleSheet.create({
     },
     loginButton: {
         width: '100%',
-        marginBottom: 22,
+        marginBottom: 12,
     },
+
     separator: {
         flexDirection: 'row',
         alignItems: 'center',

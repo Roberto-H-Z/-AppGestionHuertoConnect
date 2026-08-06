@@ -31,7 +31,7 @@ export const Button: React.FC<ButtonProps> = ({
     const handlePressIn = () => {
         Animated.spring(animatedScale, {
             toValue: 0.97,
-            useNativeDriver: true,
+            useNativeDriver: false,
         }).start();
     };
 
@@ -40,7 +40,7 @@ export const Button: React.FC<ButtonProps> = ({
             toValue: 1,
             friction: 3,
             tension: 40,
-            useNativeDriver: true,
+            useNativeDriver: false,
         }).start();
     };
 

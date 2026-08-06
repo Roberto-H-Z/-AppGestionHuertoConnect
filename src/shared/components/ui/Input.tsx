@@ -95,12 +95,12 @@ export const Input: React.FC<InputProps> = ({
             Animated.timing(messageOpacity, {
                 toValue: hasMessage ? 1 : 0,
                 duration: 250,
-                useNativeDriver: true,
+                useNativeDriver: false,
             }),
             Animated.timing(messageSlide, {
                 toValue: hasMessage ? 0 : -6,
                 duration: 250,
-                useNativeDriver: true,
+                useNativeDriver: false,
             }),
         ]).start();
     }, [validationStatus, validationMessage, messageOpacity, messageSlide]);
@@ -112,7 +112,7 @@ export const Input: React.FC<InputProps> = ({
                 toValue: 1,
                 friction: 4,
                 tension: 120,
-                useNativeDriver: true,
+                useNativeDriver: false,
             }).start();
         } else {
             iconScale.setValue(0);
@@ -123,12 +123,12 @@ export const Input: React.FC<InputProps> = ({
     useEffect(() => {
         if (validationStatus === 'error' && prevStatus.current !== 'error') {
             Animated.sequence([
-                Animated.timing(shakeAnim, { toValue: 8, duration: 50, useNativeDriver: true }),
-                Animated.timing(shakeAnim, { toValue: -8, duration: 50, useNativeDriver: true }),
-                Animated.timing(shakeAnim, { toValue: 6, duration: 50, useNativeDriver: true }),
-                Animated.timing(shakeAnim, { toValue: -6, duration: 50, useNativeDriver: true }),
-                Animated.timing(shakeAnim, { toValue: 3, duration: 40, useNativeDriver: true }),
-                Animated.timing(shakeAnim, { toValue: 0, duration: 40, useNativeDriver: true }),
+                Animated.timing(shakeAnim, { toValue: 8, duration: 50, useNativeDriver: false }),
+                Animated.timing(shakeAnim, { toValue: -8, duration: 50, useNativeDriver: false }),
+                Animated.timing(shakeAnim, { toValue: 6, duration: 50, useNativeDriver: false }),
+                Animated.timing(shakeAnim, { toValue: -6, duration: 50, useNativeDriver: false }),
+                Animated.timing(shakeAnim, { toValue: 3, duration: 40, useNativeDriver: false }),
+                Animated.timing(shakeAnim, { toValue: 0, duration: 40, useNativeDriver: false }),
             ]).start();
         }
         prevStatus.current = validationStatus;

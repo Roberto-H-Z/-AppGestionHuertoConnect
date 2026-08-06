@@ -87,6 +87,11 @@ export const HomeScreen: React.FC = () => {
             setRegiones(regionesData);
             setCultivos(cultivosData);
 
+            if (huertosData.length === 0) {
+                setHuertosConDetalles([]);
+                return;
+            }
+
             // For each huerto, load its siembras
             const enriched: HuertoConDetalles[] = await Promise.all(
                 huertosData.map(async (huerto) => {
@@ -114,6 +119,9 @@ export const HomeScreen: React.FC = () => {
             setHuertosConDetalles(enriched);
         } catch (error) {
             console.warn('[HomeScreen] loadAllData failed:', error);
+            setRegiones([]);
+            setCultivos([]);
+            setHuertosConDetalles([]);
         }
     }, []);
 

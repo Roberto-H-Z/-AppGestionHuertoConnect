@@ -1,6 +1,29 @@
 /**
  * huertoService — CRUD operations for Huertos, Regiones, Cultivos & Siembras.
- * All endpoints require JWT (injected automatically by apiClient interceptor).
+ *
+ * Endpoints (relativos al baseURL del apiClient = /api):
+ *   GET    /huertos                         — Listar huertos del usuario
+ *   POST   /huertos                         — Crear huerto
+ *   GET    /huertos/{id}                    — Obtener huerto
+ *   PUT    /huertos/{id}                    — Actualizar huerto
+ *   DELETE /huertos/{id}                    — Eliminar huerto (soft-delete)
+ *   POST   /huertos/recomendar              — IA: recomendar cultivos por ubicación
+ *
+ *   GET    /regiones                        — Listar regiones
+ *   GET    /regiones/{id}                   — Obtener región
+ *   POST   /regiones                        — Crear región
+ *   PUT    /regiones/{id}                   — Actualizar región
+ *   DELETE /regiones/{id}                   — Eliminar región
+ *   GET    /regiones/{id}/plantios          — Plantíos de una región
+ *
+ *   GET    /cultivos                        — Listar cultivos
+ *   POST   /cultivos                        — Crear cultivo
+ *   PUT    /cultivos/{id}                   — Actualizar cultivo
+ *   DELETE /cultivos/{id}                   — Eliminar cultivo
+ *   POST   /cultivos/siembras               — Asociar cultivo a huerto (siembra)
+ *   GET    /cultivos/siembras/{huerto_id}   — Listar siembras de un huerto
+ *
+ * Todos los endpoints requieren JWT (inyectado por el interceptor de apiClient).
  */
 
 import { apiClient } from '../../../infrastructure/api/apiClient';
@@ -24,39 +47,41 @@ export const huertoService = {
     // HUERTOS
     // ═══════════════════════════════════════════════════════════════
 
-    /** GET /huertos — List all huertos for the authenticated user */
-    getHuertos: async (): Promise<Huerto[]> => {
-        const res = await apiClient.get('/huertos');
-        return res.data || [];
+    /** GET /huertos — Lista los huertos del usuario autenticado */
+    getHuertos: async (params?: { skip?: number; limit?: number; region_id?: string; estado?: string }): Promise<Huerto[]> => {
+        const res = await apiClient.get('/huertos', { params });
+        return res.data ?? [];
     },
 
-    /** GET /huertos/{id} — Get a single huerto by ID */
+    /** GET /huertos/{id} — Obtiene un huerto específico */
     getHuerto: async (id: string): Promise<Huerto> => {
         const res = await apiClient.get(`/huertos/${id}`);
         return res.data;
     },
 
-    /** POST /huertos — Create a new huerto */
+    /** POST /huertos — Crea un nuevo huerto asignado al usuario actual */
     createHuerto: async (data: HuertoCreate): Promise<Huerto> => {
         const res = await apiClient.post('/huertos', data);
         return res.data;
     },
 
-    /** PUT /huertos/{id} — Update an existing huerto */
+    /** PUT /huertos/{id} — Actualiza un huerto */
     updateHuerto: async (id: string, data: HuertoUpdate): Promise<Huerto> => {
         const res = await apiClient.put(`/huertos/${id}`, data);
         return res.data;
     },
 
-    /** DELETE /huertos/{id} — Delete a huerto */
-    deleteHuerto: async (id: string): Promise<void> => {
-        await apiClient.delete(`/huertos/${id}`);
+    /** DELETE /huertos/{id} — Soft-delete de un huerto */
+    deleteHuerto: async (id: string): Promise<{ message: string }> => {
+        const res = await apiClient.delete(`/huertos/${id}`);
+        return res.data;
     },
 
-    /** POST /huertos/recomendar — Recommend crops using location and real weather */
-    recomendarCultivos: async (
-        data: RecomendarCultivosRequest
-    ): Promise<RecomendarCultivosResponse> => {
+    /**
+     * POST /huertos/recomendar
+     * IA Random Forest: recomienda cultivos según el clima real de la ubicación.
+     */
+    recomendarCultivos: async (data: RecomendarCultivosRequest): Promise<RecomendarCultivosResponse> => {
         const res = await apiClient.post('/huertos/recomendar', data);
         return res.data;
     },
@@ -65,21 +90,33 @@ export const huertoService = {
     // REGIONES
     // ═══════════════════════════════════════════════════════════════
 
-    /** GET /regiones — List all regions */
-    getRegiones: async (): Promise<Region[]> => {
-        const res = await apiClient.get('/regiones');
-        return res.data || [];
+    /** GET /regiones — Lista todas las regiones */
+    getRegiones: async (params?: { skip?: number; limit?: number }): Promise<Region[]> => {
+        const res = await apiClient.get('/regiones', { params });
+        return res.data ?? [];
     },
 
-    /** GET /regiones/{id} — Get a single region */
+    /** GET /regiones/{id} — Obtiene una región específica */
     getRegion: async (id: string): Promise<Region> => {
         const res = await apiClient.get(`/regiones/${id}`);
         return res.data;
     },
 
-    /** POST /regiones — Create a new region */
+    /** POST /regiones — Crea una nueva región */
     createRegion: async (data: RegionCreate): Promise<Region> => {
         const res = await apiClient.post('/regiones', data);
+        return res.data;
+    },
+
+    /** PUT /regiones/{id} — Actualiza una región */
+    updateRegion: async (id: string, data: Partial<RegionCreate>): Promise<Region> => {
+        const res = await apiClient.put(`/regiones/${id}`, data);
+        return res.data;
+    },
+
+    /** DELETE /regiones/{id} — Elimina una región */
+    deleteRegion: async (id: string): Promise<{ message: string }> => {
+        const res = await apiClient.delete(`/regiones/${id}`);
         return res.data;
     },
 
@@ -87,29 +124,41 @@ export const huertoService = {
     // CULTIVOS
     // ═══════════════════════════════════════════════════════════════
 
-    /** GET /cultivos — List all available crops */
-    getCultivos: async (): Promise<Cultivo[]> => {
-        const res = await apiClient.get('/cultivos');
-        return res.data || [];
+    /** GET /cultivos — Lista todos los cultivos disponibles */
+    getCultivos: async (params?: { skip?: number; limit?: number; activo?: boolean }): Promise<Cultivo[]> => {
+        const res = await apiClient.get('/cultivos', { params });
+        return res.data ?? [];
     },
 
-    /** POST /cultivos — Create a new crop type */
+    /** POST /cultivos — Crea un nuevo tipo de cultivo */
     createCultivo: async (data: CultivoCreate): Promise<Cultivo> => {
         const res = await apiClient.post('/cultivos', data);
         return res.data;
     },
 
-    // ═══════════════════════════════════════════════════════════════
-    // SIEMBRAS (Huerto ↔ Cultivo relationship)
-    // ═══════════════════════════════════════════════════════════════
-
-    /** GET /cultivos/siembras/{huerto_id} — Get all siembras for a huerto */
-    getSiembras: async (huertoId: string): Promise<Siembra[]> => {
-        const res = await apiClient.get(`/cultivos/siembras/${huertoId}`);
-        return res.data || [];
+    /** PUT /cultivos/{id} — Actualiza un cultivo */
+    updateCultivo: async (id: string, data: Partial<CultivoCreate>): Promise<Cultivo> => {
+        const res = await apiClient.put(`/cultivos/${id}`, data);
+        return res.data;
     },
 
-    /** POST /cultivos/siembras — Associate a cultivo to a huerto */
+    /** DELETE /cultivos/{id} — Elimina un cultivo */
+    deleteCultivo: async (id: string): Promise<{ message: string }> => {
+        const res = await apiClient.delete(`/cultivos/${id}`);
+        return res.data;
+    },
+
+    // ═══════════════════════════════════════════════════════════════
+    // SIEMBRAS (Huerto ↔ Cultivo)
+    // ═══════════════════════════════════════════════════════════════
+
+    /** GET /cultivos/siembras/{huerto_id} — Lista todas las siembras de un huerto */
+    getSiembras: async (huertoId: string): Promise<Siembra[]> => {
+        const res = await apiClient.get(`/cultivos/siembras/${huertoId}`);
+        return res.data ?? [];
+    },
+
+    /** POST /cultivos/siembras — Asocia un cultivo a un huerto */
     createSiembra: async (data: SiembraCreate): Promise<Siembra> => {
         const res = await apiClient.post('/cultivos/siembras', data);
         return res.data;
