@@ -1,6 +1,6 @@
 import React from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, Platform, StatusBar as RNStatusBar } from 'react-native';
 import { palette, radii } from '../theme';
 
 interface HeaderAction {
@@ -58,7 +58,8 @@ const styles = StyleSheet.create({
     header: {
         minHeight: 86,
         paddingHorizontal: 18,
-        paddingVertical: 14,
+        paddingTop: Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) + 14 : 14,
+        paddingBottom: 14,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
