@@ -19,6 +19,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button } from '../../../shared/components/ui';
 import { perfilAgricultorService } from '../services/perfilAgricultorService';
 import { OnboardingProgressBar } from '../components/OnboardingProgressBar';
+import { geocodeMunicipio } from '../../main/services/geocodingService';
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -153,8 +154,18 @@ export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation
             return;
         }
 
-        // Veracruz default coordinates if manual location used
-        const finalCoords = coords || { lat: 19.1738, lon: -96.1342 };
+        setIsLoadingLocation(true);
+        let finalCoords = coords;
+        // Si el usuario escribió un texto, lo convertimos a coordenadas reales mediante geocodificación
+        if (!finalCoords && locationText.trim().length > 0) {
+            const geo = await geocodeMunicipio(locationText);
+            if (geo) {
+                finalCoords = { lat: geo.lat, lon: geo.lon };
+            }
+        }
+        setIsLoadingLocation(false);
+
+        finalCoords = finalCoords || { lat: 19.1738, lon: -96.1342 };
 
         navigation?.navigate('CropRecommendation', {
             perfil,
