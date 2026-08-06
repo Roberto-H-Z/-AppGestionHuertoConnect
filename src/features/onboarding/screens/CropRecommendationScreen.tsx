@@ -75,12 +75,7 @@ export const CropRecommendationScreen: React.FC<{ navigation?: any }> = ({ navig
                 perfil: perfil,
                 area_cultivo: area_cultivo || "0 m²",
                 ubicacion: ubicacion || "",
-                acceso_agua: acceso_agua || "",
-                // Guardamos el cultivo seleccionado en los metadatos o simplemente creamos el perfil primero
-                // En una app real, aquí también podríamos llamar al endpoint para crear el cultivo.
-                metadata: {
-                    primer_cultivo: selectedCrop
-                }
+                acceso_agua: acceso_agua || ""
             });
             navigation?.replace('Main');
         } catch (error: any) {
