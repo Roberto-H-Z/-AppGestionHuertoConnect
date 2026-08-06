@@ -127,13 +127,10 @@ export const GardenAreaScreen: React.FC<{ navigation?: any }> = ({ navigation })
             <StatusBar style="dark" />
             <OnboardingProgressBar currentStep={2} totalSteps={3} />
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                <Animated.View style={[styles.backButtonContainer, { opacity: fadeAnim }]}>
-                    <TouchableOpacity style={styles.backButton} onPress={() => navigation?.goBack()} activeOpacity={0.7}>
+                <Animated.View style={[styles.headerContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+                    <TouchableOpacity style={styles.backButtonInline} onPress={() => navigation?.goBack()} activeOpacity={0.7}>
                         <MaterialCommunityIcons name="arrow-left" size={24} color="#111827" />
                     </TouchableOpacity>
-                </Animated.View>
-
-                <Animated.View style={[styles.headerContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
                     <Text style={styles.title}>¿Cómo vas a cultivar?</Text>
                 </Animated.View>
 
@@ -275,11 +272,12 @@ export const GardenAreaScreen: React.FC<{ navigation?: any }> = ({ navigation })
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#FAFAFA' },
-    scrollContent: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 10, paddingBottom: 40 },
-    backButtonContainer: { marginBottom: 16 },
+    scrollContent: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 0, paddingBottom: 40 },
+    backButtonContainer: { marginBottom: 16 }, // Kept for reference but unused
     backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
-    headerContainer: { marginBottom: 20 },
-    title: { fontSize: 24, fontWeight: '800', color: '#111827', lineHeight: 32 },
+    backButtonInline: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, marginRight: 16 },
+    headerContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+    title: { fontSize: 24, fontWeight: '800', color: '#111827', lineHeight: 32, flex: 1 },
     typeContainer: { flexDirection: 'row', gap: 10, marginBottom: 20 },
     typeCard: { flex: 1, backgroundColor: '#fff', paddingVertical: 16, borderRadius: 16, alignItems: 'center', borderWidth: 2, borderColor: '#F3F4F6' },
     typeCardActive: { borderColor: '#059669', backgroundColor: '#059669' },
