@@ -19,8 +19,8 @@ export const OnboardingProgressBar: React.FC<OnboardingProgressBarProps> = ({ cu
     }, [currentStep, progressAnim]);
 
     // Map step indices to icons
-    const icons: (keyof typeof MaterialCommunityIcons.glyphMap)[] = ['account-hard-hat', 'vector-square', 'water'];
-    const labels = ['Perfil', 'Área', 'Entorno'];
+    const icons: (keyof typeof MaterialCommunityIcons.glyphMap)[] = ['account-hard-hat', 'vector-square', 'water', 'sprout'];
+    const labels = ['Perfil', 'Área', 'Entorno', 'Cultivo'];
 
     // Calculamos el ancho de la barra de progreso
     const progressWidth = progressAnim.interpolate({

@@ -62,7 +62,7 @@ export const FarmerProfileScreen: React.FC<{ navigation?: any }> = ({ navigation
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
-            <OnboardingProgressBar currentStep={1} totalSteps={3} />
+            <OnboardingProgressBar currentStep={1} totalSteps={4} />
             <ScrollView
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}

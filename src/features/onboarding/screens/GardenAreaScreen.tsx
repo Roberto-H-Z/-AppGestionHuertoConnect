@@ -125,7 +125,7 @@ export const GardenAreaScreen: React.FC<{ navigation?: any }> = ({ navigation })
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
-            <OnboardingProgressBar currentStep={2} totalSteps={3} />
+            <OnboardingProgressBar currentStep={2} totalSteps={4} />
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <Animated.View style={[styles.headerContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
                     <TouchableOpacity style={styles.backButtonInline} onPress={() => navigation?.goBack()} activeOpacity={0.7}>

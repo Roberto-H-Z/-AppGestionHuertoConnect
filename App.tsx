@@ -9,7 +9,7 @@ import {
   ResetPasswordScreen,
   AuthProvider
 } from './src/features/auth';
-import { FarmerProfileScreen, GardenAreaScreen, LocationWaterScreen } from './src/features/onboarding';
+import { FarmerProfileScreen, GardenAreaScreen, LocationWaterScreen, CropRecommendationScreen } from './src/features/onboarding';
 import { MainTabNavigator } from './src/navigation/MainTabNavigator';
 import { SplashScreen } from './src/features/splash';
 import {
@@ -40,6 +40,7 @@ export default function App() {
           <Stack.Screen name="FarmerProfile" component={FarmerProfileScreen} />
           <Stack.Screen name="GardenArea" component={GardenAreaScreen} />
           <Stack.Screen name="LocationWater" component={LocationWaterScreen} />
+          <Stack.Screen name="CropRecommendation" component={CropRecommendationScreen} />
           <Stack.Screen name="Main" component={MainTabNavigator} />
           <Stack.Screen name="EditProfile" component={EditProfileScreen} />
           <Stack.Screen name="MyLand" component={MyLandScreen} />

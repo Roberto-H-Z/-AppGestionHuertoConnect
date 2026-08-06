@@ -36,6 +36,7 @@ export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation
 
     // Water access state
     const [selectedWater, setSelectedWater] = useState<WaterAccessType>(null);
+    const [coords, setCoords] = useState<{ lat: number, lon: number } | null>(null);
 
     // Animaciones
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -111,6 +112,7 @@ export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation
                 setLocationText(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
             }
             setLocationObtained(true);
+            setCoords({ lat: latitude, lon: longitude });
         } catch (error) {
             Alert.alert(
                 'Error',
@@ -151,20 +153,17 @@ export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation
             return;
         }
 
-        setIsSaving(true);
-        try {
-            await perfilAgricultorService.createProfile({
-                perfil: getPerfilLabel(perfil),
-                area_cultivo: area_cultivo || "0 m²",
-                ubicacion: locationText,
-                acceso_agua: getWaterLabel(selectedWater),
-            });
-            navigation?.replace('Main');
-        } catch (error: any) {
-            Alert.alert('Error', error.message || 'No se pudo guardar la configuración.');
-        } finally {
-            setIsSaving(false);
-        }
+        // Veracruz default coordinates if manual location used
+        const finalCoords = coords || { lat: 19.1738, lon: -96.1342 };
+
+        navigation?.navigate('CropRecommendation', {
+            perfil,
+            area_cultivo: area_cultivo || "0 m²",
+            ubicacion: locationText,
+            acceso_agua: getWaterLabel(selectedWater),
+            lat: finalCoords.lat,
+            lon: finalCoords.lon
+        });
     };
 
     const waterOptions: { type: WaterAccessType; icon: string; label: string; description: string }[] = [
@@ -176,7 +175,7 @@ export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
-            <OnboardingProgressBar currentStep={3} totalSteps={3} />
+            <OnboardingProgressBar currentStep={3} totalSteps={4} />
             <ScrollView
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
@@ -342,9 +341,9 @@ export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation
                     ]}
                 >
                     <Button
-                        title={isSaving ? "Guardando..." : "Finalizar Configuración"}
+                        title="Ir a Recomendaciones"
                         onPress={handleFinish}
-                        disabled={!isValid || isSaving}
+                        disabled={!isValid}
                         style={styles.finishButton}
                     />
                 </Animated.View>
