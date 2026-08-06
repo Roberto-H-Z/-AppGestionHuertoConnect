@@ -28,7 +28,7 @@ export default function App() {
     <AuthProvider>
       <NavigationContainer>
         <Stack.Navigator
-          initialRouteName="Splash"
+          initialRouteName="FarmerProfile"
           screenOptions={{ headerShown: false, gestureEnabled: false }}
         >
           <Stack.Screen name="Splash" component={SplashScreen} />
