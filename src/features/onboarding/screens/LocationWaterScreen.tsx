@@ -182,38 +182,10 @@ export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
             >
-                {/* Botón de retroceso */}
-                <Animated.View
-                    style={[
-                        styles.backButtonContainer,
-                        {
-                            opacity: fadeAnim,
-                        },
-                    ]}
-                >
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={() => navigation?.goBack()}
-                        activeOpacity={0.7}
-                    >
-                        <MaterialCommunityIcons
-                            name="arrow-left"
-                            size={24}
-                            color="#111827"
-                        />
+                <Animated.View style={[styles.headerContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+                    <TouchableOpacity style={styles.backButtonInline} onPress={() => navigation?.goBack()} activeOpacity={0.7}>
+                        <MaterialCommunityIcons name="arrow-left" size={24} color="#111827" />
                     </TouchableOpacity>
-                </Animated.View>
-
-                {/* Título */}
-                <Animated.View
-                    style={[
-                        styles.headerContainer,
-                        {
-                            opacity: fadeAnim,
-                            transform: [{ translateY: slideAnim }],
-                        },
-                    ]}
-                >
                     <Text style={styles.title}>Ubicación y acceso al agua</Text>
                 </Animated.View>
 
@@ -389,7 +361,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         flexGrow: 1,
         paddingHorizontal: 24,
-        paddingTop: screenHeight * 0.06,
+        paddingTop: 0,
         paddingBottom: 40,
     },
     backButtonContainer: {
@@ -408,14 +380,31 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 3,
     },
+    backButtonInline: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+        marginRight: 16,
+    },
     headerContainer: {
-        marginBottom: 24,
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 20,
     },
     title: {
         fontSize: 24,
         fontWeight: '800',
         color: '#111827',
         lineHeight: 32,
+        flex: 1,
     },
     contentContainer: {
         marginBottom: 24,
