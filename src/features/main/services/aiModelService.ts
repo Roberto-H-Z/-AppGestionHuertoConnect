@@ -8,6 +8,7 @@
 
 import { apiClient } from '../../../infrastructure/api/apiClient';
 import { environment } from '../../../config/environment';
+import { tokenStorage } from '../../../infrastructure/storage/tokenStorage';
 
 // ── Tipos: Recomendación de Cultivos ──────────────────────────────────────────
 
@@ -185,12 +186,20 @@ export const aiModelService = {
             } as any);
             if (huertoId) formData.append('huerto_id', huertoId);
             if (cultivoId) formData.append('cultivo_id', cultivoId);
-            const res = await apiClient.post<PestDetectionResponse>(
-                `${environment.services.plagas}/detectar`,
-                formData,
-                { headers: { 'Content-Type': 'multipart/form-data' } }
-            );
-            return res.data;
+
+            // Usar FETCH estándar garantizado para FormData + uri local en React Native
+            const token = await tokenStorage.getToken();
+            const fetchRes = await fetch(`${environment.apiUrl}${environment.services.plagas}/detectar`, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'Accept': 'application/json',
+                    'ngrok-skip-browser-warning': 'true',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                }
+            });
+            if (!fetchRes.ok) throw new Error(`Error subiendo la imagen: ${fetchRes.status}`);
+            return await fetchRes.json();
         }
     },
 
@@ -210,12 +219,19 @@ export const aiModelService = {
             name: `plaga.${ext}`,
             type: mimeType,
         } as any);
-        const res = await apiClient.post<{ secure_url: string; public_id: string; message: string }>(
-            `${environment.services.plagas}/upload-imagen`,
-            formData,
-            { headers: { 'Content-Type': 'multipart/form-data' } }
-        );
-        return res.data;
+
+        const token = await tokenStorage.getToken();
+        const fetchRes = await fetch(`${environment.apiUrl}${environment.services.plagas}/upload-imagen`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'Accept': 'application/json',
+                'ngrok-skip-browser-warning': 'true',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            }
+        });
+        if (!fetchRes.ok) throw new Error(`Error en upload: ${fetchRes.status}`);
+        return await fetchRes.json();
     },
 };
 
