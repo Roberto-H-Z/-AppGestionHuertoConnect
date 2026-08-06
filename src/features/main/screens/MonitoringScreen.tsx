@@ -182,19 +182,56 @@ export const MonitoringScreen: React.FC = () => {
                         const status: StageStatus =
                             s.estado === 'Cosechado' ? 'completed' :
                                 s.estado === 'Activo' && idx === 0 ? 'in-progress' : 'pending';
+                        const cropName = s.cultivo_nombre || `Cultivo ${idx + 1}`;
+                        const cropNameLower = cropName.toLowerCase();
+
+                        let activities: TimelineActivity[] = [];
+                        if (status === 'in-progress' || status === 'pending') {
+                            const initialCropSteps: Record<string, { action: string, detail: string }[]> = {
+                                'limón persa': [{ action: 'Preparación de Suelo', detail: 'Preparar cepas profundas y aplicar materia orgánica.' }, { action: 'Siembra Segura', detail: 'Sembrar el arbolito y regar abundantemente de inmediato.' }],
+                                'papaya maradol': [{ action: 'Acondicionamiento', detail: 'Asegurar buena filtración de terreno para evitar pudrición.' }, { action: 'Distanciamiento', detail: 'Plantar con 2m de separación y aplicar un primer riego.' }],
+                                'caña de azúcar': [{ action: 'Apertura de Surcos', detail: 'Hacer surcos profundos horizontalmente en la zona elegida.' }, { action: 'Plantación', detail: 'Colocar los trozos de caña de forma acostada y cubrir bien.' }],
+                                'tomate de temporada': [{ action: 'Almácigos', detail: 'Colocar semillas en pequeños germinadores bajo la luz.' }, { action: 'Preparación de Tutores', detail: 'Agrega estacas porque la planta requerirá fuerte soporte.' }],
+                                'chile serranito': [{ action: 'Rayos Solares', detail: 'Exponer la parcela al sol directo unas 6 a 8 horas diarias.' }, { action: 'Siembra Ligera', detail: 'Plantar las semillas a max 1cm de profundidad sin encharcar.' }],
+                                'rábano orgánico': [{ action: 'Aligeramiento de Tierra', detail: 'Remover la tierra por completo para favorecer rápido anclaje.' }, { action: 'Riego y Sembrado', detail: 'Sembrar a 2cm y mantener húmedo diariamente sin falta.' }]
+                            };
+
+                            const foundKey = Object.keys(initialCropSteps).find(key => cropNameLower.includes(key));
+                            if (foundKey) {
+                                activities = initialCropSteps[foundKey].map((step, stepIdx) => ({
+                                    id: `${s.id}-init-${stepIdx}`,
+                                    action: step.action,
+                                    detail: step.detail,
+                                    date: 'Fase Inicial',
+                                    icon: 'seed-outline',
+                                    iconColor: '#059669'
+                                }));
+                            } else {
+                                // Default task for completely unknown crops
+                                activities = [{
+                                    id: `${s.id}-init-gen`,
+                                    action: 'Aclimatación y Riego Inicial',
+                                    detail: 'Revisar la humedad general del suelo y los niveles de sol que recibe el terreno.',
+                                    date: 'Fase Inicial',
+                                    icon: 'water-outline',
+                                    iconColor: '#3B82F6'
+                                }];
+                            }
+                        }
+
                         return {
                             id: s.id,
-                            name: s.cultivo_nombre || `Cultivo ${idx + 1}`,
+                            name: cropName,
                             dayLabel: s.fecha_siembra
-                                ? `Día ${Math.ceil((Date.now() - new Date(s.fecha_siembra).getTime()) / 86400000)}`
+                                ? `Día ${Math.max(1, Math.ceil((Date.now() - new Date(s.fecha_siembra).getTime()) / 86400000))}`
                                 : 'Día 1',
                             status,
                             description: status === 'completed'
                                 ? 'Cosecha completada exitosamente.'
                                 : status === 'in-progress'
-                                    ? 'Cultivo activo — revisa el riego y nutrición.'
+                                    ? 'Cultivo activo — Primeros pasos requeridos.'
                                     : 'Listo para iniciar esta etapa.',
-                            activities: [],
+                            activities: activities,
                         };
                     });
 

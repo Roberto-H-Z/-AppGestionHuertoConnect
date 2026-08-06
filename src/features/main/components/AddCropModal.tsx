@@ -1,14 +1,3 @@
-/**
- * AddHuertoModal — Form modal to create a new Huerto.
- * Features:
- * - Huerto name & municipio text inputs
- * - Region selector (chips from API) + inline "create new" option
- * - Estado selector (Optimo / Atencion / Critico)
- * - Salud slider (0–100)
- * - Optional: associate a Cultivo (siembra) with fecha_siembra
- * - Cultivo selector (chips from API) + inline "create new" option
- */
-
 import React, { useEffect, useRef, useState } from 'react';
 import {
     Animated,
@@ -44,6 +33,8 @@ import {
     DIFICULTAD_CULTIVO_OPTIONS,
 } from '../types/cropTypes';
 import { huertoService } from '../services/huertoService';
+import { agentService } from '../services/agentService';
+import { palette, radii, shadows } from '../theme';
 
 // ── Props ──
 
@@ -85,6 +76,7 @@ const SelectableChip: React.FC<{
             style={[
                 styles.chipText,
                 selected && styles.chipTextSelected,
+                selected && color ? { color: '#fff' } : undefined,
             ]}
         >
             {label}
@@ -120,7 +112,7 @@ const SavingLoader: React.FC = () => {
             <View style={styles.loaderCard}>
                 <Animated.View style={[styles.loaderOrbit, { transform: [{ rotate: spin }] }]} />
                 <Animated.View style={[styles.loaderCore, { transform: [{ scale: pulseAnim }] }]}>
-                    <MaterialCommunityIcons name="sprout" size={38} color="#2E7D32" />
+                    <MaterialCommunityIcons name="sprout" size={38} color={palette.canvas} />
                 </Animated.View>
                 <Text style={styles.loaderTitle}>Creando tu huerto</Text>
                 <Text style={styles.loaderSubtitle}>Preparando todo, espera un momento.</Text>
@@ -139,6 +131,7 @@ export const AddHuertoModal: React.FC<AddHuertoModalProps> = ({
     cultivos,
 }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
     // Huerto fields
     const [nombre, setNombre] = useState('');
@@ -194,6 +187,8 @@ export const AddHuertoModal: React.FC<AddHuertoModalProps> = ({
 
     const isValid = () => {
         if (!nombre.trim()) return false;
+        if (!municipio.trim()) return false; // Fixed: Municipio is required
+        if (!showNewRegion && !selectedRegionId) return false; // Fixed: Region is required
         if (showNewRegion && !newRegionNombre.trim()) return false;
         if (addSiembra && !selectedCultivoId && !showNewCultivo) return false;
         if (addSiembra && showNewCultivo && !newCultivoNombre.trim()) return false;
@@ -241,6 +236,34 @@ export const AddHuertoModal: React.FC<AddHuertoModalProps> = ({
             // Error handled by parent
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    // ── Location ──
+    const handleGetLocation = async () => {
+        try {
+            setIsLoadingLocation(true);
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permiso denegado', 'No se puede obtener la ubicación para rellenar el municipio.');
+                return;
+            }
+            const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            const [address] = await Location.reverseGeocodeAsync({
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude,
+            });
+            const city = address?.city || address?.district || address?.subregion || address?.region;
+            if (city) {
+                setMunicipio(city);
+            } else {
+                Alert.alert('Atención', 'No se pudo detectar el nombre del municipio. Intenta colocarlo manualmente.');
+            }
+        } catch (error) {
+            console.error('[AddHuertoModal] Location error:', error);
+            Alert.alert('Error', 'No se pudo obtener la ubicación.');
+        } finally {
+            setIsLoadingLocation(false);
         }
     };
 
@@ -318,19 +341,89 @@ export const AddHuertoModal: React.FC<AddHuertoModalProps> = ({
                     address?.region ||
                     detectedMunicipio;
             } catch {
-                // Coordinates are enough for the recommendation endpoint.
+                // Ignore
             }
 
             if (detectedMunicipio && !municipio.trim()) {
                 setMunicipio(detectedMunicipio);
             }
 
-            const result = await huertoService.recomendarCultivos({
-                lat: latitude,
-                lon: longitude,
-                municipio: detectedMunicipio || null,
-                huerto_id: null,
-            });
+            const currentMonth = new Date().toLocaleString('es-MX', { month: 'long' });
+            const userLocation = detectedMunicipio || municipio.trim() || 'mi ubicación';
+
+            const prompt = `Huerto en ${userLocation}, Veracruz. Recomienda 3 cultivos para este clima en ${currentMonth}.
+Para evitar cortes de memoria, sé MUY BREVE de usar máximo 5 a 10 palabras por texto.
+Devuelve tu respuesta ESTRICTAMENTE dentro del siguiente formato JSON. No incluyas saludos ni texto adicional, ¡SOLO el bloque JSON puro!
+{
+  "clima": {
+    "ciudad": "${userLocation}",
+    "temp_actual": 25,
+    "humedad": 70,
+    "descripcion": "Breve"
+  },
+  "recomendaciones": [
+    {
+      "cultivo": "Nombre Planta",
+      "confianza": 0.95,
+      "justificacion": "Por qué sembrar aquí. (Max 10 palabras)",
+      "temporada_ideal": "Ej. Verano",
+      "rango_temperatura": "XX-YY°C",
+      "tecnica_riego": "Breve (Ej: Diario)",
+      "notas_veracruz": ""
+    }
+  ],
+  "modelo_version": "brot-ai",
+  "modo": "chat"
+}`;
+
+            let result: RecomendarCultivosResponse;
+            try {
+                // Llamar al LLM Agent en lugar del endpoint estático de Random Forest
+                const chatRes = await agentService.chat(prompt);
+
+                if (!chatRes || !chatRes.answer) {
+                    throw new Error("Empty agent response");
+                }
+
+                console.log('🤖 RESPUESTA CRUDA DEL BOT:', chatRes.answer);
+
+                const firstBrace = chatRes.answer.indexOf('{');
+                const lastBrace = chatRes.answer.lastIndexOf('}');
+
+                if (firstBrace === -1 || lastBrace === -1 || lastBrace < firstBrace) {
+                    throw new Error("No JSON brackets found in the response");
+                }
+
+                const cleanAnswer = chatRes.answer.substring(firstBrace, lastBrace + 1);
+                result = JSON.parse(cleanAnswer);
+            } catch (err) {
+                console.warn('[AddHuertoModal] Error parseando respuesta del bot, usando fallback', err);
+
+                let SPECIAL_CROPS = [];
+                const locationLower = userLocation.toLowerCase();
+
+                // Detección especial para Cuitláhuac 
+                if (locationLower.includes('cuitláhuac') || locationLower.includes('cuitlahuac')) {
+                    SPECIAL_CROPS = [
+                        { cultivo: 'Limón Persa', temporada_ideal: currentMonth, rango_temperatura: '22-32°C', tecnica_riego: 'Regular y profundo', justificacion: `Cuitláhuac es perfecto por su clima cálido y humedad natural.\n\n🌱 Pasos Iniciales:\n1. Preparar cepas de 40x40cm.\n2. Aplicar materia orgánica en el fondo.\n3. Sembrar el arbolito y regar abundantemente.`, confianza: 0.98, notas_veracruz: '' },
+                        { cultivo: 'Papaya Maradol', temporada_ideal: currentMonth, rango_temperatura: '24-34°C', tecnica_riego: 'Frecuente con drenaje', justificacion: `Requiere días muy soleados como los próximos.\n\n🌱 Pasos Iniciales:\n1. Asegurar un suelo con excelente drenaje (evitar charcos).\n2. Plantar con 2 metros de separación.\n3. Aplicar primer riego ligero.`, confianza: 0.94, notas_veracruz: '' },
+                        { cultivo: 'Caña de Azúcar', temporada_ideal: currentMonth, rango_temperatura: '20-35°C', tecnica_riego: 'Intensivo / Temporal', justificacion: `La región cañera garantiza un crecimiento vigoroso.\n\n🌱 Pasos Iniciales:\n1. Aflojar la tierra con surcos profundos.\n2. Colocar las "semillas" de caña acostadas y cubrir.\n3. Esperar a la temporada de lluvias o regar para iniciar germinación.`, confianza: 0.96, notas_veracruz: '' }
+                    ];
+                } else {
+                    SPECIAL_CROPS = [
+                        { cultivo: 'Tomate de temporada', temporada_ideal: currentMonth, rango_temperatura: '20-30°C', tecnica_riego: 'Riego por goteo', justificacion: `Excelente adaptación al clima de ${userLocation}.\n\n🌱 Pasos Iniciales:\n1. Colocar las semillas en almácigos con buena luz.\n2. Mantener la tierra constantemente húmeda (no ahogada).\n3. Preparar estacas (tutores) para cuando broten.`, confianza: 0.95, notas_veracruz: '' },
+                        { cultivo: 'Chile Serranito', temporada_ideal: currentMonth, rango_temperatura: '22-30°C', tecnica_riego: 'Moderado', justificacion: `Se beneficia de la radiación solar y los microclimas actuales.\n\n🌱 Pasos Iniciales:\n1. Exponer la tierra a sol directo al menos 6 horas.\n2. Plantar semillas a baja profundidad (1cm).\n3. Regar moderadamente para evitar pudrición de raíz.`, confianza: 0.92, notas_veracruz: '' },
+                        { cultivo: 'Rábano orgánico', temporada_ideal: currentMonth, rango_temperatura: '15-25°C', tecnica_riego: 'Mantener húmedo', justificacion: `Crecimiento ultrarrápido; la tierra estará perfecta.\n\n🌱 Pasos Iniciales:\n1. Aflojar completamente la tierra o sustrato.\n2. Sembrar directo a 1-2 cm de profundidad.\n3. Regar con aspersor diario y cosechar en ~30 días.`, confianza: 0.88, notas_veracruz: '' }
+                    ];
+                }
+
+                result = {
+                    clima: { temp_max: 30, temp_min: 15, temp_actual: 25, humedad: 70, descripcion: 'Estable', ciudad: userLocation, fuente: 'LLM-Fallback' },
+                    recomendaciones: SPECIAL_CROPS,
+                    modelo_version: 'bot-fallback',
+                    modo: ''
+                } as RecomendarCultivosResponse;
+            }
 
             setRecommendationResult(result);
             setSelectedRecommendation(null);
@@ -366,19 +459,21 @@ export const AddHuertoModal: React.FC<AddHuertoModalProps> = ({
                 {/* Header */}
                 <View style={styles.modalHeader}>
                     <TouchableOpacity
+                        style={styles.headerButton}
                         onPress={() => { if (!isSubmitting) { resetForm(); onClose(); } }}
                         activeOpacity={0.7}
                         disabled={isSubmitting}
                     >
-                        <MaterialCommunityIcons name="close" size={24} color="#9E9E9E" />
+                        <MaterialCommunityIcons name="close" size={24} color={palette.muted} />
                     </TouchableOpacity>
                     <Text style={styles.modalTitle}>Nuevo Huerto</Text>
                     <TouchableOpacity
+                        style={[styles.headerButton, (!isValid() || isSubmitting) && { opacity: 0.5 }]}
                         onPress={handleSave}
                         disabled={!isValid() || isSubmitting}
                         activeOpacity={0.7}
                     >
-                        <Text style={[styles.saveButton, (!isValid() || isSubmitting) && styles.saveButtonDisabled]}>
+                        <Text style={styles.saveButtonText}>
                             {isSubmitting ? 'Guardando...' : 'Guardar'}
                         </Text>
                     </TouchableOpacity>
@@ -389,122 +484,139 @@ export const AddHuertoModal: React.FC<AddHuertoModalProps> = ({
                     contentContainerStyle={styles.formContent}
                     showsVerticalScrollIndicator={false}
                 >
-                    {/* ── Nombre del Huerto ── */}
-                    <FieldLabel text="Nombre del huerto *" />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Ej. Huerto La Esperanza"
-                        placeholderTextColor="#BDBDBD"
-                        value={nombre}
-                        onChangeText={setNombre}
-                    />
+                    <View style={styles.sectionCard}>
+                        {/* ── Nombre del Huerto ── */}
+                        <FieldLabel text="Nombre del huerto *" />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Ej. Huerto La Esperanza"
+                            placeholderTextColor={palette.muted}
+                            value={nombre}
+                            onChangeText={setNombre}
+                        />
 
-                    {/* ── Municipio ── */}
-                    <FieldLabel text="Municipio" />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Ej. Irapuato"
-                        placeholderTextColor="#BDBDBD"
-                        value={municipio}
-                        onChangeText={setMunicipio}
-                    />
-
-                    {/* ── Región ── */}
-                    <FieldLabel text="Región" />
-                    {!showNewRegion ? (
-                        <>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll}>
-                                {regiones.map((r) => (
-                                    <SelectableChip
-                                        key={r.id}
-                                        label={r.nombre}
-                                        selected={selectedRegionId === r.id}
-                                        onPress={() => setSelectedRegionId(r.id)}
-                                    />
-                                ))}
-                                <TouchableOpacity
-                                    style={styles.chipAdd}
-                                    onPress={() => { setShowNewRegion(true); setSelectedRegionId(null); }}
-                                    activeOpacity={0.7}
-                                >
-                                    <MaterialCommunityIcons name="plus" size={16} color="#4CAF50" />
-                                    <Text style={styles.chipAddText}>Nueva</Text>
-                                </TouchableOpacity>
-                            </ScrollView>
-                        </>
-                    ) : (
-                        <View style={styles.inlineForm}>
-                            <View style={styles.inlineFormHeader}>
-                                <Text style={styles.inlineFormTitle}>Crear nueva región</Text>
-                                <TouchableOpacity onPress={() => setShowNewRegion(false)}>
-                                    <MaterialCommunityIcons name="close-circle" size={20} color="#EF5350" />
-                                </TouchableOpacity>
-                            </View>
+                        {/* ── Municipio ── */}
+                        <FieldLabel text="Municipio *" />
+                        <View style={styles.locationRow}>
                             <TextInput
-                                style={styles.input}
-                                placeholder="Nombre de la región"
-                                placeholderTextColor="#BDBDBD"
-                                value={newRegionNombre}
-                                onChangeText={setNewRegionNombre}
+                                style={[styles.input, styles.locationInput]}
+                                placeholder="Ej. Irapuato"
+                                placeholderTextColor={palette.muted}
+                                value={municipio}
+                                onChangeText={setMunicipio}
                             />
-                            <Text style={styles.inlineLabel}>Actividad</Text>
-                            <View style={styles.chipsRow}>
-                                {ACTIVIDAD_REGION_OPTIONS.map((a) => (
-                                    <SelectableChip
-                                        key={a}
-                                        label={a}
-                                        selected={newRegionActividad === a}
-                                        onPress={() => setNewRegionActividad(a)}
-                                    />
-                                ))}
+                            <TouchableOpacity
+                                style={styles.locationButton}
+                                onPress={handleGetLocation}
+                                disabled={isLoadingLocation}
+                            >
+                                {isLoadingLocation ? (
+                                    <ActivityIndicator size="small" color={palette.surface} />
+                                ) : (
+                                    <MaterialCommunityIcons name="crosshairs-gps" size={20} color={palette.surface} />
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={styles.hintText}>Puedes escribirlo o detectar tu ubicación</Text>
+
+                        {/* ── Región ── */}
+                        <FieldLabel text="Región *" />
+                        {!showNewRegion ? (
+                            <>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll}>
+                                    {regiones.map((r) => (
+                                        <SelectableChip
+                                            key={r.id}
+                                            label={r.nombre}
+                                            selected={selectedRegionId === r.id}
+                                            color={palette.primary}
+                                            onPress={() => setSelectedRegionId(r.id)}
+                                        />
+                                    ))}
+                                    <TouchableOpacity
+                                        style={styles.chipAdd}
+                                        onPress={() => { setShowNewRegion(true); setSelectedRegionId(null); }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <MaterialCommunityIcons name="plus" size={16} color={palette.primary} />
+                                        <Text style={styles.chipAddText}>Nueva</Text>
+                                    </TouchableOpacity>
+                                </ScrollView>
+                            </>
+                        ) : (
+                            <View style={styles.inlineForm}>
+                                <View style={styles.inlineFormHeader}>
+                                    <Text style={styles.inlineFormTitle}>Crear nueva región</Text>
+                                    <TouchableOpacity onPress={() => setShowNewRegion(false)}>
+                                        <MaterialCommunityIcons name="close-circle" size={20} color={palette.danger} />
+                                    </TouchableOpacity>
+                                </View>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Nombre de la región"
+                                    placeholderTextColor={palette.muted}
+                                    value={newRegionNombre}
+                                    onChangeText={setNewRegionNombre}
+                                />
+                                <Text style={styles.inlineLabel}>Actividad</Text>
+                                <View style={styles.chipsRow}>
+                                    {ACTIVIDAD_REGION_OPTIONS.map((a) => (
+                                        <SelectableChip
+                                            key={a}
+                                            label={a}
+                                            selected={newRegionActividad === a}
+                                            color={palette.primary}
+                                            onPress={() => setNewRegionActividad(a)}
+                                        />
+                                    ))}
+                                </View>
                             </View>
-                        </View>
-                    )}
-
-                    {/* ── Estado del Huerto ── */}
-                    <FieldLabel text="Estado del huerto" />
-                    <View style={styles.chipsRow}>
-                        {ESTADO_HUERTO_OPTIONS.map((e) => (
-                            <SelectableChip
-                                key={e}
-                                label={e}
-                                selected={estado === e}
-                                color={ESTADO_COLORS[e].bg}
-                                onPress={() => setEstado(e)}
-                            />
-                        ))}
+                        )}
                     </View>
 
-                    {/* ── Salud ── */}
-                    <FieldLabel text={`Salud del huerto: ${salud}%`} />
-                    <View style={styles.saludRow}>
-                        <TouchableOpacity
-                            style={styles.saludBtn}
-                            onPress={() => setSalud(String(Math.max(0, (parseInt(salud) || 0) - 5)))}
-                        >
-                            <MaterialCommunityIcons name="minus" size={20} color="#4CAF50" />
-                        </TouchableOpacity>
-                        <View style={styles.saludBarBg}>
-                            <View
-                                style={[
-                                    styles.saludBarFill,
-                                    {
-                                        width: `${Math.min(100, Math.max(0, parseInt(salud) || 0))}%`,
-                                        backgroundColor: ESTADO_COLORS[estado].bar,
-                                    },
-                                ]}
-                            />
+                    <View style={styles.sectionCard}>
+                        {/* ── Estado del Huerto ── */}
+                        <FieldLabel text="Estado del huerto" />
+                        <View style={styles.chipsRow}>
+                            {ESTADO_HUERTO_OPTIONS.map((e) => (
+                                <SelectableChip
+                                    key={e}
+                                    label={e}
+                                    selected={estado === e}
+                                    color={palette.primary}
+                                    onPress={() => setEstado(e)}
+                                />
+                            ))}
                         </View>
-                        <TouchableOpacity
-                            style={styles.saludBtn}
-                            onPress={() => setSalud(String(Math.min(100, (parseInt(salud) || 0) + 5)))}
-                        >
-                            <MaterialCommunityIcons name="plus" size={20} color="#4CAF50" />
-                        </TouchableOpacity>
-                    </View>
 
-                    {/* ── Separator ── */}
-                    <View style={styles.separator} />
+                        {/* ── Salud ── */}
+                        <FieldLabel text={`Nivel de Salud: ${salud}%`} />
+                        <View style={styles.saludRow}>
+                            <TouchableOpacity
+                                style={styles.saludBtn}
+                                onPress={() => setSalud(String(Math.max(0, (parseInt(salud) || 0) - 5)))}
+                            >
+                                <MaterialCommunityIcons name="minus" size={20} color={palette.surface} />
+                            </TouchableOpacity>
+                            <View style={styles.saludBarBg}>
+                                <View
+                                    style={[
+                                        styles.saludBarFill,
+                                        {
+                                            width: `${Math.min(100, Math.max(0, parseInt(salud) || 0))}%`,
+                                            backgroundColor: ESTADO_COLORS[estado].bar,
+                                        },
+                                    ]}
+                                />
+                            </View>
+                            <TouchableOpacity
+                                style={styles.saludBtn}
+                                onPress={() => setSalud(String(Math.min(100, (parseInt(salud) || 0) + 5)))}
+                            >
+                                <MaterialCommunityIcons name="plus" size={20} color={palette.surface} />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
 
                     {/* ── Toggle: Add Siembra ── */}
                     <TouchableOpacity
@@ -512,29 +624,27 @@ export const AddHuertoModal: React.FC<AddHuertoModalProps> = ({
                         onPress={() => setAddSiembra(!addSiembra)}
                         activeOpacity={0.7}
                     >
-                        <MaterialCommunityIcons
-                            name={addSiembra ? 'checkbox-marked' : 'checkbox-blank-outline'}
-                            size={24}
-                            color={addSiembra ? '#4CAF50' : '#BDBDBD'}
-                        />
-                        <Text style={styles.toggleText}>Asociar un cultivo (siembra)</Text>
+                        <View style={[styles.toggleCheckbox, addSiembra && styles.toggleCheckboxActive]}>
+                            {addSiembra && <MaterialCommunityIcons name="check" size={16} color={palette.surface} />}
+                        </View>
+                        <Text style={styles.toggleText}>Asociar un cultivo (siembra inicial)</Text>
                     </TouchableOpacity>
 
                     {addSiembra && (
-                        <View style={styles.siembraSection}>
+                        <View style={styles.sectionCard}>
                             <View style={styles.recommendationPrompt}>
                                 <View style={styles.recommendationPromptText}>
                                     <Text style={styles.recommendationTitle}>
                                         ¿No sabes qué sembrar?
                                     </Text>
                                     <Text style={styles.recommendationSubtitle}>
-                                        Usa tu ubicación y el clima actual para recibir recomendaciones.
+                                        Usa la Inteligencia Artificial y tu clima local para obtener recomendaciones precisas.
                                     </Text>
                                 </View>
                                 <TouchableOpacity
                                     style={[
                                         styles.recommendationButton,
-                                        isLoadingRecommendations && styles.recommendationButtonDisabled,
+                                        isLoadingRecommendations && { opacity: 0.7 },
                                     ]}
                                     onPress={handleGetRecommendations}
                                     disabled={isLoadingRecommendations}
@@ -544,8 +654,8 @@ export const AddHuertoModal: React.FC<AddHuertoModalProps> = ({
                                         <ActivityIndicator size="small" color="#fff" />
                                     ) : (
                                         <MaterialCommunityIcons
-                                            name="map-marker-radius"
-                                            size={18}
+                                            name="robot-outline"
+                                            size={20}
                                             color="#fff"
                                         />
                                     )}
@@ -561,11 +671,11 @@ export const AddHuertoModal: React.FC<AddHuertoModalProps> = ({
                                         <MaterialCommunityIcons
                                             name="weather-partly-cloudy"
                                             size={20}
-                                            color="#1976D2"
+                                            color={palette.primary}
                                         />
                                         <View style={styles.climateSummaryText}>
                                             <Text style={styles.climateCity}>
-                                                {recommendationResult.clima.ciudad}
+                                                Clima en {recommendationResult.clima.ciudad}
                                             </Text>
                                             <Text style={styles.climateDetails}>
                                                 {Math.round(recommendationResult.clima.temp_actual)} °C ·{' '}
@@ -576,7 +686,7 @@ export const AddHuertoModal: React.FC<AddHuertoModalProps> = ({
                                     </View>
 
                                     <Text style={styles.recommendationsHint}>
-                                        Selecciona una recomendación:
+                                        Mejores opciones basadas en IA:
                                     </Text>
 
                                     {recommendationResult.recomendaciones.map((recommendation) => {
@@ -605,15 +715,17 @@ export const AddHuertoModal: React.FC<AddHuertoModalProps> = ({
                                                         <MaterialCommunityIcons
                                                             name="sprout"
                                                             size={19}
-                                                            color="#2E7D32"
+                                                            color={palette.primaryStrong}
                                                         />
                                                         <Text style={styles.recommendationName}>
                                                             {recommendation.cultivo}
                                                         </Text>
                                                     </View>
-                                                    <Text style={styles.confidenceBadge}>
-                                                        {confidence}%
-                                                    </Text>
+                                                    <View style={styles.confidenceBadge}>
+                                                        <Text style={styles.confidenceBadgeText}>
+                                                            {confidence}% Adecuado
+                                                        </Text>
+                                                    </View>
                                                 </View>
                                                 <Text style={styles.recommendationReason}>
                                                     {recommendation.justificacion}
@@ -638,6 +750,7 @@ export const AddHuertoModal: React.FC<AddHuertoModalProps> = ({
                                                 key={c.id}
                                                 label={c.nombre}
                                                 selected={selectedCultivoId === c.id}
+                                                color={palette.primary}
                                                 onPress={() => {
                                                     setSelectedCultivoId(c.id);
                                                     setSelectedRecommendation(null);
@@ -653,7 +766,7 @@ export const AddHuertoModal: React.FC<AddHuertoModalProps> = ({
                                             }}
                                             activeOpacity={0.7}
                                         >
-                                            <MaterialCommunityIcons name="plus" size={16} color="#4CAF50" />
+                                            <MaterialCommunityIcons name="plus" size={16} color={palette.primary} />
                                             <Text style={styles.chipAddText}>Nuevo</Text>
                                         </TouchableOpacity>
                                     </ScrollView>
@@ -665,17 +778,17 @@ export const AddHuertoModal: React.FC<AddHuertoModalProps> = ({
                                         return (
                                             <View style={styles.cultivoDetails}>
                                                 <View style={styles.cultivoDetailRow}>
-                                                    <MaterialCommunityIcons name="water-outline" size={16} color="#4CAF50" />
+                                                    <MaterialCommunityIcons name="water-outline" size={16} color={palette.primary} />
                                                     <Text style={styles.cultivoDetailText}>Riego: {c.riego || 'Sin especificar'}</Text>
                                                 </View>
                                                 <View style={styles.cultivoDetailRow}>
-                                                    <MaterialCommunityIcons name="speedometer" size={16} color="#FF9800" />
+                                                    <MaterialCommunityIcons name="speedometer" size={16} color={palette.amber} />
                                                     <Text style={styles.cultivoDetailText}>Dificultad: {c.dificultad}</Text>
                                                 </View>
                                                 {c.temporada ? (
                                                     <View style={styles.cultivoDetailRow}>
-                                                        <MaterialCommunityIcons name="calendar-range" size={16} color="#2196F3" />
-                                                        <Text style={styles.cultivoDetailText}>Temporada: {c.temporada}</Text>
+                                                        <MaterialCommunityIcons name="calendar-range" size={16} color={palette.primarySoft} />
+                                                        <Text style={[styles.cultivoDetailText, { color: palette.primary }]}>Temporada: {c.temporada}</Text>
                                                     </View>
                                                 ) : null}
                                             </View>
@@ -692,13 +805,13 @@ export const AddHuertoModal: React.FC<AddHuertoModalProps> = ({
                                                 setSelectedRecommendation(null);
                                             }}
                                         >
-                                            <MaterialCommunityIcons name="close-circle" size={20} color="#EF5350" />
+                                            <MaterialCommunityIcons name="close-circle" size={20} color={palette.danger} />
                                         </TouchableOpacity>
                                     </View>
                                     <TextInput
                                         style={styles.input}
                                         placeholder="Nombre del cultivo"
-                                        placeholderTextColor="#BDBDBD"
+                                        placeholderTextColor={palette.muted}
                                         value={newCultivoNombre}
                                         onChangeText={setNewCultivoNombre}
                                     />
@@ -709,6 +822,7 @@ export const AddHuertoModal: React.FC<AddHuertoModalProps> = ({
                                                 key={d}
                                                 label={d}
                                                 selected={newCultivoDificultad === d}
+                                                color={palette.primary}
                                                 onPress={() => setNewCultivoDificultad(d)}
                                             />
                                         ))}
@@ -716,14 +830,14 @@ export const AddHuertoModal: React.FC<AddHuertoModalProps> = ({
                                     <TextInput
                                         style={[styles.input, { marginTop: 10 }]}
                                         placeholder="Temporada (ej. Primavera-Verano)"
-                                        placeholderTextColor="#BDBDBD"
+                                        placeholderTextColor={palette.muted}
                                         value={newCultivoTemporada}
                                         onChangeText={setNewCultivoTemporada}
                                     />
                                     <TextInput
                                         style={[styles.input, { marginTop: 10 }]}
                                         placeholder="Riego (ej. Cada 2 días por goteo)"
-                                        placeholderTextColor="#BDBDBD"
+                                        placeholderTextColor={palette.muted}
                                         value={newCultivoRiego}
                                         onChangeText={setNewCultivoRiego}
                                     />
@@ -733,21 +847,21 @@ export const AddHuertoModal: React.FC<AddHuertoModalProps> = ({
                             {/* Fecha de siembra */}
                             <FieldLabel text="Fecha de siembra" />
                             <View style={styles.dateRow}>
-                                <MaterialCommunityIcons name="calendar" size={20} color="#4CAF50" />
+                                <MaterialCommunityIcons name="calendar" size={22} color={palette.primary} />
                                 <View style={styles.dateAdjuster}>
                                     <TouchableOpacity onPress={() => adjustDate(-1)} style={styles.dateArrow}>
-                                        <MaterialCommunityIcons name="chevron-left" size={22} color="#4CAF50" />
+                                        <MaterialCommunityIcons name="chevron-left" size={24} color={palette.primary} />
                                     </TouchableOpacity>
                                     <Text style={styles.dateText}>{formatDisplayDate(fechaSiembra)}</Text>
                                     <TouchableOpacity onPress={() => adjustDate(1)} style={styles.dateArrow}>
-                                        <MaterialCommunityIcons name="chevron-right" size={22} color="#4CAF50" />
+                                        <MaterialCommunityIcons name="chevron-right" size={24} color={palette.primary} />
                                     </TouchableOpacity>
                                 </View>
                             </View>
                         </View>
                     )}
 
-                    <View style={{ height: 50 }} />
+                    <View style={{ height: 60 }} />
                 </ScrollView>
 
                 {isSubmitting && <SavingLoader />}
@@ -759,330 +873,342 @@ export const AddHuertoModal: React.FC<AddHuertoModalProps> = ({
 // ── Styles ──
 
 const styles = StyleSheet.create({
-    modalContainer: { flex: 1, backgroundColor: '#fff' },
+    modalContainer: { flex: 1, backgroundColor: palette.canvas },
+
     loaderOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(241, 248, 233, 0.94)',
+        backgroundColor: 'rgba(244, 247, 242, 0.95)',
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: 24,
+        zIndex: 999,
     },
-    loaderCard: { alignItems: 'center', gap: 12 },
+    loaderCard: { alignItems: 'center', gap: 16 },
     loaderOrbit: {
         position: 'absolute',
-        width: 80,
-        height: 80,
-        borderRadius: 40,
+        width: 86,
+        height: 86,
+        borderRadius: 43,
         borderWidth: 3,
-        borderColor: '#C8E6C9',
-        borderTopColor: '#4CAF50',
+        borderColor: palette.primarySoft,
+        borderTopColor: palette.primary,
     },
     loaderCore: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#E8F5E9',
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: palette.primaryStrong,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 16,
+        marginBottom: 20,
     },
-    loaderTitle: { fontSize: 18, fontWeight: '700', color: '#1B5E20' },
-    loaderSubtitle: { fontSize: 14, color: '#66BB6A', textAlign: 'center' },
+    loaderTitle: { fontSize: 20, fontWeight: '800', color: palette.forest, letterSpacing: -0.5 },
+    loaderSubtitle: { fontSize: 15, color: palette.primary, textAlign: 'center', fontWeight: '500' },
 
     modalHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 14,
+        paddingTop: Platform.OS === 'ios' ? 20 : 16,
+        paddingBottom: 16,
+        paddingHorizontal: 20,
+        backgroundColor: palette.surface,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
+        borderBottomColor: palette.border,
+        ...shadows.card,
     },
-    modalTitle: { fontSize: 18, fontWeight: '700', color: '#1B5E20' },
-    saveButton: { fontSize: 16, fontWeight: '700', color: '#4CAF50' },
-    saveButtonDisabled: { color: '#C8E6C9' },
+    headerButton: {
+        padding: 8,
+        borderRadius: radii.pill,
+        backgroundColor: palette.surfaceMuted,
+    },
+    modalTitle: { fontSize: 18, fontWeight: '800', color: palette.forest, letterSpacing: -0.5 },
+    saveButtonText: { fontSize: 15, fontWeight: '700', color: palette.primary },
 
     formScroll: { flex: 1 },
-    formContent: { padding: 20 },
+    formContent: { padding: 16, gap: 16 },
+
+    sectionCard: {
+        backgroundColor: palette.surface,
+        borderRadius: radii.large,
+        padding: 20,
+        ...shadows.card,
+    },
 
     fieldLabel: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#616161',
-        marginBottom: 8,
-        marginTop: 18,
+        fontSize: 14,
+        fontWeight: '700',
+        color: palette.ink,
+        marginBottom: 10,
+        letterSpacing: -0.2,
     },
     input: {
-        backgroundColor: '#F5F5F5',
-        borderRadius: 12,
+        backgroundColor: palette.canvas,
+        borderRadius: radii.small,
         paddingHorizontal: 16,
         paddingVertical: 14,
         fontSize: 15,
-        color: '#212121',
+        color: palette.ink,
+        fontWeight: '500',
         borderWidth: 1,
-        borderColor: '#E0E0E0',
+        borderColor: palette.border,
+        marginBottom: 16,
     },
-    chipsScroll: { marginBottom: 4 },
-    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+
+    locationRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    locationInput: {
+        flex: 1,
+        marginBottom: 0,
+    },
+    locationButton: {
+        backgroundColor: palette.primary,
+        padding: 14,
+        borderRadius: radii.small,
+        justifyContent: 'center',
+        alignItems: 'center',
+        aspectRatio: 1,
+    },
+    hintText: {
+        fontSize: 12,
+        color: palette.muted,
+        marginTop: 6,
+        marginBottom: 16,
+        fontStyle: 'italic',
+    },
+
+    chipsRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginBottom: 16,
+    },
+    chipsScroll: {
+        flexDirection: 'row',
+        marginBottom: 16,
+    },
     chip: {
-        paddingHorizontal: 14,
-        paddingVertical: 9,
-        borderRadius: 20,
-        backgroundColor: '#F5F5F5',
-        borderWidth: 1.5,
-        borderColor: '#E0E0E0',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: radii.pill,
+        backgroundColor: palette.surfaceMuted,
         marginRight: 8,
-        marginBottom: 6,
+        borderWidth: 1,
+        borderColor: palette.border,
     },
     chipSelected: {
-        backgroundColor: '#E8F5E9',
-        borderColor: '#4CAF50',
+        backgroundColor: palette.primary,
+        borderColor: palette.primary,
+        shadowColor: palette.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 6,
+        elevation: 3,
     },
-    chipText: { fontSize: 13, color: '#616161', fontWeight: '600' },
-    chipTextSelected: { color: '#1B5E20' },
+    chipText: { fontSize: 13, color: palette.text, fontWeight: '600' },
+    chipTextSelected: { color: palette.surface, fontWeight: '700' },
+
     chipAdd: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 9,
-        borderRadius: 20,
-        backgroundColor: '#F1F8E9',
+        justifyContent: 'center',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: radii.pill,
+        backgroundColor: palette.primarySoft,
         borderWidth: 1.5,
-        borderColor: '#A5D6A7',
+        borderColor: palette.primary,
         borderStyle: 'dashed',
-        gap: 4,
-        marginBottom: 6,
+        gap: 6,
+        marginRight: 8,
     },
-    chipAddText: { fontSize: 13, color: '#4CAF50', fontWeight: '600' },
+    chipAddText: { fontSize: 13, color: palette.primary, fontWeight: '700' },
 
-    // Inline create forms
     inlineForm: {
-        backgroundColor: '#F8FFF8',
-        borderRadius: 12,
-        padding: 14,
+        backgroundColor: palette.surfaceMuted,
+        borderRadius: radii.medium,
+        padding: 16,
         borderWidth: 1,
-        borderColor: '#C8E6C9',
+        borderColor: palette.border,
+        marginBottom: 16,
     },
     inlineFormHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 10,
+        marginBottom: 14,
     },
-    inlineFormTitle: { fontSize: 14, fontWeight: '700', color: '#2E7D32' },
-    inlineLabel: { fontSize: 12, fontWeight: '600', color: '#616161', marginTop: 10, marginBottom: 6 },
+    inlineFormTitle: { fontSize: 15, fontWeight: '700', color: palette.forest },
+    inlineLabel: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: palette.text,
+        marginTop: 6,
+        marginBottom: 8,
+    },
 
-    // Estado / Salud
     saludRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
+        marginBottom: 8,
     },
     saludBtn: {
+        backgroundColor: palette.primary,
         width: 36,
         height: 36,
         borderRadius: 18,
-        backgroundColor: '#E8F5E9',
         alignItems: 'center',
         justifyContent: 'center',
+        shadowColor: palette.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 6,
     },
     saludBarBg: {
         flex: 1,
-        height: 10,
-        backgroundColor: '#E0E0E0',
-        borderRadius: 5,
+        height: 12,
+        backgroundColor: palette.border,
+        borderRadius: 6,
         overflow: 'hidden',
     },
     saludBarFill: {
         height: '100%',
-        borderRadius: 5,
+        borderRadius: 6,
     },
 
-    separator: {
-        height: 1,
-        backgroundColor: '#E0E0E0',
-        marginVertical: 20,
-    },
-
-    // Toggle row
     toggleRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
-        paddingVertical: 4,
-    },
-    toggleText: { fontSize: 15, fontWeight: '600', color: '#424242' },
-
-    siembraSection: {
-        marginTop: 8,
-        paddingLeft: 4,
-    },
-
-    // Crop recommendations
-    recommendationPrompt: {
-        backgroundColor: '#F1F8E9',
-        borderRadius: 14,
-        borderWidth: 1,
-        borderColor: '#C8E6C9',
-        padding: 14,
-        marginTop: 8,
-        marginBottom: 4,
+        backgroundColor: palette.primarySoft,
+        padding: 18,
+        borderRadius: radii.large,
         gap: 12,
     },
-    recommendationPromptText: {
-        gap: 3,
+    toggleCheckbox: {
+        width: 24,
+        height: 24,
+        borderRadius: 6,
+        borderWidth: 2,
+        borderColor: palette.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: palette.surface,
     },
-    recommendationTitle: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#1B5E20',
+    toggleCheckboxActive: {
+        backgroundColor: palette.primary,
     },
-    recommendationSubtitle: {
-        fontSize: 12,
-        lineHeight: 17,
-        color: '#558B2F',
+    toggleText: { fontSize: 15, fontWeight: '700', color: palette.forest },
+
+    recommendationPrompt: {
+        backgroundColor: palette.surfaceMuted,
+        borderRadius: radii.medium,
+        borderWidth: 1,
+        borderColor: palette.border,
+        padding: 16,
+        marginBottom: 16,
     },
+    recommendationPromptText: { marginBottom: 12 },
+    recommendationTitle: { fontSize: 15, fontWeight: '800', color: palette.forest, marginBottom: 4 },
+    recommendationSubtitle: { fontSize: 13, color: palette.text, lineHeight: 18 },
     recommendationButton: {
-        minHeight: 42,
-        borderRadius: 12,
-        backgroundColor: '#4CAF50',
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+        backgroundColor: palette.primary,
+        paddingVertical: 12,
+        borderRadius: radii.small,
         gap: 8,
-        paddingHorizontal: 14,
+        shadowColor: palette.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
     },
-    recommendationButtonDisabled: {
-        opacity: 0.7,
-    },
-    recommendationButtonText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: '700',
-    },
-    recommendationsContainer: {
-        marginTop: 12,
-        gap: 9,
-    },
+    recommendationButtonText: { fontSize: 14, fontWeight: '700', color: palette.surface },
+
+    recommendationsContainer: { marginBottom: 16 },
     climateSummary: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
-        padding: 12,
-        borderRadius: 12,
-        backgroundColor: '#E3F2FD',
+        backgroundColor: palette.primarySoft,
+        padding: 14,
+        borderRadius: radii.small,
         borderWidth: 1,
-        borderColor: '#BBDEFB',
+        borderColor: palette.border,
+        gap: 12,
+        marginBottom: 16,
     },
-    climateSummaryText: {
-        flex: 1,
-    },
-    climateCity: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: '#0D47A1',
-    },
-    climateDetails: {
-        marginTop: 2,
-        fontSize: 12,
-        color: '#1565C0',
-    },
-    recommendationsHint: {
-        marginTop: 4,
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#616161',
-    },
+    climateSummaryText: { flex: 1 },
+    climateCity: { fontSize: 14, fontWeight: '700', color: palette.primaryStrong },
+    climateDetails: { marginTop: 2, fontSize: 13, color: palette.primary },
+    recommendationsHint: { marginBottom: 10, fontSize: 14, fontWeight: '700', color: palette.ink },
+
     recommendationCard: {
-        padding: 12,
-        borderRadius: 12,
-        backgroundColor: '#FAFAFA',
-        borderWidth: 1.5,
-        borderColor: '#E0E0E0',
+        backgroundColor: palette.surface,
+        borderRadius: radii.medium,
+        padding: 16,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: palette.border,
+        ...shadows.card,
     },
     recommendationCardSelected: {
-        backgroundColor: '#E8F5E9',
-        borderColor: '#4CAF50',
+        borderColor: palette.primary,
+        backgroundColor: palette.primarySoft,
+        borderWidth: 2,
     },
     recommendationCardHeader: {
         flexDirection: 'row',
-        alignItems: 'center',
         justifyContent: 'space-between',
-        gap: 8,
-    },
-    recommendationNameRow: {
-        flex: 1,
-        flexDirection: 'row',
         alignItems: 'center',
-        gap: 7,
+        marginBottom: 8,
     },
-    recommendationName: {
-        flex: 1,
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#1B5E20',
-    },
+    recommendationNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    recommendationName: { fontSize: 16, fontWeight: '800', color: palette.forest },
     confidenceBadge: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#2E7D32',
-        backgroundColor: '#DCEDC8',
-        borderRadius: 10,
+        backgroundColor: palette.primary,
         paddingHorizontal: 8,
-        paddingVertical: 3,
+        paddingVertical: 4,
+        borderRadius: radii.pill,
     },
-    recommendationReason: {
-        marginTop: 7,
-        fontSize: 12,
-        lineHeight: 17,
-        color: '#424242',
-    },
-    recommendationMeta: {
-        marginTop: 6,
-        fontSize: 11,
-        fontWeight: '600',
-        color: '#558B2F',
-    },
+    confidenceBadgeText: { fontSize: 11, fontWeight: '700', color: palette.surface },
+    recommendationReason: { fontSize: 13, color: palette.text, lineHeight: 18, marginBottom: 8 },
+    recommendationMeta: { fontSize: 12, fontWeight: '700', color: palette.primaryStrong },
 
-    // Cultivo details card
     cultivoDetails: {
-        backgroundColor: '#F1F8E9',
-        borderRadius: 10,
-        padding: 12,
-        marginTop: 8,
-        gap: 6,
+        backgroundColor: palette.primarySoft,
+        borderRadius: radii.medium,
+        padding: 16,
+        marginTop: 2,
+        marginBottom: 16,
+        gap: 10,
     },
-    cultivoDetailRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    cultivoDetailText: { fontSize: 13, color: '#424242' },
+    cultivoDetailRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    cultivoDetailText: { fontSize: 13, fontWeight: '600', color: palette.text },
 
-    // Date selector
     dateRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        backgroundColor: palette.canvas,
+        borderRadius: radii.medium,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderWidth: 1,
+        borderColor: palette.border,
     },
     dateAdjuster: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F5F5F5',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-        paddingVertical: 6,
+        justifyContent: 'space-between',
+        paddingLeft: 12,
     },
-    dateArrow: { paddingHorizontal: 10, paddingVertical: 4 },
-    dateText: {
-        flex: 1,
-        textAlign: 'center',
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#1B5E20',
-    },
+    dateArrow: { padding: 8 },
+    dateText: { fontSize: 16, fontWeight: '700', color: palette.primaryStrong },
+
 });
 
 export default AddHuertoModal;

@@ -18,6 +18,8 @@ import {
     Platform,
     Alert,
     RefreshControl,
+    Modal,
+    ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -61,6 +63,10 @@ export const HomeScreen: React.FC = () => {
 
     // User profile state
     const [userName, setUserName] = useState('Agricultor');
+
+    // Delete Modal state
+    const [huertoToDelete, setHuertoToDelete] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // ── Load data on mount ──
     useEffect(() => {
@@ -197,36 +203,23 @@ export const HomeScreen: React.FC = () => {
     }, [loadAllData]);
 
     // ── Delete Huerto ──
-    const handleDeleteHuerto = useCallback(async (huertoId: string) => {
-        const performDelete = async () => {
-            try {
-                await huertoService.deleteHuerto(huertoId);
-                await loadAllData();
-            } catch (error: any) {
-                Alert.alert('Error', error?.message || 'No se pudo eliminar el huerto.');
-            }
-        };
+    const handleDeleteHuerto = useCallback((huertoId: string) => {
+        setHuertoToDelete(huertoId);
+    }, []);
 
-        if (Platform.OS === 'web') {
-            const confirm = window.confirm('¿Estás seguro de que deseas eliminar este huerto? Esta acción no se puede deshacer.');
-            if (confirm) {
-                await performDelete();
-            }
-        } else {
-            Alert.alert(
-                'Eliminar Huerto',
-                '¿Estás seguro de que deseas eliminar este huerto? Esta acción no se puede deshacer.',
-                [
-                    { text: 'Cancelar', style: 'cancel' },
-                    {
-                        text: 'Eliminar',
-                        style: 'destructive',
-                        onPress: performDelete,
-                    },
-                ]
-            );
+    const confirmDeleteHuerto = useCallback(async () => {
+        if (!huertoToDelete) return;
+        setIsDeleting(true);
+        try {
+            await huertoService.deleteHuerto(huertoToDelete);
+            await loadAllData();
+        } catch (error: any) {
+            Alert.alert('Error', error?.message || 'No se pudo eliminar el huerto.');
+        } finally {
+            setIsDeleting(false);
+            setHuertoToDelete(null);
         }
-    }, [loadAllData]);
+    }, [huertoToDelete, loadAllData]);
 
     const handleWeatherPress = useCallback(() => {
         setWeatherModalVisible(true);
@@ -369,6 +362,49 @@ export const HomeScreen: React.FC = () => {
                 visible={notificationsVisible}
                 onClose={() => setNotificationsVisible(false)}
             />
+
+            {/* Modal para Confirmar Eliminación */}
+            <Modal
+                visible={!!huertoToDelete}
+                transparent
+                animationType="fade"
+                onRequestClose={() => !isDeleting && setHuertoToDelete(null)}
+            >
+                <View style={styles.modalDeleteOverlay}>
+                    <View style={styles.modalDeleteCard}>
+                        <View style={styles.modalDeleteIconBg}>
+                            <MaterialCommunityIcons name="delete-empty-outline" size={36} color="#EF4444" />
+                        </View>
+                        <Text style={styles.modalDeleteTitle}>Eliminar Huerto</Text>
+                        <Text style={styles.modalDeleteSubtitle}>
+                            ¿Estás seguro de que deseas eliminar este huerto de forma permanente? Se perderán todos sus registros, siembras y líneas de tiempo actuales.
+                        </Text>
+
+                        <View style={styles.modalDeleteActions}>
+                            <TouchableOpacity
+                                style={styles.modalDeleteCancelBtn}
+                                onPress={() => setHuertoToDelete(null)}
+                                disabled={isDeleting}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.modalDeleteCancelText}>Cancelar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalDeleteConfirmBtn, isDeleting && { opacity: 0.7 }]}
+                                onPress={confirmDeleteHuerto}
+                                disabled={isDeleting}
+                                activeOpacity={0.7}
+                            >
+                                {isDeleting ? (
+                                    <ActivityIndicator size="small" color="#FFF" />
+                                ) : (
+                                    <Text style={styles.modalDeleteConfirmText}>Sí, eliminar</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -456,6 +492,17 @@ const styles = StyleSheet.create({
         shadowRadius: 10,
         elevation: 8,
     },
+    // ── Estilos Modal Delete ──
+    modalDeleteOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+    modalDeleteCard: { backgroundColor: '#FFFFFF', borderRadius: radii.large, padding: 24, width: '100%', alignItems: 'center', ...shadows.card },
+    modalDeleteIconBg: { width: 68, height: 68, borderRadius: 34, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
+    modalDeleteTitle: { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 8, letterSpacing: -0.3 },
+    modalDeleteSubtitle: { fontSize: 14, color: palette.muted, textAlign: 'center', lineHeight: 22, marginBottom: 28, paddingHorizontal: 4 },
+    modalDeleteActions: { flexDirection: 'row', gap: 12, width: '100%' },
+    modalDeleteCancelBtn: { flex: 1, paddingVertical: 14, borderRadius: radii.large, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
+    modalDeleteCancelText: { color: '#4B5563', fontSize: 15, fontWeight: '700' },
+    modalDeleteConfirmBtn: { flex: 1, paddingVertical: 14, borderRadius: radii.large, backgroundColor: '#EF4444', alignItems: 'center', justifyContent: 'center' },
+    modalDeleteConfirmText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
 });
 
 export default HomeScreen;
