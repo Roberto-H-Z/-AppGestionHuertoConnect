@@ -32,6 +32,7 @@ import { chatbotService, ConversacionOut, MensajeOut } from '../services/chatbot
 import { aiModelService, CultivoRecomendado, PlagaDetectada } from '../services/aiModelService';
 import { agentService } from '../services/agentService';
 import { geocodeMunicipio } from '../services/geocodingService';
+import { perfilAgricultorService } from '../../onboarding/services/perfilAgricultorService';
 import { AppScreenHeader } from '../components';
 import { palette, radii, shadows } from '../theme';
 import * as ImagePicker from 'expo-image-picker';
@@ -891,6 +892,14 @@ export const AIChatScreen: React.FC = () => {
 
                 let extraContext = '';
                 let weatherDataContext: any = null;
+
+                try {
+                    const profileData = await perfilAgricultorService.getMyProfile();
+                    if (profileData) {
+                        const perfilStr = `Perfil: ${profileData.perfil || 'Desconocido'}. Área: ${profileData.area_cultivo || 'No especificada'}. Ubicación general: ${profileData.ubicacion || 'No especificada'}. Acceso a agua: ${profileData.acceso_agua || 'No especificado'}.`;
+                        extraContext += `\n\n[SISTEMA - CONTEXTO DEL USUARIO: Su huerto tiene las siguientes características: ${perfilStr}. Utiliza obligatoriamente este contexto para personalizar tus respuestas hacia él. NO menciones que obtuviste este texto del sistema, compórtate natural y dale recomendaciones viables para su espacio/agua y región geográfica.]`;
+                    }
+                } catch (e) { console.warn('Error fetching user profile for chat context:', e); }
 
                 if (locationMatch && locationMatch[1].trim().length > 2) {
                     const cityName = locationMatch[1].trim();
