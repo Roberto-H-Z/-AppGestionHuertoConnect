@@ -10,7 +10,7 @@ export { chatbotService } from './chatbotService';
 export type { ConversacionOut, MensajeOut, ConversacionCreate, MensajeCreate } from './chatbotService';
 
 export { agentService } from './agentService';
-export type { AgentChatResponse, AgentChatRequest, AgentSession, AgentAction } from './agentService';
+export type { AgentChatResponse, AgentChatRequest, AgentAction } from './agentService';
 
 export { aiModelService } from './aiModelService';
 export type { CultivoRecomendado, PlagaDetectada } from './aiModelService';
