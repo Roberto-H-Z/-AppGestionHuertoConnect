@@ -34,6 +34,7 @@ import { agentService } from '../services/agentService';
 import { geocodeMunicipio } from '../services/geocodingService';
 import { AppScreenHeader } from '../components';
 import { palette, radii, shadows } from '../theme';
+import * as ImagePicker from 'expo-image-picker';
 
 const { width } = Dimensions.get('window');
 
@@ -575,13 +576,17 @@ const MessageBubble: React.FC<{ msg: Message; accentColor: string; onAction?: (a
                 {(msg.type === 'text' || msg.type === 'error' || msg.type === 'system') && (
                     <View style={[
                         styles.msgBubble,
-                        isUser ? [styles.userBubble, { backgroundColor: accentColor }] : styles.aiBubble,
+                        isUser ? [styles.userBubble, { backgroundColor: msg.text.startsWith('file://') || msg.text.startsWith('http://') || msg.text.startsWith('https://') ? 'transparent' : accentColor, paddingHorizontal: msg.text.startsWith('file://') || msg.text.startsWith('http://') || msg.text.startsWith('https://') ? 0 : 16, paddingVertical: msg.text.startsWith('file://') || msg.text.startsWith('http://') || msg.text.startsWith('https://') ? 0 : 12 }] : styles.aiBubble,
                         msg.type === 'error' && styles.errorBubble,
                     ]}>
                         {isUser ? (
-                            <Text style={[styles.msgText, styles.userMsgText]}>
-                                {msg.text}
-                            </Text>
+                            msg.text.startsWith('file://') || msg.text.startsWith('http://') || msg.text.startsWith('https://') ? (
+                                <Image source={{ uri: msg.text }} style={{ width: 150, height: 150, borderRadius: 12, borderWidth: 1, borderColor: '#eee' }} />
+                            ) : (
+                                <Text style={[styles.msgText, styles.userMsgText]}>
+                                    {msg.text}
+                                </Text>
+                            )
                         ) : (
                             <FormattedText
                                 text={msg.text}
@@ -782,6 +787,19 @@ export const AIChatScreen: React.FC = () => {
         } catch { /* silent */ } finally { setHistoryLoading(false); }
     }, []);
 
+    const handlePickImage = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            quality: 0.7,
+        });
+
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+            const uri = result.assets[0].uri;
+            // Set message immediately so it doesn't get blocked
+            sendMessage(uri);
+        }
+    };
+
     const loadConversation = useCallback(async (conv: ConversacionOut) => {
         try {
             const msgs = await chatbotService.listMensajes(conv.id);
@@ -847,9 +865,9 @@ export const AIChatScreen: React.FC = () => {
 
                 // ── PLAGAS: YOLOv8 ───────────────────────────────────
             } else if (mode === 'plagas') {
-                if (!trimmed.startsWith('http')) {
+                if (!trimmed.startsWith('file:') && !trimmed.startsWith('http')) {
                     addMessage({
-                        text: 'La URL debe comenzar con https://...\n\nEjemplo:\nhttps://images.unsplash.com/photo-xxx.jpg',
+                        text: 'Por favor presiona el icono de cámara para subir una foto o ingresa una URL de imagen válida.',
                         sender: 'ai', type: 'error',
                     });
                     return;
@@ -1040,12 +1058,18 @@ export const AIChatScreen: React.FC = () => {
                 {/* ── INPUT BAR ── */}
                 <View style={styles.inputBar}>
                     <View style={[styles.inputWrapper, { borderColor: modeConfig.color + '55' }]}>
-                        <MaterialCommunityIcons
-                            name={mode === 'cultivos' ? 'map-marker-outline' : mode === 'plagas' ? 'link-variant' : 'message-outline'}
-                            size={18}
-                            color={modeConfig.color}
-                            style={styles.inputPrefixIcon}
-                        />
+                        {mode === 'plagas' ? (
+                            <TouchableOpacity onPress={handlePickImage} activeOpacity={0.7} style={[styles.inputPrefixIcon, { paddingBottom: 2, marginRight: 2 }]}>
+                                <MaterialCommunityIcons name="camera-outline" size={26} color={modeConfig.color} />
+                            </TouchableOpacity>
+                        ) : (
+                            <MaterialCommunityIcons
+                                name={mode === 'cultivos' ? 'map-marker-outline' : 'message-outline'}
+                                size={18}
+                                color={modeConfig.color}
+                                style={styles.inputPrefixIcon}
+                            />
+                        )}
                         <TextInput
                             style={styles.input}
                             placeholder={modeConfig.placeholder}
