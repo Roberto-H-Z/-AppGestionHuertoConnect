@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
         width: '100%',
         paddingHorizontal: 30,
         marginBottom: 35,
-        marginTop: 20,
+        marginTop: 45,
     },
     trackContainer: {
         position: 'absolute',
