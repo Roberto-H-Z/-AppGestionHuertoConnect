@@ -15,6 +15,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button } from '../../../shared/components/ui';
+import { OnboardingProgressBar } from '../components/OnboardingProgressBar';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -71,10 +72,10 @@ export const GardenAreaScreen: React.FC<{ navigation?: any }> = ({ navigation })
     const length = parseFloat(lengthValue) || 0;
     const widthNum = parseFloat(widthValue) || 0;
     const area = length * widthNum;
-    
+
     const totalAreaNum = parseFloat(totalAreaValue) || 0;
 
-    const isValid = inputMode === 'dimensions' 
+    const isValid = inputMode === 'dimensions'
         ? (length >= MIN_DIMENSION && widthNum >= MIN_DIMENSION)
         : (totalAreaNum > 0);
 
@@ -117,13 +118,13 @@ export const GardenAreaScreen: React.FC<{ navigation?: any }> = ({ navigation })
     ).current;
 
     const handleNext = () => {
-        const finalArea = inputMode === 'dimensions' 
-            ? `${area} m²` 
+        const finalArea = inputMode === 'dimensions'
+            ? `${area} m²`
             : `${totalAreaValue} ${areaUnit}`;
-            
-        navigation?.navigate('LocationWater', { 
-            perfil, 
-            area_cultivo: finalArea 
+
+        navigation?.navigate('LocationWater', {
+            perfil,
+            area_cultivo: finalArea
         });
     };
 
@@ -142,6 +143,7 @@ export const GardenAreaScreen: React.FC<{ navigation?: any }> = ({ navigation })
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
+            <OnboardingProgressBar currentStep={2} totalSteps={3} />
             <ScrollView
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
@@ -184,29 +186,29 @@ export const GardenAreaScreen: React.FC<{ navigation?: any }> = ({ navigation })
 
                 {/* Selector de Modo */}
                 <Animated.View style={[styles.toggleContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         style={[styles.toggleButton, inputMode === 'dimensions' && styles.toggleButtonActive]}
                         onPress={() => setInputMode('dimensions')}
                         activeOpacity={0.8}
                     >
-                        <MaterialCommunityIcons 
-                            name="vector-square" 
-                            size={20} 
-                            color={inputMode === 'dimensions' ? '#fff' : '#111827'} 
+                        <MaterialCommunityIcons
+                            name="vector-square"
+                            size={20}
+                            color={inputMode === 'dimensions' ? '#fff' : '#111827'}
                         />
                         <Text style={[styles.toggleText, inputMode === 'dimensions' && styles.toggleTextActive]}>
                             Dimensiones
                         </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         style={[styles.toggleButton, inputMode === 'totalArea' && styles.toggleButtonActive]}
                         onPress={() => setInputMode('totalArea')}
                         activeOpacity={0.8}
                     >
-                        <MaterialCommunityIcons 
-                            name="shape-polygon-plus" 
-                            size={20} 
-                            color={inputMode === 'totalArea' ? '#fff' : '#111827'} 
+                        <MaterialCommunityIcons
+                            name="shape-polygon-plus"
+                            size={20}
+                            color={inputMode === 'totalArea' ? '#fff' : '#111827'}
                         />
                         <Text style={[styles.toggleText, inputMode === 'totalArea' && styles.toggleTextActive]}>
                             Área Libre
@@ -298,7 +300,7 @@ export const GardenAreaScreen: React.FC<{ navigation?: any }> = ({ navigation })
                     ) : (
                         <>
                             <Text style={styles.previewLabel}>Especifica tu área total y unidad:</Text>
-                            
+
                             <View style={styles.inputsRow}>
                                 <View style={[styles.inputGroup, { flex: 2 }]}>
                                     <Text style={styles.inputLabel}>Área Total</Text>
@@ -314,10 +316,10 @@ export const GardenAreaScreen: React.FC<{ navigation?: any }> = ({ navigation })
                                         />
                                     </View>
                                 </View>
-                                
+
                                 <View style={[styles.inputGroup, { flex: 1.5 }]}>
                                     <Text style={styles.inputLabel}>Unidad</Text>
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         style={styles.unitSelector}
                                         onPress={() => setAreaUnit(prev => prev === 'm²' ? 'Hectáreas' : prev === 'Hectáreas' ? 'Acres' : 'm²')}
                                         activeOpacity={0.7}

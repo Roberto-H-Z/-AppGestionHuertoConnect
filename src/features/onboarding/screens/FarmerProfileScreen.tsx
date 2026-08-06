@@ -12,6 +12,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from '@react-navigation/native';
 import { Button } from '../../../shared/components/ui';
 import { ProfileSelectionCard } from '../../../shared/components/ui/ProfileSelectionCard';
+import { OnboardingProgressBar } from '../components/OnboardingProgressBar';
 
 const { width, height } = Dimensions.get('window');
 
@@ -61,6 +62,7 @@ export const FarmerProfileScreen: React.FC<{ navigation?: any }> = ({ navigation
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
+            <OnboardingProgressBar currentStep={1} totalSteps={3} />
             <ScrollView
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}

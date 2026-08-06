@@ -18,6 +18,7 @@ import * as Location from 'expo-location';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button } from '../../../shared/components/ui';
 import { perfilAgricultorService } from '../services/perfilAgricultorService';
+import { OnboardingProgressBar } from '../components/OnboardingProgressBar';
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -26,7 +27,7 @@ type WaterAccessType = 'constant' | 'scheduled' | 'seasonal' | null;
 export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
     const route = useRoute<any>();
     const { perfil, area_cultivo } = route.params || {};
-    
+
     // Location state
     const [locationText, setLocationText] = useState('');
     const [isLoadingLocation, setIsLoadingLocation] = useState(false);
@@ -175,6 +176,7 @@ export const LocationWaterScreen: React.FC<{ navigation?: any }> = ({ navigation
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
+            <OnboardingProgressBar currentStep={3} totalSteps={3} />
             <ScrollView
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
