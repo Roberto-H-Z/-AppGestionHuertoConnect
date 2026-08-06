@@ -130,6 +130,14 @@ export const CropRecommendationScreen: React.FC<{ navigation?: any }> = ({ navig
                         recommendations.map((rec, index) => {
                             const name = rec.cultivo || rec.nombre || rec.crop || 'Desconocido';
                             const isSelected = selectedCrop === name;
+                            let justificacion = rec.justificacion || rec.descripcion || `Ideal para la temporada de ${rec.temporada_ideal}`;
+
+                            // Ajuste dinámico: La API a veces devuelve la estación meteorológica principal ("Fortín de las Flores") 
+                            // para toda la región alta montaña. Lo reemplazamos con el nombre exacto de la ubicación del usuario.
+                            if (ubicacion) {
+                                justificacion = justificacion.replace(/Fortín de las Flores/g, ubicacion);
+                            }
+
                             return (
                                 <TouchableOpacity
                                     key={index}
@@ -145,7 +153,7 @@ export const CropRecommendationScreen: React.FC<{ navigation?: any }> = ({ navig
                                             {name.charAt(0).toUpperCase() + name.slice(1)}
                                         </Text>
                                         <Text style={styles.cropJustification} numberOfLines={2}>
-                                            {rec.justificacion || rec.descripcion || `Ideal para la temporada de ${rec.temporada_ideal}`}
+                                            {justificacion}
                                         </Text>
 
                                         <View style={styles.tagsRow}>
