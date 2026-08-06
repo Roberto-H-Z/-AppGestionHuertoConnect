@@ -18,6 +18,10 @@ export interface GardenRecommendationRequest {
     municipio?: string | null;
     /** ID del huerto (opcional — para guardar la recomendación en BD) */
     huerto_id?: string | null;
+    /** Datos extraídos del onboarding para afinar la AI */
+    perfil?: string;
+    area_cultivo?: string;
+    acceso_agua?: string;
 }
 
 export interface CultivoRecomendado {

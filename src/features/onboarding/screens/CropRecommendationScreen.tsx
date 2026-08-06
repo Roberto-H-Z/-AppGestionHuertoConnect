@@ -38,6 +38,9 @@ export const CropRecommendationScreen: React.FC<{ navigation?: any }> = ({ navig
             const data = await aiModelService.recommendGarden({
                 lat: lat || 19.1738,
                 lon: lon || -96.1342,
+                perfil: perfil,
+                area_cultivo: area_cultivo,
+                acceso_agua: acceso_agua
             });
             setRecommendations(data.recomendaciones || data.cultivos || data.predicciones || []);
         } catch (error: any) {
